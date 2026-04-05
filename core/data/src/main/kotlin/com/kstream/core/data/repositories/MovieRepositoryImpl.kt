@@ -22,32 +22,36 @@ class MovieRepositoryImpl @Inject constructor(
     private val gson: Gson
 ) : MovieRepository {
 
+    // Improved SWR implementation
     override fun getMovieDetail(path: String): Flow<Resource<MovieDetail>> = flow {
         emit(Resource.Loading)
-        
         val cached = movieDao.getMovieByPath(path)
         if (cached != null) {
             emit(Resource.Success(cached.toDomain(gson), fromCache = true))
-            
-            // Revalidate if stale (over 24 hours)
             if (System.currentTimeMillis() - cached.cachedAt > 24 * 60 * 60 * 1000) {
-                fetchAndCacheMovie(path)
+                try {
+                    val response = api.fetchMovieDetail(path)
+                    val entity = response.toEntity(path, gson)
+                    movieDao.insertWithEviction(entity)
+                    emit(Resource.Success(entity.toDomain(gson), fromCache = false))
+                } catch (e: Exception) {
+                    // Silently fail if we have stale data
+                }
             } else {
                 movieDao.updateLastAccessed(path)
             }
         } else {
-            fetchAndCacheMovie(path)
+            try {
+                val response = api.fetchMovieDetail(path)
+                val entity = response.toEntity(path, gson)
+                movieDao.insertWithEviction(entity)
+                emit(Resource.Success(entity.toDomain(gson), fromCache = false))
+            } catch (e: Exception) {
+                emit(Resource.Error(e.message ?: "Network error"))
+            }
         }
-    }.catch { e ->
-        emit(Resource.Error(e.message ?: "Unknown error"))
     }
 
-    private suspend fun fetchAndCacheMovie(path: String) {
-        val response = api.fetchMovieDetail(path)
-        val entity = response.toEntity(path, gson)
-        movieDao.insertWithEviction(entity)
-        // Note: Success emission will happen from the flow if we were observing the DB, 
-        // but here we are using a simple flow. For a true SWR, we should observe the DB.
         // I'll adjust this to emit the fresh data.
     }
 
