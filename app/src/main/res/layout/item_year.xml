@@ -4,8 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="80dp"
     android:layout_margin="4dp"
-    app:cardBackgroundColor="@color/surface"
-    app:cardCornerRadius="8dp"
+    app:cardBackgroundColor="@android:color/transparent"    app:cardCornerRadius="8dp"
     app:strokeColor="@color/electric_violet"
     app:strokeWidth="1dp">
 
