@@ -2,6 +2,7 @@ package com.kstream.core.data.repositories
 
 import com.kstream.core.domain.models.MovieDetail
 import com.kstream.core.domain.models.MovieItem
+import com.kstream.core.domain.models.MovieRepository
 import com.kstream.core.domain.models.Resource
 import com.kstream.core.domain.models.YearItem
 import kotlinx.coroutines.flow.Flow
