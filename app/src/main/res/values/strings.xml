@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">KStream</string>
+    <string name="welcome_title">Welcome to KStream</string>
+    <string name="start_watching">Start Watching</string>
+    <string name="name_hint">Your Name</string>
+    <string name="base_url_hint">Source Base URL</string>
+    <string name="worker_url_hint">Worker Proxy URL</string>
+</resources>

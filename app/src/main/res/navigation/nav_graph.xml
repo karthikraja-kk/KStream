@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/welcomeFragment"
+        android:name="com.kstream.app.ui.welcome.WelcomeFragment"
+        android:label="Welcome" />
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.kstream.app.ui.home.HomeFragment"
+        android:label="Home">
+        <action
+            android:id="@+id/action_homeFragment_to_welcomeFragment"
+            app:destination="@id/welcomeFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_homeFragment_to_yearFragment"
+            app:destination="@id/yearFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/yearFragment"
+        android:name="com.kstream.app.ui.year.YearFragment"
+        android:label="Year">
+        <argument
+            android:name="year"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_yearFragment_to_movieDetailFragment"
+            app:destination="@id/movieDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/movieDetailFragment"
+        android:name="com.kstream.app.ui.detail.MovieDetailFragment"
+        android:label="Detail">
+        <argument
+            android:name="path"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_movieDetailFragment_to_playerFragment"
+            app:destination="@id/playerFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/playerFragment"
+        android:name="com.kstream.app.ui.player.PlayerFragment"
+        android:label="Player">
+        <argument
+            android:name="url"
+            app:argType="string" />
+        <argument
+            android:name="title"
+            app:argType="string" />
+    </fragment>
+
+</navigation>
