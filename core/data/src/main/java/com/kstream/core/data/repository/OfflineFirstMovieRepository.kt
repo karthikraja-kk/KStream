@@ -1,0 +1,113 @@
+package com.kstream.core.data.repository
+
+import com.kstream.core.data.local.dao.MovieDao
+import com.kstream.core.data.local.entities.MovieEntity
+import com.kstream.core.network.KStreamNetworkDataSource
+import com.kstream.core.network.model.asExternalModel
+import com.kstream.core.model.Movie
+import com.kstream.core.model.MovieWithMedia
+import com.kstream.core.domain.repository.MovieRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlin.math.min
+import javax.inject.Inject
+
+class OfflineFirstMovieRepository @Inject constructor(
+    private val movieDao: MovieDao,
+    private val network: KStreamNetworkDataSource
+) : MovieRepository {
+
+    override fun getMovies(): Flow<List<Movie>> {
+        return movieDao.getMovies().map { entities ->
+            entities.map { it.asExternalModel() }
+        }
+    }
+
+    override suspend fun getMovieWithMedia(movieId: String): MovieWithMedia? {
+        return network.getMovieWithMedia(movieId)?.asExternalModel()
+    }
+
+    override suspend fun syncMovies() {
+        val networkMovies = network.getMovies()
+        movieDao.insertMovies(networkMovies.map { it.asLocalEntity() })
+    }
+
+    override suspend fun searchMovies(query: String): List<Movie> {
+        val normalizedQuery = query.trim().lowercase()
+        if (normalizedQuery.isEmpty()) return emptyList()
+
+        // APP_SPEC requires matching by title and metadata fields; we filter over live data.
+        return network.getMovies()
+            .map { it.asExternalModel() }
+            .filter { movie -> movie.matchesQuery(normalizedQuery) }
+            .take(100)
+    }
+}
+
+private fun Movie.matchesQuery(query: String): Boolean {
+    val title = movieName.lowercase()
+    val directors = director.map { it.lowercase() }
+    val cast = castMembers.map { it.lowercase() }
+
+    if (title.contains(query)) return true
+    if (directors.any { it.contains(query) }) return true
+    if (cast.any { it.contains(query) }) return true
+
+    // Light typo tolerance: allow 1-character edit distance against title words.
+    val tokens = title.split(" ").filter { it.isNotBlank() }
+    return tokens.any { token -> levenshteinDistance(token, query) <= 1 }
+}
+
+private fun levenshteinDistance(a: String, b: String): Int {
+    if (a == b) return 0
+    if (a.isEmpty()) return b.length
+    if (b.isEmpty()) return a.length
+
+    val prev = IntArray(b.length + 1) { it }
+    val curr = IntArray(b.length + 1)
+
+    for (i in 1..a.length) {
+        curr[0] = i
+        for (j in 1..b.length) {
+            val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+            curr[j] = min(
+                min(curr[j - 1] + 1, prev[j] + 1),
+                prev[j - 1] + cost
+            )
+        }
+        for (j in prev.indices) prev[j] = curr[j]
+    }
+    return prev[b.length]
+}
+
+private fun MovieEntity.asExternalModel() = Movie(
+    id = id,
+    movieName = movieName,
+    year = year,
+    posterUrl = posterUrl,
+    duration = duration,
+    synopsis = synopsis,
+    director = director.split(","),
+    castMembers = castMembers.split(","),
+    genres = genres.split(","),
+    rating = rating,
+    language = language,
+    type = type,
+    slug = slug
+)
+
+private fun com.kstream.core.network.model.NetworkMovie.asLocalEntity() = MovieEntity(
+    id = id,
+    movieName = movieName,
+    year = year,
+    posterUrl = posterUrl,
+    duration = duration,
+    synopsis = synopsis,
+    director = director.joinToString(","),
+    castMembers = castMembers.joinToString(","),
+    genres = genres.joinToString(","),
+    rating = rating,
+    language = language,
+    type = type,
+    slug = slug
+)
