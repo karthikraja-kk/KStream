@@ -1,0 +1,12 @@
+package com.kstream.core.domain.repository
+
+import kotlinx.coroutines.flow.Flow
+
+interface UserDataRepository {
+    val username: Flow<String>
+    val isFirstLaunchCompleted: Flow<Boolean>
+    val isWifiOnlyDownload: Flow<Boolean>
+    suspend fun setUsername(name: String)
+    suspend fun setFirstLaunchCompleted(completed: Boolean)
+    suspend fun setWifiOnlyDownload(wifiOnly: Boolean)
+}
