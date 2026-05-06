@@ -40,18 +40,23 @@ class HomeViewModel @Inject constructor(
 
     private fun observeMovies() {
         combine(
-            getMoviesUseCase(),
-            getAllWatchProgressUseCase()
+            getMoviesUseCase().catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } },
+            getAllWatchProgressUseCase().catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
         ) { movies, progress ->
             if (movies.isNotEmpty()) {
                 _uiState.update { it.copy(isLoading = false, rails = groupMoviesIntoRails(movies, progress)) }
+            } else if (_uiState.value.isLoading) {
+                // If we have no movies and we're still loading, just stop loading but don't show error yet
+                // as refreshContent might still be working.
+                _uiState.update { it.copy(isLoading = false) }
             }
         }.launchIn(viewModelScope)
     }
 
-    private fun refreshContent() {
+    fun refreshContent() {
         viewModelScope.launch {
             try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
                 syncMoviesUseCase()
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }

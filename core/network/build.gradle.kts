@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.storage)
     implementation(libs.supabase.gotrue)
+    implementation(libs.ktor.client.cio)
     implementation(libs.kotlinx.serialization.json)
     
     implementation(libs.hilt.android)

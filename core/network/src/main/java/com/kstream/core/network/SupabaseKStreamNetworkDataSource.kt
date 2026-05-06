@@ -1,5 +1,6 @@
 package com.kstream.core.network
 
+import android.util.Log
 import com.kstream.core.network.model.NetworkMovie
 import com.kstream.core.network.model.NetworkMovieWithMedia
 import io.github.jan.supabase.SupabaseClient
@@ -12,28 +13,52 @@ class SupabaseKStreamNetworkDataSource @Inject constructor(
 ) : KStreamNetworkDataSource {
 
     override suspend fun getMovies(): List<NetworkMovie> {
-        return client.postgrest["movies"]
-            .select(columns = Columns.raw("id, movie_name, year, poster_url, duration, synopsis, director, cast_members, genres, rating, language, type, slug"))
-            .decodeList<NetworkMovie>()
+        return try {
+            Log.d("KStreamNetwork", "Fetching movies from Supabase...")
+            val movies = client.postgrest["movies"]
+                .select()
+                .decodeList<NetworkMovie>()
+            Log.d("KStreamNetwork", "Successfully fetched ${movies.size} movies")
+            movies
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error fetching movies: ${e.message}", e)
+            throw e
+        }
     }
 
     override suspend fun getMovieWithMedia(movieId: String): NetworkMovieWithMedia? {
-        return client.postgrest["movies"]
-            .select(columns = Columns.raw("*, media(*)")) {
-                filter {
-                    eq("id", movieId)
+        return try {
+            Log.d("KStreamNetwork", "Fetching movie details for ID: $movieId")
+            val movie = client.postgrest["movies"]
+                .select(columns = Columns.raw("*, media(*)")) {
+                    filter {
+                        eq("id", movieId)
+                    }
                 }
-            }
-            .decodeSingleOrNull<NetworkMovieWithMedia>()
+                .decodeSingleOrNull<NetworkMovieWithMedia>()
+            Log.d("KStreamNetwork", "Found movie: ${movie?.movieName ?: "null"}")
+            movie
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error fetching movie details: ${e.message}", e)
+            throw e
+        }
     }
 
     override suspend fun searchMovies(query: String): List<NetworkMovie> {
-        return client.postgrest["movies"]
-            .select {
-                filter {
-                    ilike("movie_name", "%$query%")
+        return try {
+            Log.d("KStreamNetwork", "Searching movies for query: $query")
+            val movies = client.postgrest["movies"]
+                .select {
+                    filter {
+                        ilike("movie_name", "%$query%")
+                    }
                 }
-            }
-            .decodeList<NetworkMovie>()
+                .decodeList<NetworkMovie>()
+            Log.d("KStreamNetwork", "Found ${movies.size} movies for search query")
+            movies
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error searching movies: ${e.message}", e)
+            throw e
+        }
     }
 }

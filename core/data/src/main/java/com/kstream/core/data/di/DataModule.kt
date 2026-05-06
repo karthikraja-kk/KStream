@@ -47,7 +47,8 @@ abstract class DataModule {
                 context,
                 KStreamDatabase::class.java,
                 "kstream.db"
-            ).build()
+            ).fallbackToDestructiveMigration()
+                .build()
         }
 
         @Provides

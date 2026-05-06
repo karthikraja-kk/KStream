@@ -1,5 +1,6 @@
 package com.kstream.core.data.repository
 
+import android.util.Log
 import com.kstream.core.data.local.dao.MovieDao
 import com.kstream.core.data.local.entities.MovieEntity
 import com.kstream.core.network.KStreamNetworkDataSource
@@ -19,23 +20,34 @@ class OfflineFirstMovieRepository @Inject constructor(
 
     override fun getMovies(): Flow<List<Movie>> {
         return movieDao.getMovies().map { entities ->
+            Log.d("MovieRepository", "Local DB has ${entities.size} movies")
             entities.map { it.asExternalModel() }
         }
     }
 
     override suspend fun getMovieWithMedia(movieId: String): MovieWithMedia? {
+        Log.d("MovieRepository", "Fetching movie details from network for $movieId")
         return network.getMovieWithMedia(movieId)?.asExternalModel()
     }
 
     override suspend fun syncMovies() {
-        val networkMovies = network.getMovies()
-        movieDao.insertMovies(networkMovies.map { it.asLocalEntity() })
+        try {
+            Log.d("MovieRepository", "Starting movie sync...")
+            val networkMovies = network.getMovies()
+            Log.d("MovieRepository", "Network returned ${networkMovies.size} movies. Inserting into local DB...")
+            movieDao.insertMovies(networkMovies.map { it.asLocalEntity() })
+            Log.d("MovieRepository", "Sync completed successfully")
+        } catch (e: Exception) {
+            Log.e("MovieRepository", "Sync failed: ${e.message}", e)
+            throw e
+        }
     }
 
     override suspend fun searchMovies(query: String): List<Movie> {
         val normalizedQuery = query.trim().lowercase()
         if (normalizedQuery.isEmpty()) return emptyList()
 
+        Log.d("MovieRepository", "Searching movies for: $query")
         // APP_SPEC requires matching by title and metadata fields; we filter over live data.
         return network.getMovies()
             .map { it.asExternalModel() }

@@ -18,6 +18,6 @@ fun PlatformProvider(content: @Composable () -> Unit) {
     val platform = if (isTv) Platform.TV else Platform.MOBILE
     
     CompositionLocalProvider(LocalPlatform provides platform) {
-        content
+        content()
     }
 }

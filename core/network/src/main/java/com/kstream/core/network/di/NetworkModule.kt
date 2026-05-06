@@ -26,6 +26,8 @@ object NetworkModule {
         ) {
             install(Postgrest)
             install(Storage)
+            // Explicitly set the engine if needed, though Ktor should find it.
+            // The issue might be related to how Ktor initializes on Android.
         }
     }
 

@@ -46,7 +46,8 @@ fun HomeRoute(
             onSeeMoreClick = onSeeMoreClick,
             onSearchClick = onSearchClick,
             onDownloadsClick = onDownloadsClick,
-            onSettingsClick = onSettingsClick
+            onSettingsClick = onSettingsClick,
+            onRetry = viewModel::refreshContent
         )
     } else {
         HomeScreenMobile(
@@ -55,7 +56,8 @@ fun HomeRoute(
             onSeeMoreClick = onSeeMoreClick,
             onSearchClick = onSearchClick,
             onDownloadsClick = onDownloadsClick,
-            onSettingsClick = onSettingsClick
+            onSettingsClick = onSettingsClick,
+            onRetry = viewModel::refreshContent
         )
     }
 }
@@ -67,7 +69,8 @@ fun HomeScreenMobile(
     onSeeMoreClick: (String) -> Unit,
     onSearchClick: () -> Unit,
     onDownloadsClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onRetry: () -> Unit
 ) {
     Scaffold(
         bottomBar = {
@@ -102,6 +105,26 @@ fun HomeScreenMobile(
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
+            }
+        } else if (uiState.error != null) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Column(
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                ) {
+                    Text(text = "Error: ${uiState.error}", color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = onRetry) {
+                        Text("Retry")
+                    }
+                }
+            }
+        } else if (uiState.rails.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Text(
+                    text = "No movies found. Pull to refresh or check your connection.",
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+                )
             }
         } else {
             LazyColumn(
@@ -148,11 +171,32 @@ fun HomeScreenTv(
     onSeeMoreClick: (String) -> Unit,
     onSearchClick: () -> Unit,
     onDownloadsClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onRetry: () -> Unit
 ) {
     if (uiState.isLoading) {
         Box(modifier = Modifier.fillMaxSize()) {
             CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
+        }
+    } else if (uiState.error != null) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+            ) {
+                TvText(text = "Error: ${uiState.error}", color = TvMaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(16.dp))
+                androidx.tv.material3.Button(onClick = onRetry) {
+                    TvText("Retry")
+                }
+            }
+        }
+    } else if (uiState.rails.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            TvText(
+                text = "No movies found. Check your connection.",
+                modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+            )
         }
     } else {
         Column {

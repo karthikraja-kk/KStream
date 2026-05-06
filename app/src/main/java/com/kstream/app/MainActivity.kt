@@ -4,9 +4,15 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -51,11 +57,22 @@ fun KStreamAppContent() {
     val viewModel: MainViewModel = hiltViewModel()
     val isFirstLaunchCompleted by viewModel.isFirstLaunchCompleted.collectAsState(initial = null)
 
-    if (isFirstLaunchCompleted == null) return // Wait for DataStore
+    if (isFirstLaunchCompleted == null) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+        return
+    }
+
+    val startDestination = remember { 
+        if (isFirstLaunchCompleted == true) "home" else "welcome" 
+    }
 
     NavHost(
         navController = navController,
-        startDestination = if (isFirstLaunchCompleted == true) "home" else "welcome"
+        startDestination = startDestination
     ) {
         composable("welcome") {
             WelcomeRoute(onNavigateToHome = {
