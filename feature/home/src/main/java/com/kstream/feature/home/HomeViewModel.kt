@@ -14,6 +14,7 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val isLoading: Boolean = false,
+    val userName: String = "",
     val rails: List<MovieRail> = emptyList(),
     val error: String? = null
 )
@@ -27,7 +28,8 @@ data class MovieRail(
 class HomeViewModel @Inject constructor(
     private val getMoviesUseCase: GetMoviesUseCase,
     private val syncMoviesUseCase: SyncMoviesUseCase,
-    private val getAllWatchProgressUseCase: GetAllWatchProgressUseCase
+    private val getAllWatchProgressUseCase: GetAllWatchProgressUseCase,
+    private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
@@ -35,20 +37,21 @@ class HomeViewModel @Inject constructor(
 
     init {
         refreshContent()
-        observeMovies()
+        observeData()
     }
 
-    private fun observeMovies() {
+    private fun observeData() {
         combine(
             getMoviesUseCase().catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } },
-            getAllWatchProgressUseCase().catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
-        ) { movies, progress ->
-            if (movies.isNotEmpty()) {
-                _uiState.update { it.copy(isLoading = false, rails = groupMoviesIntoRails(movies, progress)) }
-            } else if (_uiState.value.isLoading) {
-                // If we have no movies and we're still loading, just stop loading but don't show error yet
-                // as refreshContent might still be working.
-                _uiState.update { it.copy(isLoading = false) }
+            getAllWatchProgressUseCase().catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } },
+            userDataRepository.username.catch { emit("") }
+        ) { movies, progress, username ->
+            _uiState.update { 
+                it.copy(
+                    isLoading = false, 
+                    userName = username,
+                    rails = groupMoviesIntoRails(movies, progress)
+                ) 
             }
         }.launchIn(viewModelScope)
     }

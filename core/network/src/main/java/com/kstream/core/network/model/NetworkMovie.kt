@@ -7,44 +7,52 @@ import kotlinx.serialization.Serializable
 data class NetworkMovie(
     @SerialName("id") val id: String,
     @SerialName("movie_name") val movieName: String,
-    @SerialName("year") val year: Int,
-    @SerialName("poster_url") val posterUrl: String,
-    @SerialName("duration") val duration: String,
-    @SerialName("synopsis") val synopsis: String,
-    @SerialName("director") val director: List<String>,
-    @SerialName("cast_members") val castMembers: List<String>,
-    @SerialName("genres") val genres: List<String>,
-    @SerialName("rating") val rating: String,
-    @SerialName("language") val language: String,
-    @SerialName("type") val type: String,
-    @SerialName("slug") val slug: String
-)
-
-@Serializable
-data class NetworkMedia(
-    @SerialName("movie_id") val movieId: String,
-    @SerialName("quality") val quality: String,
-    @SerialName("file_size") val fileSize: String,
-    @SerialName("download_url_1") val downloadUrl1: String? = null,
-    @SerialName("download_url_2") val downloadUrl2: String? = null,
-    @SerialName("watch_url_1") val watchUrl1: String? = null,
-    @SerialName("watch_url_2") val watchUrl2: String? = null
+    @SerialName("year") val year: Int?, // Made nullable
+    @SerialName("poster_url") val posterUrl: String?, // Made nullable
+    @SerialName("duration") val duration: String?, // Made nullable
+    @SerialName("synopsis") val synopsis: String?, // Already nullable
+    @SerialName("director") val director: List<String>?, // Made nullable
+    @SerialName("cast_members") val castMembers: List<String>?, // Made nullable
+    @SerialName("genres") val genres: List<String>?, // Made nullable
+    @SerialName("rating") val rating: String?, // Made nullable
+    @SerialName("language") val language: String?, // Made nullable
+    @SerialName("type") val type: String?, // Made nullable
+    @SerialName("slug") val slug: String,
+    @SerialName("movie_url") val movieUrl: String,
+    // Apply the custom serializer for created_at and updated_at
+    @Serializable(with = DateTimeAsLongSerializer::class)
+    @SerialName("created_at") val createdAt: Long? = null,
+    @Serializable(with = DateTimeAsLongSerializer::class)
+    @SerialName("updated_at") val updatedAt: Long? = null
 )
 
 @Serializable
 data class NetworkMovieWithMedia(
     @SerialName("id") val id: String,
     @SerialName("movie_name") val movieName: String,
-    @SerialName("year") val year: Int,
-    @SerialName("poster_url") val posterUrl: String,
-    @SerialName("duration") val duration: String,
-    @SerialName("synopsis") val synopsis: String,
-    @SerialName("director") val director: List<String>,
-    @SerialName("cast_members") val castMembers: List<String>,
-    @SerialName("genres") val genres: List<String>,
-    @SerialName("rating") val rating: String,
-    @SerialName("language") val language: String,
-    @SerialName("type") val type: String,
+    @SerialName("year") val year: Int?, // Made nullable
+    @SerialName("poster_url") val posterUrl: String?, // Made nullable
+    @SerialName("duration") val duration: String?, // Made nullable
+    @SerialName("synopsis") val synopsis: String?, // Already nullable
+    @SerialName("director") val director: List<String>?, // Made nullable
+    @SerialName("cast_members") val castMembers: List<String>?, // Made nullable
+    @SerialName("genres") val genres: List<String>?, // Made nullable
+    @SerialName("rating") val rating: String?, // Made nullable
+    @SerialName("language") val language: String?, // Made nullable
+    @SerialName("type") val type: String?, // Made nullable
     @SerialName("slug") val slug: String,
+    @SerialName("movie_url") val movieUrl: String? = null,
+    // Apply the custom serializer for created_at and updated_at
+    @Serializable(with = DateTimeAsLongSerializer::class)
+    @SerialName("created_at") val createdAt: Long? = null,
+    @Serializable(with = DateTimeAsLongSerializer::class)
+    @SerialName("updated_at") val updatedAt: Long? = null,
+    // If 'media' itself can be null from API, change to:
+    // @SerialName("media") val media: List<NetworkMedia>? = null
+    // Otherwise, List<NetworkMedia> is fine if it's always an empty list []
     @SerialName("media") val media: List<NetworkMedia> = emptyList()
 )
+
+
+
+

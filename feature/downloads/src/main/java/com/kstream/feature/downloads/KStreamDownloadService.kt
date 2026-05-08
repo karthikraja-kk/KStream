@@ -15,7 +15,7 @@ class KStreamDownloadService : DownloadService(
     1, // FOREGROUND_NOTIFICATION_ID
     DEFAULT_FOREGROUND_NOTIFICATION_UPDATE_INTERVAL,
     "kstream_download_channel",
-    R.string.download_channel_name,
+    com.kstream.feature.downloads.R.string.download_channel_name,
     0
 ) {
     @Inject

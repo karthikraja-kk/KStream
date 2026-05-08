@@ -10,7 +10,9 @@ import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.serializer.KotlinXSerializer
 import io.github.jan.supabase.storage.Storage
+import kotlinx.serialization.json.Json
 import javax.inject.Singleton
 
 @Module
@@ -26,8 +28,10 @@ object NetworkModule {
         ) {
             install(Postgrest)
             install(Storage)
-            // Explicitly set the engine if needed, though Ktor should find it.
-            // The issue might be related to how Ktor initializes on Android.
+            defaultSerializer = KotlinXSerializer(Json {
+                ignoreUnknownKeys = true
+                coerceInputValues = true
+            })
         }
     }
 

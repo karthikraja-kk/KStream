@@ -26,14 +26,15 @@ fun MovieTileMobile(
 ) {
     Column(
         modifier = modifier
-            .width(120.dp)
+            .fillMaxWidth()
             .clickable { onClick(movie.id) }
+            .padding(4.dp)
     ) {
         AsyncImage(
             model = movie.posterUrl,
             contentDescription = movie.movieName,
             modifier = Modifier
-                .height(180.dp)
+                .aspectRatio(2f / 3f)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop
@@ -41,8 +42,12 @@ fun MovieTileMobile(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = movie.movieName,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
         )
     }
 }
@@ -57,7 +62,7 @@ fun MovieTileTv(
     TvSurface(
         onClick = { onClick(movie.id) },
         modifier = modifier
-            .width(150.dp)
+            .width(160.dp)
             .padding(8.dp),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp))
     ) {
@@ -66,16 +71,17 @@ fun MovieTileTv(
                 model = movie.posterUrl,
                 contentDescription = movie.movieName,
                 modifier = Modifier
-                    .height(225.dp)
+                    .aspectRatio(2f / 3f)
                     .fillMaxWidth(),
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.height(8.dp))
             TvText(
                 text = movie.movieName,
+                style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
     }

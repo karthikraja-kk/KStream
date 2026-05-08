@@ -18,6 +18,7 @@ import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.MovieTileMobile
 import com.kstream.core.ui.components.MovieTileTv
+import com.kstream.core.model.Movie
 import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
 import androidx.tv.foundation.lazy.grid.items as tvItems
@@ -63,12 +64,28 @@ fun SearchRoute(
         }
         
         if (uiState.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+            Box(modifier = Modifier.fillMaxSize()) {
+                CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
+            }
+        } else if (uiState.results.isEmpty() && uiState.query.isNotBlank()) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Text(
+                    text = "No results found for \"${uiState.query}\"",
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
         } else {
             if (platform == Platform.TV) {
-                SearchScreenTv(uiState = uiState, onMovieClick = onMovieClick)
+                SearchScreenTv(
+                    uiState = uiState,
+                    onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) }
+                )
             } else {
-                SearchScreenMobile(uiState = uiState, onMovieClick = onMovieClick)
+                SearchScreenMobile(
+                    uiState = uiState,
+                    onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) }
+                )
             }
         }
     }
@@ -94,7 +111,7 @@ fun SearchBar(
 @Composable
 fun SearchScreenMobile(
     uiState: SearchUiState,
-    onMovieClick: (String) -> Unit
+    onMovieClick: (com.kstream.core.model.Movie) -> Unit
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
@@ -103,7 +120,7 @@ fun SearchScreenMobile(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(uiState.results) { movie ->
-            MovieTileMobile(movie = movie, onClick = onMovieClick)
+            MovieTileMobile(movie = movie, onClick = { onMovieClick(movie) })
         }
     }
 }
@@ -112,7 +129,7 @@ fun SearchScreenMobile(
 @Composable
 fun SearchScreenTv(
     uiState: SearchUiState,
-    onMovieClick: (String) -> Unit
+    onMovieClick: (com.kstream.core.model.Movie) -> Unit
 ) {
     TvLazyVerticalGrid(
         columns = TvGridCells.Fixed(5),
@@ -121,7 +138,7 @@ fun SearchScreenTv(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         tvItems(uiState.results) { movie ->
-            MovieTileTv(movie = movie, onClick = onMovieClick)
+            MovieTileTv(movie = movie, onClick = { onMovieClick(movie) })
         }
     }
 }

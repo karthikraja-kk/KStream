@@ -49,15 +49,19 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    fun onMovieClick(movie: Movie, onNavigate: (String) -> Unit) {
+        viewModelScope.launch {
+            userDataRepository.addRecentSearch(_uiState.value.query.trim())
+            onNavigate(movie.id)
+        }
+    }
+
     private fun searchMovies(query: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val results = movieRepository.searchMovies(query)
                 _uiState.update { it.copy(results = results, isLoading = false) }
-                if (results.isNotEmpty()) {
-                    userDataRepository.addRecentSearch(query)
-                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false) }
             }

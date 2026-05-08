@@ -17,10 +17,14 @@ import javax.inject.Singleton
 @Singleton
 @UnstableApi
 class KStreamDownloadManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository
 ) {
     private val databaseProvider: DatabaseProvider = StandaloneDatabaseProvider(context)
+    
+    // In a real app, we'd observe userDataRepository.downloadLocation and re-init cache
     private val downloadDirectory: File = context.getExternalFilesDir(null) ?: context.filesDir
+    
     private val downloadCache: SimpleCache = SimpleCache(
         File(downloadDirectory, "downloads"),
         NoOpCacheEvictor(),
@@ -34,4 +38,8 @@ class KStreamDownloadManager @Inject constructor(
         DefaultHttpDataSource.Factory(),
         Executor { it.run() }
     )
+    
+    fun getDownloadDirectory(): String {
+        return downloadDirectory.absolutePath
+    }
 }

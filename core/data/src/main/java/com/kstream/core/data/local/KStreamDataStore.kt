@@ -25,16 +25,22 @@ class KStreamDataStore @Inject constructor(
     private val FIRST_LAUNCH_COMPLETED = booleanPreferencesKey("first_launch_completed")
     private val WIFI_ONLY_DOWNLOAD = booleanPreferencesKey("wifi_only_download")
     private val RECENT_SEARCHES = stringPreferencesKey("recent_searches")
+    private val DOWNLOAD_LOCATION = stringPreferencesKey("download_location")
 
     val username: Flow<String> = context.dataStore.data.map { it[USERNAME] ?: "Guest" }
     val isFirstLaunchCompleted: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH_COMPLETED] ?: false }
     val isWifiOnlyDownload: Flow<Boolean> = context.dataStore.data.map { it[WIFI_ONLY_DOWNLOAD] ?: true }
+    val downloadLocation: Flow<String> = context.dataStore.data.map { it[DOWNLOAD_LOCATION] ?: "Internal Storage" }
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         decodeRecentSearches(it[RECENT_SEARCHES])
     }
 
     suspend fun setUsername(name: String) {
         context.dataStore.edit { it[USERNAME] = name }
+    }
+
+    suspend fun setDownloadLocation(location: String) {
+        context.dataStore.edit { it[DOWNLOAD_LOCATION] = location }
     }
 
     suspend fun setFirstLaunchCompleted(completed: Boolean) {

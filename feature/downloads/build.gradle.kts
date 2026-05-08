@@ -19,6 +19,10 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.media3.common.util.UnstableApi",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api"
+        )
     }
     buildFeatures {
         compose = true
@@ -48,7 +52,11 @@ dependencies {
     
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.workmanager)
+    implementation(libs.media3.common)
     implementation(libs.androidx.work.runtime.ktx)
+
+    implementation(libs.coil.compose)
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)

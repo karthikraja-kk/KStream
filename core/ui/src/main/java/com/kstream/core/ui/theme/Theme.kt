@@ -20,6 +20,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun KStreamTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit

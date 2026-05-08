@@ -60,10 +60,12 @@ private fun Movie.matchesQuery(query: String): Boolean {
     val title = movieName.lowercase()
     val directors = director.map { it.lowercase() }
     val cast = castMembers.map { it.lowercase() }
+    val genreList = genres.map { it.lowercase() }
 
     if (title.contains(query)) return true
     if (directors.any { it.contains(query) }) return true
     if (cast.any { it.contains(query) }) return true
+    if (genreList.any { it.contains(query) }) return true
 
     // Light typo tolerance: allow 1-character edit distance against title words.
     val tokens = title.split(" ").filter { it.isNotBlank() }
@@ -92,22 +94,24 @@ private fun levenshteinDistance(a: String, b: String): Int {
     return prev[b.length]
 }
 
+@Suppress("USELESS_ELVIS_CHECK")
 private fun MovieEntity.asExternalModel() = Movie(
     id = id,
     movieName = movieName,
-    year = year ?: 0, // Provide default for Int?
-    posterUrl = posterUrl ?: "", // Provide default for String?
-    duration = duration ?: "", // Provide default for String?
-    synopsis = synopsis ?: "", // Provide default for String?
-    director = director?.split(",") ?: emptyList(), // Handle nullable String and split result
-    castMembers = castMembers?.split(",") ?: emptyList(), // Handle nullable String
-    genres = genres?.split(",") ?: emptyList(), // Handle nullable String
-    rating = rating ?: "", // Provide default for String?
-    language = language ?: "", // Provide default for String?
-    type = type ?: "", // Provide default for String? // <-- Added missing comma here
+    year = year,
+    posterUrl = posterUrl,
+    duration = duration,
+    synopsis = synopsis,
+    director = director.split(",").filter { it.isNotBlank() },
+    castMembers = castMembers.split(",").filter { it.isNotBlank() },
+    genres = genres.split(",").filter { it.isNotBlank() },
+    rating = rating,
+    language = language,
+    type = type,
     slug = slug
 )
 
+@Suppress("USELESS_ELVIS_CHECK")
 private fun com.kstream.core.network.model.NetworkMovie.asLocalEntity() = MovieEntity(
     id = id,
     movieName = movieName,

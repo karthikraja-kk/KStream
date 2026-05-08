@@ -30,6 +30,14 @@ data class Media(
     val watchUrl2: String?
 )
 
+@Serializable
+data class DownloadMetadata(
+    val movieName: String,
+    val posterUrl: String,
+    val quality: String,
+    val fileSize: String
+)
+
 data class MovieWithMedia(
     val movie: Movie,
     val media: List<Media>

@@ -131,6 +131,19 @@ fun HomeScreenMobile(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
+                item {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (uiState.userName.isNotBlank()) "Hello, ${uiState.userName}!" else "Hello!",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Text(
+                            text = "What would you like to watch today?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 items(uiState.rails) { rail ->
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         Row(
@@ -153,7 +166,11 @@ fun HomeScreenMobile(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(rail.movies) { movie ->
-                                MovieTileMobile(movie = movie, onClick = onMovieClick)
+                                MovieTileMobile(
+                                    movie = movie,
+                                    onClick = onMovieClick,
+                                    modifier = Modifier.width(120.dp)
+                                )
                             }
                         }
                     }
@@ -222,6 +239,19 @@ fun HomeScreenTv(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 24.dp)) {
+                        TvText(
+                            text = if (uiState.userName.isNotBlank()) "Hello, ${uiState.userName}!" else "Hello!",
+                            style = TvMaterialTheme.typography.displaySmall
+                        )
+                        TvText(
+                            text = "What would you like to watch today?",
+                            style = TvMaterialTheme.typography.bodyLarge,
+                            color = TvMaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 tvItems(uiState.rails) { rail ->
                     Column(modifier = Modifier.padding(vertical = 16.dp)) {
                         Row(
