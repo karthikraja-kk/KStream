@@ -35,14 +35,14 @@ class SearchViewModel @Inject constructor(
     fun setInitialQuery(query: String) {
         if (_uiState.value.query == query) return
         _uiState.update { it.copy(query = query) }
-        if (query.length >= 3) {
+        if (query.isNotEmpty()) {
             searchMovies(query)
         }
     }
 
     fun onQueryChange(newQuery: String) {
         _uiState.update { it.copy(query = newQuery) }
-        if (newQuery.length >= 3) {
+        if (newQuery.isNotEmpty()) {
             searchMovies(newQuery)
         } else {
             _uiState.update { it.copy(results = emptyList()) }

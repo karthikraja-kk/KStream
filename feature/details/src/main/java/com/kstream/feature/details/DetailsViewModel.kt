@@ -22,11 +22,17 @@ import com.kstream.core.model.DownloadMetadata
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadManager
+
 data class DetailsUiState(
     val isLoading: Boolean = false,
     val movieWithMedia: MovieWithMedia? = null,
     val selectedQuality: String? = null,
     val selectedFileSize: String? = null,
+    val downloadState: Int = Download.STATE_QUEUED,
+    val downloadProgress: Float = -1f,
+    val isInDownloads: Boolean = false,
     val error: String? = null
 )
 
@@ -46,6 +52,45 @@ class DetailsViewModel @Inject constructor(
 
     init {
         fetchMovieDetails()
+        observeDownloads()
+    }
+
+    private fun observeDownloads() {
+        val downloadManager = downloadManagerWrapper.downloadManager
+        viewModelScope.launch {
+            val listener = object : DownloadManager.Listener {
+                override fun onDownloadChanged(manager: DownloadManager, download: Download, finalException: Exception?) {
+                    updateDownloadState()
+                }
+                override fun onDownloadRemoved(manager: DownloadManager, download: Download) {
+                    updateDownloadState()
+                }
+            }
+            downloadManager.addListener(listener)
+            updateDownloadState()
+            
+            // Ticker for progress
+            while (true) {
+                updateDownloadState()
+                kotlinx.coroutines.delay(1000)
+            }
+        }
+    }
+
+    private fun updateDownloadState() {
+        val downloadManager = downloadManagerWrapper.downloadManager
+        val quality = _uiState.value.selectedQuality ?: return
+        
+        val downloadId = "${movieId}_${quality}"
+        val currentDownload = downloadManager.downloadIndex.getDownload(downloadId)
+
+        _uiState.update { 
+            it.copy(
+                downloadState = currentDownload?.state ?: -1,
+                downloadProgress = currentDownload?.percentDownloaded ?: -1f,
+                isInDownloads = currentDownload != null
+            )
+        }
     }
 
     private fun fetchMovieDetails() {
@@ -64,6 +109,7 @@ class DetailsViewModel @Inject constructor(
                         selectedFileSize = highestQualityMedia?.fileSize
                     ) 
                 }
+                updateDownloadState()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
@@ -73,6 +119,7 @@ class DetailsViewModel @Inject constructor(
     fun onQualitySelected(quality: String) {
         val fileSize = _uiState.value.movieWithMedia?.media?.find { it.quality == quality }?.fileSize
         _uiState.update { it.copy(selectedQuality = quality, selectedFileSize = fileSize) }
+        updateDownloadState()
     }
 
     fun downloadMovie() {
@@ -81,22 +128,11 @@ class DetailsViewModel @Inject constructor(
         val media = movieWithMedia.media.find { it.quality == quality } ?: return
         val url = media.downloadUrl1 ?: media.downloadUrl2 ?: return
 
-        // Check for duplicates (same ID and quality in metadata)
+        val downloadId = "${movieId}_${quality}"
         val downloadManager = downloadManagerWrapper.downloadManager
-        val existingDownloads = downloadManager.downloadIndex.getDownloads().use { cursor ->
-            generateSequence { if (cursor.moveToNext()) cursor.download else null }.toList()
-        }
+        val existingDownload = downloadManager.downloadIndex.getDownload(downloadId)
 
-        val isAlreadyDownloading = existingDownloads.any { d ->
-            try {
-                val metadata = Json.decodeFromString<DownloadMetadata>(d.request.data.decodeToString())
-                d.request.id == movieId && metadata.quality == quality
-            } catch (e: Exception) {
-                false
-            }
-        }
-
-        if (isAlreadyDownloading) {
+        if (existingDownload != null) {
             Toast.makeText(context, "This movie in $quality is already in downloads", Toast.LENGTH_SHORT).show()
             return
         }
@@ -110,7 +146,7 @@ class DetailsViewModel @Inject constructor(
         
         val metadataJson = Json.encodeToString(metadata)
 
-        val request = DownloadRequest.Builder(movieId, Uri.parse(url))
+        val request = DownloadRequest.Builder(downloadId, Uri.parse(url))
             .setData(metadataJson.toByteArray())
             .build()
 

@@ -15,6 +15,11 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text as TvText
 import androidx.activity.compose.BackHandler
 
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Check
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsRoute(
@@ -22,7 +27,19 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showLocationDialog by remember { mutableStateOf(false) }
+    var isEditingUsername by remember { mutableStateOf(false) }
+    var tempUsername by remember { mutableStateOf("") }
+    
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+        onResult = { uri ->
+            uri?.let { viewModel.onDownloadLocationChange(it.toString()) }
+        }
+    )
+
+    LaunchedEffect(uiState.username) {
+        tempUsername = uiState.username
+    }
 
     BackHandler {
         onBackClick()
@@ -43,20 +60,36 @@ fun SettingsRoute(
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             Text(text = "Profile", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = uiState.username,
-                onValueChange = viewModel::onUsernameChange,
-                label = { Text("Username") },
-                modifier = Modifier.fillMaxWidth()
-            )
             
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Button(
-                onClick = viewModel::saveUsername,
-                modifier = Modifier.align(androidx.compose.ui.Alignment.End)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                Text("Change")
+                if (isEditingUsername) {
+                    OutlinedTextField(
+                        value = tempUsername,
+                        onValueChange = { tempUsername = it },
+                        label = { Text("Username") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    IconButton(onClick = {
+                        viewModel.onUsernameChange(tempUsername)
+                        viewModel.saveUsername()
+                        isEditingUsername = false
+                    }) {
+                        Icon(Icons.Default.Check, contentDescription = "Save")
+                    }
+                } else {
+                    Text(
+                        text = uiState.username.ifBlank { "Guest" },
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { isEditingUsername = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -65,8 +98,8 @@ fun SettingsRoute(
             
             ListItem(
                 headlineContent = { Text("Download Location") },
-                supportingContent = { Text(uiState.downloadLocation) },
-                modifier = Modifier.clickable { showLocationDialog = true }
+                supportingContent = { Text(formatDownloadPath(uiState.downloadLocation)) },
+                modifier = Modifier.clickable { folderPickerLauncher.launch(null) }
             )
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -76,39 +109,22 @@ fun SettingsRoute(
             }
         }
     }
+}
 
-    if (showLocationDialog) {
-        AlertDialog(
-            onDismissRequest = { showLocationDialog = false },
-            title = { Text("Select Download Location") },
-            text = {
-                Column {
-                    listOf("Internal Storage", "SD Card").forEach { location ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.onDownloadLocationChange(location)
-                                    showLocationDialog = false
-                                }
-                                .padding(16.dp),
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = uiState.downloadLocation == location,
-                                onClick = null
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = location)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showLocationDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
+private fun formatDownloadPath(path: String): String {
+    if (path.isBlank()) return "/Internal Storage/Movies/KStream"
+    
+    return try {
+        val uri = android.net.Uri.parse(path)
+        val decodedPath = android.net.Uri.decode(uri.toString())
+        if (decodedPath.contains("primary:")) {
+            "/Internal Storage/" + decodedPath.substringAfter("primary:").replace("%2F", "/").replace(":", "/")
+        } else if (decodedPath.contains("/storage/emulated/0/")) {
+            "/Internal Storage/" + decodedPath.substringAfter("/storage/emulated/0/")
+        } else {
+            decodedPath.replace("content://com.android.externalstorage.documents/tree/primary%3A", "/Internal Storage/").replace("%3A", "/").replace("%2F", "/")
+        }
+    } catch (e: Exception) {
+        path
     }
 }

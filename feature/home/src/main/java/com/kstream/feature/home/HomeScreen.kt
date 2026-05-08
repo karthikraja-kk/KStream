@@ -27,9 +27,13 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.Text as TvText
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.*
+
 @Composable
 fun HomeRoute(
     onMovieClick: (String) -> Unit,
+    onWatchClick: (String, String) -> Unit, // movieId, quality
     onSeeMoreClick: (String) -> Unit,
     onSearchClick: () -> Unit,
     onDownloadsClick: () -> Unit,
@@ -38,11 +42,48 @@ fun HomeRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val platform = LocalPlatform.current
+    var showExitDialog by remember { mutableStateOf(false) }
+
+    BackHandler {
+        showExitDialog = true
+    }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("Exit App") },
+            text = { Text("Are you sure you want to exit?") },
+            confirmButton = {
+                TextButton(onClick = { 
+                    // How to exit? In a real app we might use (LocalContext.current as Activity).finish()
+                    // For now we'll just show the dialog.
+                    showExitDialog = false
+                }) {
+                    Text("Exit")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    val movieClickHandler: (String) -> Unit = { movieId ->
+        val progress = uiState.watchProgressMap[movieId]
+        val quality = progress?.quality
+        if (quality != null) {
+            onWatchClick(movieId, quality)
+        } else {
+            onMovieClick(movieId)
+        }
+    }
 
     if (platform == Platform.TV) {
         HomeScreenTv(
             uiState = uiState,
-            onMovieClick = onMovieClick,
+            onMovieClick = movieClickHandler,
             onSeeMoreClick = onSeeMoreClick,
             onSearchClick = onSearchClick,
             onDownloadsClick = onDownloadsClick,
@@ -52,7 +93,7 @@ fun HomeRoute(
     } else {
         HomeScreenMobile(
             uiState = uiState,
-            onMovieClick = onMovieClick,
+            onMovieClick = movieClickHandler,
             onSeeMoreClick = onSeeMoreClick,
             onSearchClick = onSearchClick,
             onDownloadsClick = onDownloadsClick,

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 fun DetailsRoute(
     onBackClick: () -> Unit,
     onWatchClick: (String, String) -> Unit, // movieId, quality
+    onGoToDownloads: (String, String) -> Unit, // movieId, quality
     viewModel: DetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -37,7 +38,13 @@ fun DetailsRoute(
             onBackClick = onBackClick,
             onWatchClick = onWatchClick,
             onQualitySelected = viewModel::onQualitySelected,
-            onDownloadClick = viewModel::downloadMovie
+            onDownloadClick = {
+                if (uiState.isInDownloads) {
+                    onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "")
+                } else {
+                    viewModel.downloadMovie()
+                }
+            }
         )
     } else {
         DetailsScreenMobile(
@@ -45,7 +52,13 @@ fun DetailsRoute(
             onBackClick = onBackClick,
             onWatchClick = onWatchClick,
             onQualitySelected = viewModel::onQualitySelected,
-            onDownloadClick = viewModel::downloadMovie
+            onDownloadClick = {
+                if (uiState.isInDownloads) {
+                    onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "")
+                } else {
+                    viewModel.downloadMovie()
+                }
+            }
         )
     }
 }
@@ -139,27 +152,40 @@ fun DetailsScreenMobile(
                             Text(text = "Watch Now")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            OutlinedButton(
-                                onClick = onDownloadClick,
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = uiState.selectedQuality != null
-                            ) {
-                                Text(text = "Download")
+                        
+                        val downloadBtnText = when {
+                            uiState.downloadState == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED -> "Go to downloads"
+                            uiState.downloadState == androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING -> "Downloading ${uiState.downloadProgress.toInt()}%"
+                            uiState.isInDownloads -> "In Downloads"
+                            else -> {
+                                val size = uiState.selectedFileSize?.let { formatSizeString(it) }
+                                if (size != null) "Download ($size)" else "Download"
                             }
-                            if (uiState.selectedFileSize != null) {
-                                Text(
-                                    text = uiState.selectedFileSize,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally)
-                                )
-                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = onDownloadClick,
+                            modifier = Modifier.weight(1f),
+                            enabled = uiState.selectedQuality != null
+                        ) {
+                            Text(text = downloadBtnText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
                     }
 
                 }
             }
         }
+    }
+}
+
+private fun formatSizeString(sizeStr: String): String {
+    val numeric = sizeStr.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: return sizeStr
+    val unit = sizeStr.filter { it.isLetter() }.uppercase()
+    
+    return if (unit == "MB" && numeric >= 1024) {
+        String.format(java.util.Locale.US, "%.2f GB", numeric / 1024.0)
+    } else {
+        sizeStr
     }
 }
 
@@ -239,21 +265,23 @@ fun DetailsScreenTv(
                         TvText(text = "Watch Now")
                     }
                     Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        androidx.tv.material3.OutlinedButton(
-                            onClick = onDownloadClick,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = uiState.selectedQuality != null
-                        ) {
-                            TvText(text = "Download")
+                    
+                    val downloadBtnText = when {
+                        uiState.downloadState == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED -> "Go to downloads"
+                        uiState.downloadState == androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING -> "Downloading ${uiState.downloadProgress.toInt()}%"
+                        uiState.isInDownloads -> "In Downloads"
+                        else -> {
+                            val size = uiState.selectedFileSize?.let { formatSizeString(it) }
+                            if (size != null) "Download ($size)" else "Download"
                         }
-                        if (uiState.selectedFileSize != null) {
-                            TvText(
-                                text = uiState.selectedFileSize,
-                                style = TvMaterialTheme.typography.labelMedium,
-                                modifier = Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally)
-                            )
-                        }
+                    }
+
+                    androidx.tv.material3.OutlinedButton(
+                        onClick = onDownloadClick,
+                        modifier = Modifier.weight(1f),
+                        enabled = uiState.selectedQuality != null
+                    ) {
+                        TvText(text = downloadBtnText)
                     }
                 }
             }

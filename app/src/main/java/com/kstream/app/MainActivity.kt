@@ -86,6 +86,9 @@ fun KStreamAppContent() {
                 onMovieClick = { movieId ->
                     navController.navigate("details/$movieId")
                 },
+                onWatchClick = { movieId, quality ->
+                    navController.navigate("player/$movieId/$quality")
+                },
                 onSeeMoreClick = { railTitle ->
                     navController.navigate("search/${Uri.encode(railTitle)}")
                 },
@@ -100,8 +103,34 @@ fun KStreamAppContent() {
                 }
             )
         }
-        composable("downloads") {
-            com.kstream.feature.downloads.DownloadRoute(onBackClick = { navController.popBackStack() })
+        composable(
+            route = "downloads?movieId={movieId}&quality={quality}",
+            arguments = listOf(
+                navArgument("movieId") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("quality") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val scrollMovieId = backStackEntry.arguments?.getString("movieId")
+            val scrollQuality = backStackEntry.arguments?.getString("quality")
+            com.kstream.feature.downloads.DownloadRoute(
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId ->
+                    navController.navigate("details/$movieId")
+                },
+                onWatchClick = { movieId, quality ->
+                    navController.navigate("player/$movieId/$quality")
+                },
+                scrollMovieId = scrollMovieId,
+                scrollQuality = scrollQuality
+            )
         }
         composable(
             route = "details/{movieId}",
@@ -111,6 +140,9 @@ fun KStreamAppContent() {
                 onBackClick = { navController.popBackStack() },
                 onWatchClick = { movieId, quality ->
                     navController.navigate("player/$movieId/$quality")
+                },
+                onGoToDownloads = { movieId, quality ->
+                    navController.navigate("downloads?movieId=$movieId&quality=$quality")
                 }
             )
         }

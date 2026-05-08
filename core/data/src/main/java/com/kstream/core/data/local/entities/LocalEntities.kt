@@ -9,7 +9,8 @@ data class WatchProgressEntity(
     val lastPosition: Long,
     val duration: Long,
     val completionPercent: Float,
-    val lastUpdated: Long
+    val lastUpdated: Long,
+    val quality: String? = null
 )
 
 @Entity(tableName = "download")

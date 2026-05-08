@@ -16,6 +16,7 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val userName: String = "",
     val rails: List<MovieRail> = emptyList(),
+    val watchProgressMap: Map<String, WatchProgress> = emptyMap(),
     val error: String? = null
 )
 
@@ -50,7 +51,8 @@ class HomeViewModel @Inject constructor(
                 it.copy(
                     isLoading = false, 
                     userName = username,
-                    rails = groupMoviesIntoRails(movies, progress)
+                    rails = groupMoviesIntoRails(movies, progress),
+                    watchProgressMap = progress.associateBy { p -> p.movieId }
                 ) 
             }
         }.launchIn(viewModelScope)

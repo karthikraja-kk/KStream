@@ -8,8 +8,8 @@ import javax.inject.Inject
 class SaveWatchProgressUseCase @Inject constructor(
     private val repository: WatchProgressRepository
 ) {
-    suspend operator fun invoke(movieId: String, position: Long, duration: Long) {
-        repository.saveProgress(movieId, position, duration)
+    suspend operator fun invoke(movieId: String, position: Long, duration: Long, quality: String? = null) {
+        repository.saveProgress(movieId, position, duration, quality)
     }
 }
 

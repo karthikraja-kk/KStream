@@ -39,15 +39,16 @@ fun MovieTileMobile(
                 .clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = movie.movieName,
-            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-            maxLines = 2,
+            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp)
+                .padding(horizontal = 2.dp)
         )
     }
 }
@@ -75,13 +76,14 @@ fun MovieTileTv(
                     .fillMaxWidth(),
                 contentScale = ContentScale.Crop
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             TvText(
                 text = movie.movieName,
-                style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
+                style = androidx.tv.material3.MaterialTheme.typography.labelMedium,
+                color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
             )
         }
     }

@@ -9,6 +9,8 @@ import androidx.media3.exoplayer.scheduler.Scheduler
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+
 @UnstableApi
 @AndroidEntryPoint
 class KStreamDownloadService : DownloadService(
@@ -20,6 +22,13 @@ class KStreamDownloadService : DownloadService(
 ) {
     @Inject
     lateinit var kstreamDownloadManager: KStreamDownloadManager
+
+    private lateinit var notificationHelper: DownloadNotificationHelper
+
+    override fun onCreate() {
+        super.onCreate()
+        notificationHelper = DownloadNotificationHelper(this, "kstream_download_channel")
+    }
 
     override fun getDownloadManager(): DownloadManager {
         return kstreamDownloadManager.downloadManager
@@ -33,10 +42,13 @@ class KStreamDownloadService : DownloadService(
         downloads: MutableList<Download>,
         notMetRequirements: Int
     ): Notification {
-        // Return a real notification here
-        return Notification.Builder(this, "kstream_download_channel")
-            .setContentTitle("Downloading...")
-            .setSmallIcon(android.R.drawable.stat_sys_download)
-            .build()
+        return notificationHelper.buildProgressNotification(
+            this,
+            android.R.drawable.stat_sys_download,
+            null,
+            null,
+            downloads,
+            notMetRequirements
+        )
     }
 }

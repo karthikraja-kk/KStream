@@ -12,7 +12,7 @@ class OfflineFirstWatchProgressRepository @Inject constructor(
     private val watchProgressDao: WatchProgressDao
 ) : WatchProgressRepository {
 
-    override suspend fun saveProgress(movieId: String, position: Long, duration: Long) {
+    override suspend fun saveProgress(movieId: String, position: Long, duration: Long, quality: String?) {
         val percent = if (duration > 0) (position.toFloat() / duration.toFloat()) * 100 else 0f
         watchProgressDao.upsertProgress(
             WatchProgressEntity(
@@ -20,7 +20,8 @@ class OfflineFirstWatchProgressRepository @Inject constructor(
                 lastPosition = position,
                 duration = duration,
                 completionPercent = percent,
-                lastUpdated = System.currentTimeMillis()
+                lastUpdated = System.currentTimeMillis(),
+                quality = quality
             )
         )
     }
@@ -41,5 +42,6 @@ private fun WatchProgressEntity.asExternalModel() = WatchProgress(
     lastPosition = lastPosition,
     duration = duration,
     completionPercent = completionPercent,
-    lastUpdated = lastUpdated
+    lastUpdated = lastUpdated,
+    quality = quality
 )
