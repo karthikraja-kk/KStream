@@ -1,5 +1,6 @@
 package com.kstream.feature.details
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,15 +9,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
+import com.kstream.core.ui.components.MovieInitialsFallback
 import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
 import androidx.tv.material3.Button as TvButton
@@ -24,6 +29,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.Text as TvText
 
+import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.Icons
@@ -135,13 +141,40 @@ fun DetailsScreenMobile(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
             ) {
-                AsyncImage(
-                    model = movie.posterUrl,
-                    contentDescription = null,
+                var detailsRetryHash by remember { mutableIntStateOf(0) }
+                val detailsContext = LocalContext.current
+
+                SubcomposeAsyncImage(
+                    model = ImageRequest.Builder(detailsContext)
+                        .data(movie.posterUrl)
+                        .setParameter("retry", detailsRetryHash)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = movie.movieName,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(400.dp),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    loading = {
+                        MovieInitialsFallback(title = movie.movieName)
+                    },
+                    error = {
+                        if (detailsRetryHash < 3) {
+                            LaunchedEffect(detailsRetryHash) {
+                                delay(3000L * (detailsRetryHash + 1))
+                                detailsRetryHash++
+                            }
+                        }
+                        MovieInitialsFallback(title = movie.movieName)
+                    },
+                    success = {
+                        Image(
+                            painter = it.painter,
+                            contentDescription = movie.movieName,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 )
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = movie.movieName, style = MaterialTheme.typography.headlineMedium)
@@ -313,11 +346,38 @@ fun DetailsScreenTv(
         val mediaList = uiState.movieWithMedia.media
 
         Row(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = movie.posterUrl,
-                contentDescription = null,
+            var tvDetailsRetryHash by remember { mutableIntStateOf(0) }
+            val tvDetailsContext = LocalContext.current
+
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(tvDetailsContext)
+                    .data(movie.posterUrl)
+                    .setParameter("retry", tvDetailsRetryHash)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = movie.movieName,
                 modifier = Modifier.fillMaxHeight().weight(1f),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                loading = {
+                    MovieInitialsFallback(title = movie.movieName)
+                },
+                error = {
+                    if (tvDetailsRetryHash < 3) {
+                        LaunchedEffect(tvDetailsRetryHash) {
+                            delay(3000L * (tvDetailsRetryHash + 1))
+                            tvDetailsRetryHash++
+                        }
+                    }
+                    MovieInitialsFallback(title = movie.movieName)
+                },
+                success = {
+                    Image(
+                        painter = it.painter,
+                        contentDescription = movie.movieName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             )
             Column(
                 modifier = Modifier

@@ -22,13 +22,13 @@ import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
-import coil.compose.SubcomposeAsyncImage
 import com.kstream.core.model.Movie
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface as TvSurface
 import androidx.tv.material3.Text as TvText
 
+private const val MAX_IMAGE_RETRIES = 3
 private val GradientStart = Color(0xFF333333)
 private val GradientEnd = Color(0xFF1A1A1A)
 
@@ -111,9 +111,11 @@ fun MovieTileMobile(
                     MovieInitialsFallback(title = movie.movieName)
                 },
                 error = {
-                    LaunchedEffect(retryHash) {
-                        delay(3000)
-                        retryHash++
+                    if (retryHash < MAX_IMAGE_RETRIES) {
+                        LaunchedEffect(retryHash) {
+                            delay(3000L * (retryHash + 1))
+                            retryHash++
+                        }
                     }
                     MovieInitialsFallback(title = movie.movieName)
                 },
@@ -179,9 +181,11 @@ fun MovieTileTv(
                         MovieInitialsFallback(title = movie.movieName)
                     },
                     error = {
-                        LaunchedEffect(retryHash) {
-                            delay(3000)
-                            retryHash++
+                        if (retryHash < MAX_IMAGE_RETRIES) {
+                            LaunchedEffect(retryHash) {
+                                delay(3000L * (retryHash + 1))
+                                retryHash++
+                            }
                         }
                         MovieInitialsFallback(title = movie.movieName)
                     },
