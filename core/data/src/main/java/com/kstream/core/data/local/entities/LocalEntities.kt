@@ -15,19 +15,23 @@ data class WatchProgressEntity(
 
 @Entity(tableName = "download")
 data class DownloadEntity(
-    @PrimaryKey val movieId: String,
+    @PrimaryKey val id: String,
+    val movieId: String,
     val title: String,
     val posterUrl: String,
     val quality: String,
     val fileSize: String,
     val downloadUrl: String,
+    val localFilePath: String = "",
     val status: DownloadStatus,
     val progress: Float,
-    val localFilePath: String? = null
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L,
+    val statusMessage: String? = null
 )
 
 enum class DownloadStatus {
-    QUEUED, DOWNLOADING, COMPLETED, FAILED, DELETED
+    QUEUED, DOWNLOADING, PAUSED, COMPLETED, FAILED, DELETED
 }
 
 @Entity(tableName = "movies_cache")

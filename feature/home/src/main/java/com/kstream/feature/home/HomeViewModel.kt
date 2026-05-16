@@ -2,6 +2,7 @@ package com.kstream.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.domain.GetMoviesUseCase
 import com.kstream.core.domain.SyncMoviesUseCase
 import com.kstream.core.domain.GetAllWatchProgressUseCase
@@ -22,7 +23,8 @@ data class HomeUiState(
 
 data class MovieRail(
     val title: String,
-    val movies: List<Movie>
+    val movies: List<Movie>,
+    val totalCount: Int? = null
 )
 
 @HiltViewModel
@@ -30,15 +32,40 @@ class HomeViewModel @Inject constructor(
     private val getMoviesUseCase: GetMoviesUseCase,
     private val syncMoviesUseCase: SyncMoviesUseCase,
     private val getAllWatchProgressUseCase: GetAllWatchProgressUseCase,
-    private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository
+    private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-
+    val isOnline: StateFlow<Boolean> = MutableStateFlow(true)
+    
+    private var lastSyncTime = 0L
+    private val syncDebounceMs = 5000L
+    
     init {
         refreshContent()
         observeData()
+        observeNetworkChanges()
+    }
+
+    private fun observeNetworkChanges() {
+        networkMonitor.isOnline
+            .onEach { online ->
+                (isOnline as MutableStateFlow).value = online
+            }
+            .launchIn(viewModelScope)
+        
+        networkMonitor.isOnline
+            .filter { isOnline -> isOnline }
+            .onEach {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastSyncTime > syncDebounceMs) {
+                    lastSyncTime = currentTime
+                    syncMoviesUseCase()
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     private fun observeData() {
@@ -62,6 +89,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
+                lastSyncTime = System.currentTimeMillis()
                 syncMoviesUseCase()
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
@@ -76,13 +104,16 @@ class HomeViewModel @Inject constructor(
         val rails = mutableListOf<MovieRail>()
         
         // Continue Watching
-        val continueWatchingMovies = progress
+        val allContinueWatchingMovies = progress
             .filter { it.completionPercent < 95f }
             .sortedByDescending { it.lastUpdated }
             .mapNotNull { p -> movies.find { it.id == p.movieId } }
         
+        val continueWatchingMovies = allContinueWatchingMovies.take(10)
+        val totalContinueWatching = allContinueWatchingMovies.size
+        
         if (continueWatchingMovies.isNotEmpty()) {
-            rails.add(MovieRail("Continue Watching", continueWatchingMovies))
+            rails.add(MovieRail("Continue Watching", continueWatchingMovies, totalContinueWatching))
         }
 
         // New Releases

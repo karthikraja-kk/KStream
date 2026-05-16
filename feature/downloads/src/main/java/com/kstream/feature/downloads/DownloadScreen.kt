@@ -18,23 +18,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.offline.Download
 import coil.compose.AsyncImage
-import com.kstream.core.model.DownloadMetadata
-import kotlinx.serialization.json.Json
+import com.kstream.core.model.Download
+import com.kstream.core.model.DownloadStatus
+import kotlinx.coroutines.delay
 import java.util.Locale
 
-private fun formatBytes(bytes: Long): String {
-    return when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> String.format(Locale.US, "%.1f KB", bytes / 1024.0)
-        bytes < 1024 * 1024 * 1024 -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024))
-        else -> String.format(Locale.US, "%.2f GB", bytes / (1024.0 * 1024 * 1024))
-    }
-}
-
-@androidx.media3.common.util.UnstableApi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadRoute(
@@ -55,12 +44,7 @@ fun DownloadRoute(
     LaunchedEffect(downloads, scrollMovieId, scrollQuality) {
         if (downloads.isNotEmpty() && scrollMovieId != null) {
             val index = downloads.indexOfFirst { d ->
-                try {
-                    val metadata = Json.decodeFromString<DownloadMetadata>(d.request.data.decodeToString())
-                    d.request.id.startsWith(scrollMovieId) && (scrollQuality == null || metadata.quality == scrollQuality)
-                } catch (e: Exception) {
-                    false
-                }
+                d.movieId.startsWith(scrollMovieId) && (scrollQuality == null || d.quality == scrollQuality)
             }
             if (index != -1) {
                 listState.animateScrollToItem(index)
@@ -117,46 +101,58 @@ fun DownloadRoute(
             }
         }
     ) { padding ->
-        val downloadDir = viewModel.getDownloadDir()
-        if (downloads.isEmpty() && searchQuery.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                Text(
-                    text = "No downloads yet.",
-                    modifier = Modifier.align(Alignment.Center),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-        } else if (downloads.isEmpty() && searchQuery.isNotEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                Text(
-                    text = "No results found for \"$searchQuery\"",
-                    modifier = Modifier.align(Alignment.Center),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(downloads, key = { it.request.id }) { download ->
-                    val bytesRemaining = download.contentLength - download.bytesDownloaded
-                    val remainingTimeMs = if (download.state == Download.STATE_DOWNLOADING) {
-                        viewModel.getRemainingTime(download.request.id, bytesRemaining)
-                    } else -1L
+        Column(modifier = Modifier.padding(padding)) {
+            val mainContentModifier = Modifier.fillMaxSize()
 
-                    DownloadItem(
-                        download = download,
-                        downloadDir = downloadDir,
-                        remainingTime = formatRemainingTime(remainingTimeMs),
-                        onClick = { onMovieClick(download.request.id.substringBefore("_")) },
-                        onWatch = { quality -> onWatchClick(download.request.id.substringBefore("_"), quality) },
-                        onPause = { viewModel.pauseDownload(download.request.id) },
-                        onResume = { viewModel.resumeDownload(download.request.id) },
-                        onRemove = { downloadToRemove = download }
+            if (downloads.isEmpty() && searchQuery.isEmpty()) {
+                Box(
+                    modifier = mainContentModifier,
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No downloads yet.",
+                        style = MaterialTheme.typography.bodyLarge
                     )
+                }
+            } else if (downloads.isEmpty() && searchQuery.isNotEmpty()) {
+                Box(
+                    modifier = mainContentModifier,
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No results found for \"$searchQuery\"",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = mainContentModifier,
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(downloads, key = { it.id }) { download ->
+                        var fileExists by remember { mutableStateOf(true) }
+                        
+                        LaunchedEffect(download.localFilePath) {
+                            fileExists = viewModel.checkFileExists(download.localFilePath)
+                            while (true) {
+                                delay(3000)
+                                fileExists = viewModel.checkFileExists(download.localFilePath)
+                            }
+                        }
+
+                        DownloadItem(
+                            download = download,
+                            fileExists = fileExists,
+                            onClick = { onMovieClick(download.movieId) },
+                            onWatch = { quality -> onWatchClick(download.movieId, quality) },
+                            onRedownload = { viewModel.redownload(download.id) },
+                            onPause = { viewModel.pauseDownload(download.id) },
+                            onResume = { viewModel.resumeDownload(download.id) },
+                            onRemove = { downloadToRemove = download }
+                        )
+                    }
                 }
             }
         }
@@ -170,7 +166,7 @@ fun DownloadRoute(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        downloadToRemove?.let { viewModel.removeDownload(it.request.id) }
+                        downloadToRemove?.let { viewModel.removeDownload(it.id) }
                         downloadToRemove = null
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -187,24 +183,17 @@ fun DownloadRoute(
     }
 }
 
-@androidx.media3.common.util.UnstableApi
 @Composable
 fun DownloadItem(
     download: Download,
-    downloadDir: String,
-    remainingTime: String,
+    fileExists: Boolean,
     onClick: () -> Unit,
     onWatch: (String) -> Unit,
+    onRedownload: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRemove: () -> Unit
 ) {
-    val metadata = try {
-        Json.decodeFromString<DownloadMetadata>(download.request.data.decodeToString())
-    } catch (e: Exception) {
-        null
-    }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -217,7 +206,7 @@ fun DownloadItem(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             AsyncImage(
-                model = metadata?.posterUrl,
+                model = download.posterUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .width(80.dp)
@@ -228,46 +217,54 @@ fun DownloadItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = metadata?.movieName ?: "Unknown Movie",
+                    text = download.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${metadata?.quality} • ${metadata?.fileSize}",
+                    text = "${download.quality} • ${download.fileSize}",
                     style = MaterialTheme.typography.bodySmall
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                val downloadedSize = formatBytes(download.bytesDownloaded)
-                val totalSize = if (download.contentLength > 0) formatBytes(download.contentLength) else "Unknown"
-                
-                val statusText = when (download.state) {
-                    Download.STATE_DOWNLOADING -> {
-                        var text = "Downloading... ${if (download.percentDownloaded >= 0) download.percentDownloaded.toInt() else 0}% ($downloadedSize / $totalSize)"
-                        if (remainingTime.isNotEmpty()) text += "\n$remainingTime remaining"
-                        text
+                val progressPercent = (download.progress * 100).toInt()
+                val statusText = when (download.status) {
+                    DownloadStatus.DOWNLOADING -> {
+                        val downloaded = formatBytes(download.downloadedBytes)
+                        val total = formatBytes(download.totalBytes)
+                        "Downloading... $downloaded / $total ($progressPercent%)"
                     }
-                    Download.STATE_COMPLETED -> "Completed ($totalSize)"
-                    Download.STATE_RESTARTING -> "Restarting..."
-                    Download.STATE_FAILED -> "Failed"
-                    Download.STATE_STOPPED -> "Paused ($downloadedSize / $totalSize)"
-                    Download.STATE_QUEUED -> "Queued"
-                    else -> "Unknown"
+                    DownloadStatus.PAUSED -> {
+                        val downloaded = formatBytes(download.downloadedBytes)
+                        val total = formatBytes(download.totalBytes)
+                        "${download.statusMessage ?: "Paused"} $downloaded / $total ($progressPercent%)"
+                    }
+                    DownloadStatus.COMPLETED -> if (fileExists) "Completed" else "File moved or deleted"
+                    DownloadStatus.QUEUED -> "Queued"
+                    DownloadStatus.FAILED -> download.statusMessage ?: "Failed"
+                    DownloadStatus.DELETED -> "Deleted"
                 }
                 
-                Text(text = statusText, style = MaterialTheme.typography.labelSmall)
+                Text(
+                    text = statusText, 
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (!fileExists && download.status == DownloadStatus.COMPLETED) 
+                        MaterialTheme.colorScheme.error 
+                    else 
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 
-                if (download.state != Download.STATE_COMPLETED) {
+                if (download.status != DownloadStatus.COMPLETED) {
                     LinearProgressIndicator(
-                        progress = if (download.percentDownloaded >= 0) download.percentDownloaded / 100f else 0f,
+                        progress = download.progress,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     )
-                } else {
+                } else if (fileExists) {
                     Button(
-                        onClick = { onWatch(metadata?.quality ?: "") },
+                        onClick = { onWatch(download.quality) },
                         modifier = Modifier.padding(top = 8.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                     ) {
@@ -275,15 +272,29 @@ fun DownloadItem(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Watch Now")
                     }
+                } else {
+                    Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onRedownload,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Redownload", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                 }
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (download.state == Download.STATE_DOWNLOADING) {
+                if (download.status == DownloadStatus.DOWNLOADING) {
                     IconButton(onClick = onPause) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Pause")
+                        Icon(imageVector = Icons.Default.Pause, contentDescription = "Pause")
                     }
-                } else if (download.state == Download.STATE_STOPPED) {
+                } else if (download.status == DownloadStatus.PAUSED || download.status == DownloadStatus.QUEUED) {
                     IconButton(onClick = onResume) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
                     }
@@ -301,14 +312,9 @@ fun DownloadItem(
     }
 }
 
-fun formatRemainingTime(seconds: Long): String {
-    if (seconds <= 0) return ""
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val s = seconds % 60
-    return if (h > 0) {
-        String.format(Locale.US, "%02d:%02d:%02d", h, m, s)
-    } else {
-        String.format(Locale.US, "%02d:%02d", m, s)
-    }
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+    return String.format(Locale.US, "%.2f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
 }

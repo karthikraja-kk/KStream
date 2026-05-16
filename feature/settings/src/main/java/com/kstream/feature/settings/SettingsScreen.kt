@@ -1,6 +1,5 @@
 package com.kstream.feature.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -9,16 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.kstream.core.ui.LocalPlatform
-import com.kstream.core.ui.Platform
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Text as TvText
 import androidx.activity.compose.BackHandler
-
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Check
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,13 +22,6 @@ fun SettingsRoute(
     var isEditingUsername by remember { mutableStateOf(false) }
     var tempUsername by remember { mutableStateOf("") }
     
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree(),
-        onResult = { uri ->
-            uri?.let { viewModel.onDownloadLocationChange(it.toString()) }
-        }
-    )
-
     LaunchedEffect(uiState.username) {
         tempUsername = uiState.username
     }
@@ -98,8 +83,9 @@ fun SettingsRoute(
             
             ListItem(
                 headlineContent = { Text("Download Location") },
-                supportingContent = { Text(formatDownloadPath(uiState.downloadLocation)) },
-                modifier = Modifier.clickable { folderPickerLauncher.launch(null) }
+                supportingContent = { 
+                    Text("/Internal Storage/Movies/KStream")
+                }
             )
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -108,23 +94,5 @@ fun SettingsRoute(
                 Text("Clear Cache")
             }
         }
-    }
-}
-
-private fun formatDownloadPath(path: String): String {
-    if (path.isBlank()) return "/Internal Storage/Movies/KStream"
-    
-    return try {
-        val uri = android.net.Uri.parse(path)
-        val decodedPath = android.net.Uri.decode(uri.toString())
-        if (decodedPath.contains("primary:")) {
-            "/Internal Storage/" + decodedPath.substringAfter("primary:").replace("%2F", "/").replace(":", "/")
-        } else if (decodedPath.contains("/storage/emulated/0/")) {
-            "/Internal Storage/" + decodedPath.substringAfter("/storage/emulated/0/")
-        } else {
-            decodedPath.replace("content://com.android.externalstorage.documents/tree/primary%3A", "/Internal Storage/").replace("%3A", "/").replace("%2F", "/")
-        }
-    } catch (e: Exception) {
-        path
     }
 }

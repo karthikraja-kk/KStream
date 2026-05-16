@@ -2,6 +2,7 @@ package com.kstream.feature.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.domain.repository.MovieRepository
 import com.kstream.core.domain.repository.UserDataRepository
 import com.kstream.core.model.Movie
@@ -20,15 +21,23 @@ data class SearchUiState(
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val movieRepository: MovieRepository,
-    private val userDataRepository: UserDataRepository
+    private val userDataRepository: UserDataRepository,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
+    val isOnline: StateFlow<Boolean> = MutableStateFlow(true)
 
     init {
         userDataRepository.recentSearches
             .onEach { recents -> _uiState.update { it.copy(recentSearches = recents) } }
+            .launchIn(viewModelScope)
+        
+        networkMonitor.isOnline
+            .onEach { online ->
+                (isOnline as MutableStateFlow).value = online
+            }
             .launchIn(viewModelScope)
     }
 

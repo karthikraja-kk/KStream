@@ -28,6 +28,9 @@ interface WatchProgressDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertProgress(progress: WatchProgressEntity)
+
+    @Query("DELETE FROM watch_progress WHERE movieId = :movieId")
+    suspend fun deleteProgress(movieId: String)
 }
 
 @Dao
@@ -38,9 +41,15 @@ interface DownloadDao {
     @Query("SELECT * FROM download WHERE movieId = :movieId")
     suspend fun getDownload(movieId: String): DownloadEntity?
 
+    @Query("SELECT * FROM download WHERE id = :id")
+    suspend fun getDownloadById(id: String): DownloadEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertDownload(download: DownloadEntity)
 
     @Query("DELETE FROM download WHERE movieId = :movieId")
     suspend fun deleteDownload(movieId: String)
+
+    @Query("DELETE FROM download WHERE id = :id")
+    suspend fun deleteDownloadById(id: String)
 }

@@ -7,6 +7,7 @@ import com.kstream.core.data.local.dao.DownloadDao
 import com.kstream.core.data.local.dao.MovieDao
 import com.kstream.core.data.local.dao.WatchProgressDao
 import com.kstream.core.data.repository.*
+import com.kstream.core.domain.repository.DownloadRepository
 import com.kstream.core.domain.repository.MovieRepository
 import com.kstream.core.domain.repository.UserDataRepository
 import com.kstream.core.domain.repository.WatchProgressRepository
@@ -36,6 +37,11 @@ abstract class DataModule {
     abstract fun bindWatchProgressRepository(
         watchProgressRepository: OfflineFirstWatchProgressRepository
     ): WatchProgressRepository
+
+    @Binds
+    abstract fun bindDownloadRepository(
+        downloadRepository: DownloadRepositoryImpl
+    ): DownloadRepository
 
     companion object {
         @Provides

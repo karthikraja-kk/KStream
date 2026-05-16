@@ -2,151 +2,77 @@ package com.kstream.feature.downloads
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadManager
+import com.kstream.core.domain.repository.DownloadRepository
+import com.kstream.core.model.Download
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import com.kstream.core.model.DownloadMetadata
-import kotlinx.serialization.json.Json
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 
-@androidx.media3.common.util.UnstableApi
 @HiltViewModel
 class DownloadViewModel @Inject constructor(
-
-    private val kstreamDownloadManager: com.kstream.feature.downloads.KStreamDownloadManager
+    private val downloadRepository: DownloadRepository,
+    private val customDownloadManager: CustomDownloadManager
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _downloadSpeeds = MutableStateFlow<Map<String, Long>>(emptyMap()) // ID to bytes/sec
-    private val _lastBytes = mutableMapOf<String, Long>()
-    private val _lastTime = mutableMapOf<String, Long>()
-
-    private fun getAllDownloads(): List<Download> {
-        return kstreamDownloadManager.downloadManager.downloadIndex.getDownloads().use { cursor ->
-            val list = mutableListOf<Download>()
-            while (cursor.moveToNext()) {
-                list.add(cursor.download)
-            }
-            list.sortedByDescending { it.startTimeMs }
-        }
-    }
-
     val downloads: Flow<List<Download>> = combine(
-        callbackFlow {
-            val listener = object : DownloadManager.Listener {
-                override fun onDownloadChanged(
-                    downloadManager: DownloadManager,
-                    download: Download,
-                    finalException: Exception?
-                ) {
-                    trySend(getAllDownloads())
-                }
-
-                override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
-                    trySend(getAllDownloads())
-                }
-
-                override fun onIdle(downloadManager: DownloadManager) {
-                    trySend(getAllDownloads())
-                }
-            }
-            
-            kstreamDownloadManager.downloadManager.addListener(listener)
-            
-            // Use a ticker to update progress and calculate speeds
-            val tickerJob = launch {
-                while (true) {
-                    val currentDownloads = kstreamDownloadManager.downloadManager.currentDownloads
-                    calculateSpeeds(currentDownloads)
-                    trySend(getAllDownloads())
-                    delay(1000)
-                }
-            }
-            
-            trySend(getAllDownloads())
-            
-            awaitClose {
-                kstreamDownloadManager.downloadManager.removeListener(listener)
-                tickerJob.cancel()
-            }
-        },
+        downloadRepository.getDownloads(),
         _searchQuery
     ) { allDownloads, query ->
         if (query.isBlank()) {
             allDownloads
         } else {
-            allDownloads.filter { d ->
-                try {
-                    val metadata = Json.decodeFromString<DownloadMetadata>(d.request.data.decodeToString())
-                    metadata.movieName.contains(query, ignoreCase = true)
-                } catch (e: Exception) {
-                    false
-                }
-            }
-        }
+            allDownloads.filter { it.title.contains(query, ignoreCase = true) }
+        }.sortedByDescending { it.progress }
     }
 
-    private fun calculateSpeeds(currentDownloads: List<Download>) {
-        val now = System.currentTimeMillis()
-        val newSpeeds = mutableMapOf<String, Long>()
-        
-        currentDownloads.forEach { d ->
-            val id = d.request.id
-            val lastByte = _lastBytes[id] ?: d.bytesDownloaded
-            val lastT = _lastTime[id] ?: d.startTimeMs
-            
-            val diffBytes = d.bytesDownloaded - lastByte
-            val diffTime = now - lastT
-            
-            if (diffTime > 0) {
-                val speed = (diffBytes * 1000) / diffTime
-                newSpeeds[id] = speed
-            }
-            
-            _lastBytes[id] = d.bytesDownloaded
-            _lastTime[id] = now
-        }
-        _downloadSpeeds.value = newSpeeds
-    }
-
-    fun getRemainingTime(id: String, bytesRemaining: Long): Long {
-        val speed = _downloadSpeeds.value[id] ?: return -1L
-        if (speed <= 0) return -1L
-        return bytesRemaining / speed
+    suspend fun checkFileExists(filePath: String): Boolean {
+        return customDownloadManager.checkFileExists(filePath)
     }
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
     }
 
+    fun removeDownload(id: String) {
+        viewModelScope.launch {
+            val download = downloadRepository.getDownload(id) ?: return@launch
+            customDownloadManager.deleteDownload(download.movieId, download.quality)
+        }
+    }
+
     fun pauseDownload(id: String) {
-        kstreamDownloadManager.downloadManager.setStopReason(id, 1)
+        customDownloadManager.pauseDownload(id)
     }
 
     fun resumeDownload(id: String) {
-        kstreamDownloadManager.downloadManager.setStopReason(id, Download.STOP_REASON_NONE)
+        viewModelScope.launch {
+            customDownloadManager.resumeDownload(id) { }
+        }
     }
 
-    fun removeDownload(id: String) {
-        kstreamDownloadManager.downloadManager.removeDownload(id)
-        _lastBytes.remove(id)
-        _lastTime.remove(id)
+    fun redownload(id: String) {
+        viewModelScope.launch {
+            val download = downloadRepository.getDownload(id) ?: return@launch
+            // First delete existing if any
+            customDownloadManager.deleteDownload(download.movieId, download.quality)
+            // Then restart
+            customDownloadManager.downloadMovie(
+                movieId = download.movieId,
+                quality = download.quality,
+                url = download.downloadUrl,
+                movieName = download.title,
+                posterUrl = download.posterUrl,
+                fileSize = download.fileSize,
+                onProgress = { }
+            )
+        }
     }
 
     fun getDownloadDir(): String {
-        return kstreamDownloadManager.getDownloadDirectory()
+        return customDownloadManager.getDownloadDirectoryDisplay()
     }
 }
-

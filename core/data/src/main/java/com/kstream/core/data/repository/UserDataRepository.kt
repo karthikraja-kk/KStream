@@ -12,10 +12,12 @@ class DefaultUserDataRepository @Inject constructor(
     override val isFirstLaunchCompleted: Flow<Boolean> = dataStore.isFirstLaunchCompleted
     override val isWifiOnlyDownload: Flow<Boolean> = dataStore.isWifiOnlyDownload
     override val downloadLocation: Flow<String> = dataStore.downloadLocation
+    override val downloadLocationUri: Flow<String> = dataStore.downloadLocationUri
     override val recentSearches: Flow<List<String>> = dataStore.recentSearches
 
     override suspend fun setUsername(name: String) = dataStore.setUsername(name)
     override suspend fun setDownloadLocation(location: String) = dataStore.setDownloadLocation(location)
+    override suspend fun setDownloadLocationUri(uri: String) = dataStore.setDownloadLocationUri(uri)
     override suspend fun setFirstLaunchCompleted(completed: Boolean) = dataStore.setFirstLaunchCompleted(completed)
     override suspend fun setWifiOnlyDownload(wifiOnly: Boolean) = dataStore.setWifiOnlyDownload(wifiOnly)
     override suspend fun addRecentSearch(query: String) = dataStore.addRecentSearch(query)

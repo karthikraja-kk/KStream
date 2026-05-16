@@ -46,6 +46,7 @@ dependencies {
     implementation(libs.androidx.tv.material)
     
     implementation(libs.coil.compose)
+    implementation(libs.androidx.material.icons.extended)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

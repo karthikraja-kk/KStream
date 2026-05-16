@@ -19,6 +19,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.media3.common.util.UnstableApi"
+        )
     }
     buildFeatures {
         compose = true
@@ -33,6 +36,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
     implementation(project(":core:ui"))
+    implementation(project(":feature:downloads"))
     
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -51,6 +55,8 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.exoplayer.dash)
     implementation(libs.media3.common)
+
+    implementation(libs.androidx.material.icons.extended)
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)

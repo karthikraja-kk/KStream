@@ -44,15 +44,41 @@ class OfflineFirstMovieRepository @Inject constructor(
     }
 
     override suspend fun searchMovies(query: String): List<Movie> {
-        val normalizedQuery = query.trim().lowercase()
+        val normalizedQuery = query.trim()
         if (normalizedQuery.isEmpty()) return emptyList()
 
         Log.d("MovieRepository", "Searching movies for: $query")
-        // APP_SPEC requires matching by title and metadata fields; we filter over live data.
-        return network.getMovies()
-            .map { it.asExternalModel() }
-            .filter { movie -> movie.matchesQuery(normalizedQuery) }
-            .take(100)
+        
+        // Handle special rail names
+        val allMovies = network.getMovies().map { it.asExternalModel() }
+        
+        when (normalizedQuery) {
+            "New Releases" -> {
+                return allMovies.sortedByDescending { it.year }.take(100)
+            }
+            "Continue Watching" -> {
+                // Return all movies - actual filtering should happen in UI based on watch progress
+                return allMovies.take(100)
+            }
+            "You Might Like" -> {
+                // Return all movies - actual filtering should happen in UI based on user preferences
+                return allMovies.take(100)
+            }
+            else -> {
+                // Handle "Released in {year}" pattern
+                if (normalizedQuery.startsWith("Released in ")) {
+                    val yearStr = normalizedQuery.removePrefix("Released in ").trim()
+                    val year = yearStr.toIntOrNull()
+                    if (year != null) {
+                        return allMovies.filter { it.year == year }.take(100)
+                    }
+                }
+                
+                // Normal text search
+                val lowercaseQuery = normalizedQuery.lowercase()
+                return allMovies.filter { movie -> movie.matchesQuery(lowercaseQuery) }.take(100)
+            }
+        }
     }
 }
 

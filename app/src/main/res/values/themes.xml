@@ -5,4 +5,10 @@
         <item name="android:windowFullscreen">false</item>
         <item name="android:windowBackground">@android:color/black</item>
     </style>
+
+    <style name="Theme.KStream.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/black</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/kstream_logo_with_name</item>
+        <item name="postSplashScreenTheme">@style/Theme.KStream</item>
+    </style>
 </resources>

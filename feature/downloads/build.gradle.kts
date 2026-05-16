@@ -32,11 +32,18 @@ android {
     }
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions {
+        freeCompilerArgs += listOf("-opt-in=androidx.media3.common.util.UnstableApi")
+    }
+}
+
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
     implementation(project(":core:ui"))
+    implementation(project(":core:data"))
     
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -46,6 +53,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
     
     implementation(libs.androidx.tv.foundation)
     implementation(libs.androidx.tv.material)
@@ -55,6 +63,8 @@ dependencies {
     implementation(libs.media3.common)
     implementation(libs.androidx.work.runtime.ktx)
 
+    implementation(libs.androidx.documentfile)
+    implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.serialization.json)
 

@@ -15,7 +15,7 @@ import com.kstream.core.data.local.entities.WatchProgressEntity
         WatchProgressEntity::class,
         DownloadEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class KStreamDatabase : RoomDatabase() {

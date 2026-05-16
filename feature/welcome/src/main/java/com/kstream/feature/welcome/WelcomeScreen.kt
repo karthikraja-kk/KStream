@@ -1,14 +1,30 @@
 package com.kstream.feature.welcome
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.kstream.core.ui.R
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 
@@ -41,6 +57,18 @@ fun WelcomeScreenMobile(
     onUsernameChange: (String) -> Unit,
     onContinueClick: () -> Unit
 ) {
+    var textFieldValue by remember(username) {
+        mutableStateOf(TextFieldValue(text = username, selection = TextRange(username.length)))
+    }
+    var isFocused by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        focusRequester.requestFocus()
+    }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -48,10 +76,12 @@ fun WelcomeScreenMobile(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "Welcome to KStream",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold
+        Image(
+            painter = painterResource(R.drawable.kstream_logo_with_name),
+            contentDescription = "KStream Logo",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp)
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
@@ -63,15 +93,40 @@ fun WelcomeScreenMobile(
         )
         Spacer(modifier = Modifier.height(32.dp))
         OutlinedTextField(
-            value = username,
-            onValueChange = onUsernameChange,
+            value = textFieldValue,
+            onValueChange = { newValue ->
+                textFieldValue = newValue.copy(selection = TextRange(newValue.text.length))
+                onUsernameChange(newValue.text)
+            },
             label = { Text("What should we call you?") },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("e.g. MovieBuff99") }
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester)
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused && !isFocused) {
+                        isFocused = true
+                        textFieldValue = textFieldValue.copy(selection = TextRange(textFieldValue.text.length))
+                    }
+                },
+            placeholder = { Text("e.g. MovieBuff99") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    onContinueClick()
+                }
+            )
         )
         Spacer(modifier = Modifier.height(24.dp))
         Button(
-            onClick = onContinueClick,
+            onClick = {
+                focusManager.clearFocus()
+                onContinueClick()
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Continue")
@@ -85,6 +140,18 @@ fun WelcomeScreenTv(
     onUsernameChange: (String) -> Unit,
     onContinueClick: () -> Unit
 ) {
+    var textFieldValue by remember(username) {
+        mutableStateOf(TextFieldValue(text = username, selection = TextRange(username.length)))
+    }
+    var isFocused by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        focusRequester.requestFocus()
+    }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -92,10 +159,11 @@ fun WelcomeScreenTv(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "Welcome to KStream",
-            style = MaterialTheme.typography.displayLarge,
-            fontWeight = FontWeight.Bold
+        Image(
+            painter = painterResource(R.drawable.kstream_logo_with_name),
+            contentDescription = "KStream Logo",
+            modifier = Modifier
+                .width(500.dp)
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
@@ -107,15 +175,40 @@ fun WelcomeScreenTv(
         )
         Spacer(modifier = Modifier.height(64.dp))
         OutlinedTextField(
-            value = username,
-            onValueChange = onUsernameChange,
+            value = textFieldValue,
+            onValueChange = { newValue ->
+                textFieldValue = newValue.copy(selection = TextRange(newValue.text.length))
+                onUsernameChange(newValue.text)
+            },
             label = { Text("What should we call you?") },
-            modifier = Modifier.width(600.dp),
-            placeholder = { Text("e.g. MovieBuff99") }
+            modifier = Modifier
+                .width(600.dp)
+                .focusRequester(focusRequester)
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused && !isFocused) {
+                        isFocused = true
+                        textFieldValue = textFieldValue.copy(selection = TextRange(textFieldValue.text.length))
+                    }
+                },
+            placeholder = { Text("e.g. MovieBuff99") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    onContinueClick()
+                }
+            )
         )
         Spacer(modifier = Modifier.height(48.dp))
         Button(
-            onClick = onContinueClick,
+            onClick = {
+                focusManager.clearFocus()
+                onContinueClick()
+            },
             modifier = Modifier.width(200.dp)
         ) {
             Text("Continue")

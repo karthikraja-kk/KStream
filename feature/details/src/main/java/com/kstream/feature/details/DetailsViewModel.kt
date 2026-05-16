@@ -1,51 +1,48 @@
 package com.kstream.feature.details
 
 import android.content.Context
-import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.domain.GetMovieDetailsUseCase
+import com.kstream.core.domain.repository.WatchProgressRepository
+import com.kstream.core.domain.repository.DownloadRepository
+import com.kstream.core.model.DownloadStatus
 import com.kstream.core.model.MovieWithMedia
-import com.kstream.feature.downloads.KStreamDownloadService
+import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.offline.DownloadRequest
-import androidx.media3.exoplayer.offline.DownloadService
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-import android.widget.Toast
-import com.kstream.core.model.DownloadMetadata
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-
-import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadManager
 
 data class DetailsUiState(
     val isLoading: Boolean = false,
     val movieWithMedia: MovieWithMedia? = null,
     val selectedQuality: String? = null,
     val selectedFileSize: String? = null,
-    val downloadState: Int = Download.STATE_QUEUED,
+    val downloadState: Int = -1,
     val downloadProgress: Float = -1f,
     val isInDownloads: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val isOnline: Boolean = true,
+    val hasWatchProgress: Boolean = false
 )
 
-@androidx.media3.common.util.UnstableApi
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val getMovieDetailsUseCase: com.kstream.core.domain.GetMovieDetailsUseCase,
-    private val downloadManagerWrapper: com.kstream.feature.downloads.KStreamDownloadManager,
+    private val getMovieDetailsUseCase: GetMovieDetailsUseCase,
+    private val watchProgressRepository: WatchProgressRepository,
+    private val customDownloadManager: CustomDownloadManager,
+    private val downloadRepository: DownloadRepository,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val movieId: String = checkNotNull(savedStateHandle["movieId"])
+    private val movieId: String = android.net.Uri.decode(checkNotNull(savedStateHandle["movieId"]))
 
     private val _uiState = MutableStateFlow(DetailsUiState(isLoading = true))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
@@ -53,49 +50,62 @@ class DetailsViewModel @Inject constructor(
     init {
         fetchMovieDetails()
         observeDownloads()
+        observeNetworkState()
+        observeWatchProgress()
+    }
+
+    private fun observeNetworkState() {
+        networkMonitor.isOnline
+            .onEach { online ->
+                _uiState.update { it.copy(isOnline = online) }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun observeWatchProgress() {
+        viewModelScope.launch {
+            val progress = watchProgressRepository.getProgress(movieId)
+            _uiState.update { 
+                it.copy(hasWatchProgress = progress != null && progress.completionPercent < 95f) 
+            }
+        }
     }
 
     private fun observeDownloads() {
-        val downloadManager = downloadManagerWrapper.downloadManager
-        viewModelScope.launch {
-            val listener = object : DownloadManager.Listener {
-                override fun onDownloadChanged(manager: DownloadManager, download: Download, finalException: Exception?) {
-                    updateDownloadState()
-                }
-                override fun onDownloadRemoved(manager: DownloadManager, download: Download) {
-                    updateDownloadState()
-                }
+        combine(
+            downloadRepository.getDownloads(),
+            _uiState.map { it.selectedQuality }.distinctUntilChanged()
+        ) { downloads, selectedQuality ->
+            val movieDownloads = downloads.filter { it.movieId == movieId }
+            val download = if (selectedQuality != null) {
+                val downloadId = "${movieId}_$selectedQuality"
+                movieDownloads.find { it.id == downloadId }
+            } else {
+                movieDownloads.firstOrNull()
             }
-            downloadManager.addListener(listener)
-            updateDownloadState()
-            
-            // Ticker for progress
-            while (true) {
-                updateDownloadState()
-                kotlinx.coroutines.delay(1000)
+            download
+        }.onEach { download ->
+            _uiState.update { 
+                it.copy(
+                    downloadState = when (download?.status) {
+                        DownloadStatus.DOWNLOADING -> 2
+                        DownloadStatus.PAUSED -> 3
+                        DownloadStatus.COMPLETED -> 4
+                        DownloadStatus.FAILED -> 16
+                        DownloadStatus.QUEUED -> 1
+                        else -> -1
+                    },
+                    downloadProgress = download?.progress ?: -1f,
+                    isInDownloads = download != null && download.status != DownloadStatus.DELETED
+                )
             }
-        }
-    }
-
-    private fun updateDownloadState() {
-        val downloadManager = downloadManagerWrapper.downloadManager
-        val quality = _uiState.value.selectedQuality ?: return
-        
-        val downloadId = "${movieId}_${quality}"
-        val currentDownload = downloadManager.downloadIndex.getDownload(downloadId)
-
-        _uiState.update { 
-            it.copy(
-                downloadState = currentDownload?.state ?: -1,
-                downloadProgress = currentDownload?.percentDownloaded ?: -1f,
-                isInDownloads = currentDownload != null
-            )
-        }
+        }.launchIn(viewModelScope)
     }
 
     private fun fetchMovieDetails() {
         viewModelScope.launch {
             try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
                 val result = getMovieDetailsUseCase(movieId)
                 val highestQualityMedia = result?.media?.maxByOrNull { 
                     it.quality.filter { c -> c.isDigit() }.toIntOrNull() ?: 0 
@@ -109,53 +119,64 @@ class DetailsViewModel @Inject constructor(
                         selectedFileSize = highestQualityMedia?.fileSize
                     ) 
                 }
-                updateDownloadState()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
         }
     }
 
+    fun refreshMovieDetails() {
+        fetchMovieDetails()
+    }
+
     fun onQualitySelected(quality: String) {
         val fileSize = _uiState.value.movieWithMedia?.media?.find { it.quality == quality }?.fileSize
         _uiState.update { it.copy(selectedQuality = quality, selectedFileSize = fileSize) }
-        updateDownloadState()
     }
 
     fun downloadMovie() {
+        performDownload()
+    }
+
+    fun onStartOver() {
+        viewModelScope.launch {
+            watchProgressRepository.deleteProgress(movieId)
+            _uiState.update { it.copy(hasWatchProgress = false) }
+        }
+    }
+
+    private fun performDownload() {
         val movieWithMedia = _uiState.value.movieWithMedia ?: return
         val quality = _uiState.value.selectedQuality ?: return
         val media = movieWithMedia.media.find { it.quality == quality } ?: return
         val url = media.downloadUrl1 ?: media.downloadUrl2 ?: return
 
-        val downloadId = "${movieId}_${quality}"
-        val downloadManager = downloadManagerWrapper.downloadManager
-        val existingDownload = downloadManager.downloadIndex.getDownload(downloadId)
-
-        if (existingDownload != null) {
-            Toast.makeText(context, "This movie in $quality is already in downloads", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val metadata = DownloadMetadata(
-            movieName = movieWithMedia.movie.movieName,
-            posterUrl = movieWithMedia.movie.posterUrl,
-            quality = quality,
-            fileSize = media.fileSize
-        )
+        val downloadId = "${movieId}_$quality"
         
-        val metadataJson = Json.encodeToString(metadata)
+        viewModelScope.launch {
+            val existingDownload = downloadRepository.getDownload(downloadId)
+            if (existingDownload != null && existingDownload.status == DownloadStatus.COMPLETED) {
+                if (customDownloadManager.checkFileExists(existingDownload.localFilePath)) {
+                    Toast.makeText(context, "Movie already in downloads", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+            }
 
-        val request = DownloadRequest.Builder(downloadId, Uri.parse(url))
-            .setData(metadataJson.toByteArray())
-            .build()
+            Toast.makeText(context, "Download started: ${movieWithMedia.movie.movieName}", Toast.LENGTH_SHORT).show()
 
-        DownloadService.sendAddDownload(
-            context,
-            KStreamDownloadService::class.java,
-            request,
-            false
-        )
-        Toast.makeText(context, "Download started: ${movieWithMedia.movie.movieName}", Toast.LENGTH_SHORT).show()
+            viewModelScope.launch {
+                customDownloadManager.downloadMovie(
+                    movieId = movieId,
+                    quality = quality,
+                    url = url,
+                    movieName = movieWithMedia.movie.movieName,
+                    posterUrl = movieWithMedia.movie.posterUrl,
+                    fileSize = media.fileSize,
+                    onProgress = { /* Observed via flow */ }
+                ).onFailure { error ->
+                    Toast.makeText(context, "Download failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 }
