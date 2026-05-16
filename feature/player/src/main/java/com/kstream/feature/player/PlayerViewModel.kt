@@ -3,9 +3,11 @@ package com.kstream.feature.player
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.domain.GetMovieDetailsUseCase
 import com.kstream.core.domain.GetWatchProgressUseCase
 import com.kstream.core.domain.SaveWatchProgressUseCase
+import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -15,7 +17,10 @@ import javax.inject.Inject
 
 data class PlayerUiState(
     val availableQualities: List<String> = emptyList(),
-    val currentQuality: String = ""
+    val currentQuality: String = "",
+    val isPlayingLocal: Boolean = false,
+    val isOffline: Boolean = false,
+    val isBuffering: Boolean = false
 )
 
 @HiltViewModel
@@ -24,11 +29,15 @@ class PlayerViewModel @Inject constructor(
     private val getMovieDetailsUseCase: GetMovieDetailsUseCase,
     private val getWatchProgressUseCase: GetWatchProgressUseCase,
     private val saveWatchProgressUseCase: SaveWatchProgressUseCase,
+    private val customDownloadManager: CustomDownloadManager,
+    private val networkMonitor: NetworkMonitor,
+    private val watchProgressRepository: com.kstream.core.domain.repository.WatchProgressRepository,
     val playerManager: PlayerManager
 ) : ViewModel() {
 
-    private val movieId: String = checkNotNull(savedStateHandle["movieId"])
-    private val initialQuality: String = checkNotNull(savedStateHandle["quality"])
+    private val movieId: String = android.net.Uri.decode(savedStateHandle.get<String>("movieId") ?: "")
+    private val initialQuality: String = android.net.Uri.decode(savedStateHandle.get<String>("quality") ?: "")
+    private val source: String = android.net.Uri.decode(savedStateHandle.get<String>("source") ?: "stream")
 
     private val _uiState = MutableStateFlow(PlayerUiState(currentQuality = initialQuality))
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -37,30 +46,102 @@ class PlayerViewModel @Inject constructor(
     private var progressSyncJob: Job? = null
 
     init {
-        loadMediaAndPlay()
+        if (movieId.isNotEmpty() && initialQuality.isNotEmpty()) {
+            loadMediaAndPlay()
+            observeNetworkState()
+        } else {
+            android.util.Log.e("PlayerViewModel", "Invalid navigation arguments: movieId=$movieId, quality=$initialQuality")
+        }
+    }
+
+    private var wasOffline = false
+
+    private fun observeNetworkState() {
+        networkMonitor.isOnline
+            .onEach { isOnline ->
+                if (isOnline) {
+                    _uiState.update { it.copy(isOffline = false) }
+                    wasOffline = false
+                } else {
+                    wasOffline = true
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    fun onBufferingStateChanged(isBuffering: Boolean) {
+        _uiState.update { 
+            it.copy(
+                isBuffering = isBuffering,
+                isOffline = wasOffline && isBuffering && !it.isPlayingLocal
+            )
+        }
+    }
+
+    fun retryConnection() {
+        viewModelScope.launch {
+            val isOnline = networkMonitor.isOnline.first()
+            if (isOnline) {
+                _uiState.update { it.copy(isOffline = false) }
+                wasOffline = false
+                val player = playerManager.getPlayer()
+                player.prepare()
+                player.play()
+            }
+        }
     }
 
     private fun loadMediaAndPlay() {
         viewModelScope.launch {
-            movieWithMedia = getMovieDetailsUseCase(movieId)
-            val mediaList = movieWithMedia?.media ?: emptyList()
-            _uiState.update { it.copy(
-                availableQualities = mediaList.map { m -> m.quality },
-                currentQuality = initialQuality
-            ) }
-            
-            val media = mediaList.find { it.quality == initialQuality }
-            val fallbackUrls = listOfNotNull(
-                media?.watchUrl1,
-                media?.watchUrl2,
-                media?.downloadUrl1,
-                media?.downloadUrl2
-            )
+            try {
+                val isOnline = networkMonitor.isOnline.first()
+                _uiState.update { it.copy(isOffline = !isOnline) }
 
-            if (fallbackUrls.isNotEmpty()) {
-                val startPosition = getWatchProgressUseCase(movieId)
-                playerManager.play(fallbackUrls, startPosition)
-                startProgressSync()
+                val localPath = customDownloadManager.getLocalPath(movieId, initialQuality)
+                if (localPath != null && customDownloadManager.checkFileExists(localPath)) {
+                    val startPosition = getWatchProgressUseCase(movieId)
+                    playerManager.playLocal(localPath, startPosition)
+                    _uiState.update { it.copy(isPlayingLocal = true, isOffline = false) }
+                    startProgressSync()
+                    return@launch
+                }
+
+                movieWithMedia = getMovieDetailsUseCase(movieId)
+                val mediaList = movieWithMedia?.media ?: emptyList()
+                _uiState.update { it.copy(
+                    availableQualities = mediaList.map { m -> m.quality },
+                    currentQuality = initialQuality
+                ) }
+                
+                val media = mediaList.find { it.quality == initialQuality }
+                val fallbackUrls = listOfNotNull(
+                    media?.watchUrl1,
+                    media?.watchUrl2,
+                    media?.downloadUrl1,
+                    media?.downloadUrl2
+                )
+
+                if (fallbackUrls.isNotEmpty()) {
+                    val startPosition = getWatchProgressUseCase(movieId)
+                    playerManager.play(fallbackUrls, startPosition)
+                    _uiState.update { it.copy(isOffline = !isOnline) }
+                    startProgressSync()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PlayerViewModel", "Error loading media", e)
+            }
+        }
+    }
+
+    private fun setStartOver(startOver: Boolean) {
+        if (startOver) {
+            viewModelScope.launch {
+                try {
+                    watchProgressRepository.deleteProgress(movieId)
+                    loadMediaAndPlay()
+                } catch (e: Exception) {
+                    android.util.Log.e("PlayerViewModel", "Error starting over", e)
+                }
             }
         }
     }
@@ -68,29 +149,50 @@ class PlayerViewModel @Inject constructor(
     fun switchQuality(newQuality: String) {
         if (newQuality == _uiState.value.currentQuality) return
         
-        val media = movieWithMedia?.media?.find { it.quality == newQuality } ?: return
-        val fallbackUrls = listOfNotNull(
-            media.watchUrl1,
-            media.watchUrl2,
-            media.downloadUrl1,
-            media.downloadUrl2
-        )
-        
-        if (fallbackUrls.isNotEmpty()) {
-            val currentPos = playerManager.getPlayer().currentPosition
-            playerManager.play(fallbackUrls, currentPos)
-            _uiState.update { it.copy(currentQuality = newQuality) }
+        viewModelScope.launch {
+            try {
+                val localPath = customDownloadManager.getLocalPath(movieId, newQuality)
+                val currentPos = playerManager.getPlayer().currentPosition
+                
+                if (localPath != null && customDownloadManager.checkFileExists(localPath)) {
+                    playerManager.playLocal(localPath, currentPos)
+                    _uiState.update { it.copy(currentQuality = newQuality, isPlayingLocal = true, isOffline = false) }
+                } else {
+                    val media = movieWithMedia?.media?.find { it.quality == newQuality } ?: return@launch
+                    val fallbackUrls = listOfNotNull(
+                        media.watchUrl1,
+                        media.watchUrl2,
+                        media.downloadUrl1,
+                        media.downloadUrl2
+                    )
+                    
+                    if (fallbackUrls.isNotEmpty()) {
+                        playerManager.switchQuality(fallbackUrls.first())
+                        _uiState.update { it.copy(currentQuality = newQuality, isPlayingLocal = false) }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PlayerViewModel", "Error switching quality", e)
+            }
         }
+    }
+
+    fun clearWatchProgress() {
+        setStartOver(true)
     }
 
     private fun startProgressSync() {
         progressSyncJob?.cancel()
         progressSyncJob = viewModelScope.launch {
             while (true) {
-                delay(5000) // Sync every 5 seconds
-                val player = playerManager.getPlayer()
-                if (player.isPlaying) {
-                    saveWatchProgressUseCase(movieId, player.currentPosition, player.duration, _uiState.value.currentQuality)
+                delay(5000)
+                try {
+                    val player = playerManager.getPlayer()
+                    if (player.isPlaying) {
+                        saveWatchProgressUseCase(movieId, player.currentPosition, player.duration, _uiState.value.currentQuality)
+                    }
+                } catch (e: Exception) {
+                    // Ignore transient player errors during sync
                 }
             }
         }
@@ -98,10 +200,10 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        val player = playerManager.getPlayer()
-        viewModelScope.launch {
-            saveWatchProgressUseCase(movieId, player.currentPosition, player.duration, _uiState.value.currentQuality)
+        try {
             playerManager.release()
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerViewModel", "Error in onCleared", e)
         }
     }
 }

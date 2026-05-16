@@ -1,5 +1,6 @@
 package com.kstream.feature.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -9,17 +10,26 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.kstream.core.ui.R
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.MovieTileMobile
 import com.kstream.core.ui.components.MovieTileTv
+import com.kstream.core.ui.components.OfflineScreen
+import com.kstream.core.ui.components.TvOfflineScreen
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.TvLazyRow
 import androidx.tv.foundation.lazy.list.items as tvItems
@@ -29,7 +39,9 @@ import androidx.tv.material3.Text as TvText
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
+import android.app.Activity
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalTvMaterial3Api::class)
 @Composable
 fun HomeRoute(
     onMovieClick: (String) -> Unit,
@@ -41,8 +53,12 @@ fun HomeRoute(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState(initial = true)
     val platform = LocalPlatform.current
+    val isOffline = !isOnline
     var showExitDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val activity = context as? Activity
 
     BackHandler {
         showExitDialog = true
@@ -55,9 +71,8 @@ fun HomeRoute(
             text = { Text("Are you sure you want to exit?") },
             confirmButton = {
                 TextButton(onClick = { 
-                    // How to exit? In a real app we might use (LocalContext.current as Activity).finish()
-                    // For now we'll just show the dialog.
                     showExitDialog = false
+                    activity?.finishAffinity()
                 }) {
                     Text("Exit")
                 }
@@ -71,13 +86,7 @@ fun HomeRoute(
     }
 
     val movieClickHandler: (String) -> Unit = { movieId ->
-        val progress = uiState.watchProgressMap[movieId]
-        val quality = progress?.quality
-        if (quality != null) {
-            onWatchClick(movieId, quality)
-        } else {
-            onMovieClick(movieId)
-        }
+        onMovieClick(movieId)
     }
 
     if (platform == Platform.TV) {
@@ -88,7 +97,10 @@ fun HomeRoute(
             onSearchClick = onSearchClick,
             onDownloadsClick = onDownloadsClick,
             onSettingsClick = onSettingsClick,
-            onRetry = viewModel::refreshContent
+            onRetry = viewModel::refreshContent,
+            onRefresh = viewModel::refreshContent,
+            isOffline = isOffline,
+            onGoToDownloads = onDownloadsClick
         )
     } else {
         HomeScreenMobile(
@@ -98,11 +110,15 @@ fun HomeRoute(
             onSearchClick = onSearchClick,
             onDownloadsClick = onDownloadsClick,
             onSettingsClick = onSettingsClick,
-            onRetry = viewModel::refreshContent
+            onRetry = viewModel::refreshContent,
+            onRefresh = viewModel::refreshContent,
+            isOffline = isOffline,
+            onGoToDownloads = onDownloadsClick
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenMobile(
     uiState: HomeUiState,
@@ -111,9 +127,29 @@ fun HomeScreenMobile(
     onSearchClick: () -> Unit,
     onDownloadsClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onRefresh: () -> Unit,
+    isOffline: Boolean = false,
+    onGoToDownloads: () -> Unit = {}
 ) {
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Image(
+                        painter = painterResource(R.drawable.kstream_logo_horizontal),
+                        contentDescription = "KStream",
+                        modifier = Modifier.height(48.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                },
+                actions = {
+                    IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                }
+            )
+        },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
@@ -160,6 +196,11 @@ fun HomeScreenMobile(
                     }
                 }
             }
+} else if (isOffline) {
+            OfflineScreen(
+                onRetry = onRetry,
+                onGoToDownloads = onGoToDownloads
+            )
         } else if (uiState.rails.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 Text(
@@ -198,8 +239,16 @@ fun HomeScreenMobile(
                                 text = rail.title,
                                 style = MaterialTheme.typography.titleLarge
                             )
-                            TextButton(onClick = { onSeeMoreClick(rail.title) }) {
-                                Text("See More")
+                            val showSeeMore = true
+                            if (showSeeMore) {
+                                val seeMoreQuery = if (rail.title == "Continue Watching") {
+                                    "continue_watching"
+                                } else {
+                                    rail.title
+                                }
+                                TextButton(onClick = { onSeeMoreClick(seeMoreQuery) }) {
+                                    Text("See More")
+                                }
                             }
                         }
                         LazyRow(
@@ -230,7 +279,10 @@ fun HomeScreenTv(
     onSearchClick: () -> Unit,
     onDownloadsClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onRefresh: () -> Unit,
+    isOffline: Boolean = false,
+    onGoToDownloads: () -> Unit = {}
 ) {
     if (uiState.isLoading) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -249,6 +301,11 @@ fun HomeScreenTv(
                 }
             }
         }
+    } else if (isOffline) {
+        TvOfflineScreen(
+            onRetry = onRetry,
+            onGoToDownloads = onGoToDownloads
+        )
     } else if (uiState.rails.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize()) {
             TvText(
@@ -262,18 +319,40 @@ fun HomeScreenTv(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 48.dp, vertical = 24.dp),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                androidx.tv.material3.Button(onClick = onSearchClick) {
-                    TvText("Search")
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                androidx.tv.material3.Button(onClick = onDownloadsClick) {
-                    TvText("Downloads")
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                androidx.tv.material3.Button(onClick = onSettingsClick) {
-                    TvText("Settings")
+                Image(
+                    painter = painterResource(R.drawable.kstream_logo_horizontal),
+                    contentDescription = "KStream",
+                    modifier = Modifier.height(48.dp),
+                    contentScale = ContentScale.Fit
+                )
+                Row {
+                    androidx.tv.material3.Button(
+                        onClick = onRefresh,
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TvText("Refresh")
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    androidx.tv.material3.Button(onClick = onSearchClick) {
+                        TvText("Search")
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    androidx.tv.material3.Button(onClick = onDownloadsClick) {
+                        TvText("Downloads")
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    androidx.tv.material3.Button(onClick = onSettingsClick) {
+                        TvText("Settings")
+                    }
                 }
             }
             TvLazyColumn(
@@ -306,8 +385,16 @@ fun HomeScreenTv(
                                 text = rail.title,
                                 style = TvMaterialTheme.typography.titleLarge
                             )
-                            androidx.tv.material3.Button(onClick = { onSeeMoreClick(rail.title) }) {
-                                TvText("See More")
+                            val showSeeMore = true
+                            if (showSeeMore) {
+                                val seeMoreQuery = if (rail.title == "Continue Watching") {
+                                    "continue_watching"
+                                } else {
+                                    rail.title
+                                }
+                                androidx.tv.material3.Button(onClick = { onSeeMoreClick(seeMoreQuery) }) {
+                                    TvText("See More")
+                                }
                             }
                         }
                         TvLazyRow(
