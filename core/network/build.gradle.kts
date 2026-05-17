@@ -41,6 +41,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf("-opt-in=io.ktor.util.InternalAPI")
     }
 }
 
@@ -51,6 +52,7 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.storage)
     implementation(libs.supabase.gotrue)
+    implementation(libs.supabase.functions)
     implementation(libs.ktor.client.cio)
     implementation(libs.kotlinx.serialization.json)
     

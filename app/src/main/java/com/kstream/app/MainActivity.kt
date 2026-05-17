@@ -16,6 +16,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -61,7 +63,9 @@ class MainActivity : ComponentActivity() {
                 val platform = LocalPlatform.current
                 if (platform == Platform.TV) {
                     KStreamTvTheme {
-                        KStreamAppContent(onLottieReady = { isLottieReady = true })
+                        KStreamTheme {
+                            KStreamAppContent(onLottieReady = { isLottieReady = true })
+                        }
                     }
                 } else {
                     KStreamTheme {
@@ -77,9 +81,19 @@ class MainActivity : ComponentActivity() {
 fun KStreamAppContent(onLottieReady: () -> Unit) {
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
-    val isFirstLaunchCompleted by viewModel.isFirstLaunchCompleted.collectAsState(initial = null)
+    val isFirstLaunchCompleted by viewModel.isFirstLaunchCompleted.collectAsStateWithLifecycle(initialValue = null)
+    val context = LocalContext.current
 
     val startDestination = remember { "splash" }
+
+    // Extract deep link movie ID if present (kstream://movie/{movieId})
+    val deepLinkMovieId = remember {
+        val activity = context as? ComponentActivity
+        val uri = activity?.intent?.data
+        if (uri?.scheme == "kstream" && uri.host == "movie") {
+            uri.pathSegments.firstOrNull()
+        } else null
+    }
 
     NavHost(
         navController = navController,
@@ -97,6 +111,9 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
                 onNavigateToHome = {
                     navController.navigate("home") {
                         popUpTo("splash") { inclusive = true }
+                    }
+                    if (!deepLinkMovieId.isNullOrBlank()) {
+                        navController.navigate("details/${Uri.encode(deepLinkMovieId)}")
                     }
                 }
             )
@@ -131,22 +148,8 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
             )
         }
         composable(
-            route = "downloads?movieId={movieId}&quality={quality}",
-            arguments = listOf(
-                navArgument("movieId") { 
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-                navArgument("quality") { 
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }
-            )
-        ) { backStackEntry ->
-            val scrollMovieId = backStackEntry.arguments?.getString("movieId")
-            val scrollQuality = backStackEntry.arguments?.getString("quality")
+            route = "downloads",
+        ) {
             com.kstream.feature.downloads.DownloadRoute(
                 onBackClick = { navController.popBackStack() },
                 onMovieClick = { movieId ->
@@ -154,9 +157,7 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
                 },
                 onWatchClick = { movieId, quality ->
                     navController.navigate("player/${Uri.encode(movieId)}/${Uri.encode(quality)}/download?startOver=false")
-                },
-                scrollMovieId = scrollMovieId,
-                scrollQuality = scrollQuality
+                }
             )
         }
         composable(
@@ -169,7 +170,7 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
                     navController.navigate("player/${Uri.encode(movieId)}/${Uri.encode(quality)}/stream?startOver=$startOver")
                 },
                 onGoToDownloads = { movieId, quality ->
-                    navController.navigate("downloads?movieId=${Uri.encode(movieId)}&quality=${Uri.encode(quality)}")
+                    navController.navigate("downloads")
                 }
             )
         }

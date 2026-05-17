@@ -4,11 +4,15 @@ import android.content.Context
 import androidx.room.Room
 import com.kstream.core.data.local.KStreamDatabase
 import com.kstream.core.data.local.dao.DownloadDao
+import com.kstream.core.data.local.dao.LikedMovieDao
 import com.kstream.core.data.local.dao.MovieDao
+import com.kstream.core.data.local.dao.RecommendationDao
 import com.kstream.core.data.local.dao.WatchProgressDao
 import com.kstream.core.data.repository.*
 import com.kstream.core.domain.repository.DownloadRepository
+import com.kstream.core.domain.repository.LikedMovieRepository
 import com.kstream.core.domain.repository.MovieRepository
+import com.kstream.core.domain.repository.RecommendationRepository
 import com.kstream.core.domain.repository.UserDataRepository
 import com.kstream.core.domain.repository.WatchProgressRepository
 import dagger.Binds
@@ -43,6 +47,16 @@ abstract class DataModule {
         downloadRepository: DownloadRepositoryImpl
     ): DownloadRepository
 
+    @Binds
+    abstract fun bindLikedMovieRepository(
+        likedMovieRepository: OfflineFirstLikedMovieRepository
+    ): LikedMovieRepository
+
+    @Binds
+    abstract fun bindRecommendationRepository(
+        recommendationRepository: OfflineFirstRecommendationRepository
+    ): RecommendationRepository
+
     companion object {
         @Provides
         @Singleton
@@ -53,7 +67,8 @@ abstract class DataModule {
                 context,
                 KStreamDatabase::class.java,
                 "kstream.db"
-            ).fallbackToDestructiveMigration()
+            ).fallbackToDestructiveMigrationFrom(1, 2, 3, 4)
+                .addMigrations(KStreamDatabase.MIGRATION_5_6)
                 .build()
         }
 
@@ -65,5 +80,11 @@ abstract class DataModule {
 
         @Provides
         fun provideDownloadDao(database: KStreamDatabase): DownloadDao = database.downloadDao()
+
+        @Provides
+        fun provideLikedMovieDao(database: KStreamDatabase): LikedMovieDao = database.likedMovieDao()
+
+        @Provides
+        fun provideRecommendationDao(database: KStreamDatabase): RecommendationDao = database.recommendationDao()
     }
 }

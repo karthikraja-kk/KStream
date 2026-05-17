@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -52,8 +53,8 @@ fun HomeRoute(
     onSettingsClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val isOnline by viewModel.isOnline.collectAsState(initial = true)
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle(initialValue = true)
     val platform = LocalPlatform.current
     val isOffline = !isOnline
     var showExitDialog by remember { mutableStateOf(false) }
@@ -189,14 +190,14 @@ fun HomeScreenMobile(
                     modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
                     horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Error: ${uiState.error}", color = MaterialTheme.colorScheme.error)
+                    Text(text = uiState.error ?: "Something went wrong", color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = onRetry) {
                         Text("Retry")
                     }
                 }
             }
-} else if (isOffline) {
+} else if (isOffline && uiState.rails.isEmpty()) {
             OfflineScreen(
                 onRetry = onRetry,
                 onGoToDownloads = onGoToDownloads
@@ -213,6 +214,21 @@ fun HomeScreenMobile(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
+                if (isOffline) {
+                    item {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "📡 You're offline — showing cached content",
+                                modifier = Modifier.padding(12.dp),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
                 item {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -241,12 +257,8 @@ fun HomeScreenMobile(
                             )
                             val showSeeMore = true
                             if (showSeeMore) {
-                                val seeMoreQuery = if (rail.title == "Continue Watching") {
-                                    "continue_watching"
-                                } else {
-                                    rail.title
-                                }
-                                TextButton(onClick = { onSeeMoreClick(seeMoreQuery) }) {
+                                val query = rail.seeMoreQuery ?: "all:*"
+                                TextButton(onClick = { onSeeMoreClick(query) }) {
                                     Text("See More")
                                 }
                             }
@@ -255,7 +267,7 @@ fun HomeScreenMobile(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(rail.movies) { movie ->
+                            items(rail.movies, key = { it.id }) { movie ->
                                 MovieTileMobile(
                                     movie = movie,
                                     onClick = onMovieClick,
@@ -294,14 +306,14 @@ fun HomeScreenTv(
                 modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
             ) {
-                TvText(text = "Error: ${uiState.error}", color = TvMaterialTheme.colorScheme.error)
+                TvText(text = uiState.error ?: "Something went wrong", color = TvMaterialTheme.colorScheme.error)
                 Spacer(modifier = Modifier.height(16.dp))
                 androidx.tv.material3.Button(onClick = onRetry) {
                     TvText("Retry")
                 }
             }
         }
-    } else if (isOffline) {
+    } else if (isOffline && uiState.rails.isEmpty()) {
         TvOfflineScreen(
             onRetry = onRetry,
             onGoToDownloads = onGoToDownloads
@@ -310,7 +322,8 @@ fun HomeScreenTv(
         Box(modifier = Modifier.fillMaxSize()) {
             TvText(
                 text = "No movies found. Check your connection.",
-                modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+                modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                color = TvMaterialTheme.colorScheme.onSurface
             )
         }
     } else {
@@ -363,7 +376,8 @@ fun HomeScreenTv(
                     Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 24.dp)) {
                         TvText(
                             text = if (uiState.userName.isNotBlank()) "Hello, ${uiState.userName}!" else "Hello!",
-                            style = TvMaterialTheme.typography.displaySmall
+                            style = TvMaterialTheme.typography.displaySmall,
+                            color = TvMaterialTheme.colorScheme.onBackground
                         )
                         TvText(
                             text = "What would you like to watch today?",
@@ -383,16 +397,13 @@ fun HomeScreenTv(
                         ) {
                             TvText(
                                 text = rail.title,
-                                style = TvMaterialTheme.typography.titleLarge
+                                style = TvMaterialTheme.typography.titleLarge,
+                                color = TvMaterialTheme.colorScheme.onSurface
                             )
                             val showSeeMore = true
                             if (showSeeMore) {
-                                val seeMoreQuery = if (rail.title == "Continue Watching") {
-                                    "continue_watching"
-                                } else {
-                                    rail.title
-                                }
-                                androidx.tv.material3.Button(onClick = { onSeeMoreClick(seeMoreQuery) }) {
+                                val query = rail.seeMoreQuery ?: "all:*"
+                                androidx.tv.material3.Button(onClick = { onSeeMoreClick(query) }) {
                                     TvText("See More")
                                 }
                             }
@@ -401,7 +412,7 @@ fun HomeScreenTv(
                             contentPadding = PaddingValues(horizontal = 48.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            tvItems(rail.movies) { movie ->
+                            tvItems(rail.movies, key = { it.id }) { movie ->
                                 MovieTileTv(movie = movie, onClick = onMovieClick)
                             }
                         }

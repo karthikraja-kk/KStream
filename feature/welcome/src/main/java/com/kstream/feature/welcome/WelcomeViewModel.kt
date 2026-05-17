@@ -24,8 +24,10 @@ class WelcomeViewModel @Inject constructor(
 
     fun onContinueClick(onComplete: () -> Unit) {
         viewModelScope.launch {
-            userDataRepository.setUsername(_username.value)
-            userDataRepository.setFirstLaunchCompleted(true)
+            try {
+                userDataRepository.setUsername(_username.value)
+                userDataRepository.setFirstLaunchCompleted(true)
+            } catch (_: Exception) { }
             onComplete()
         }
     }

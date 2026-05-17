@@ -3,14 +3,19 @@ package com.kstream.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kstream.core.common.NetworkMonitor
+import com.kstream.core.common.toUserMessage
 import com.kstream.core.domain.GetMoviesUseCase
 import com.kstream.core.domain.SyncMoviesUseCase
 import com.kstream.core.domain.GetAllWatchProgressUseCase
+import com.kstream.core.domain.GetRecommendationsUseCase
+import com.kstream.core.domain.repository.DownloadRepository
 import com.kstream.core.model.Movie
 import com.kstream.core.model.WatchProgress
+import com.kstream.core.domain.repository.LikedMovieRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -24,7 +29,8 @@ data class HomeUiState(
 data class MovieRail(
     val title: String,
     val movies: List<Movie>,
-    val totalCount: Int? = null
+    val totalCount: Int? = null,
+    val seeMoreQuery: String? = null
 )
 
 @HiltViewModel
@@ -32,6 +38,9 @@ class HomeViewModel @Inject constructor(
     private val getMoviesUseCase: GetMoviesUseCase,
     private val syncMoviesUseCase: SyncMoviesUseCase,
     private val getAllWatchProgressUseCase: GetAllWatchProgressUseCase,
+    private val getRecommendationsUseCase: GetRecommendationsUseCase,
+    private val likedMovieRepository: LikedMovieRepository,
+    private val downloadRepository: DownloadRepository,
     private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository,
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
@@ -47,6 +56,7 @@ class HomeViewModel @Inject constructor(
         refreshContent()
         observeData()
         observeNetworkChanges()
+        observeActivityForRecommendations()
     }
 
     private fun observeNetworkChanges() {
@@ -62,7 +72,9 @@ class HomeViewModel @Inject constructor(
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastSyncTime > syncDebounceMs) {
                     lastSyncTime = currentTime
-                    syncMoviesUseCase()
+                    try {
+                        syncMoviesUseCase()
+                    } catch (_: Exception) { }
                 }
             }
             .launchIn(viewModelScope)
@@ -70,15 +82,17 @@ class HomeViewModel @Inject constructor(
 
     private fun observeData() {
         combine(
-            getMoviesUseCase().catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } },
-            getAllWatchProgressUseCase().catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } },
-            userDataRepository.username.catch { emit("") }
-        ) { movies, progress, username ->
+            getMoviesUseCase().catch { e -> _uiState.update { it.copy(error = e.toUserMessage(), isLoading = false) } },
+            getAllWatchProgressUseCase().catch { e -> _uiState.update { it.copy(error = e.toUserMessage(), isLoading = false) } },
+            userDataRepository.username.catch { emit("") },
+            likedMovieRepository.getAllLikedMovieIds().catch { emit(emptyList()) },
+            getRecommendationsUseCase().catch { emit(emptyList()) }
+        ) { movies, progress, username, likedIds, recommendations ->
             _uiState.update { 
                 it.copy(
                     isLoading = false, 
                     userName = username,
-                    rails = groupMoviesIntoRails(movies, progress),
+                    rails = groupMoviesIntoRails(movies, progress, likedIds, recommendations),
                     watchProgressMap = progress.associateBy { p -> p.movieId }
                 ) 
             }
@@ -91,19 +105,51 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = true, error = null) }
                 lastSyncTime = System.currentTimeMillis()
                 syncMoviesUseCase()
+                getRecommendationsUseCase.refreshRecommendations()
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                _uiState.update { it.copy(error = e.toUserMessage(), isLoading = false) }
             }
+        }
+    }
+
+    /**
+     * Watches the 3 user activity sources (watch progress, liked, downloads).
+     * When any changes, debounce 2s then recompute and store recommendations.
+     */
+    private fun observeActivityForRecommendations() {
+        combine(
+            getAllWatchProgressUseCase().catch { emit(emptyList()) },
+            likedMovieRepository.getAllLikedMovieIds().catch { emit(emptyList()) },
+            downloadRepository.getDownloads().catch { emit(emptyList()) }
+        ) { progress, liked, downloads ->
+            Triple(progress.size, liked.size, downloads.size)
+        }
+            .drop(1) // skip initial emission — refreshContent handles first compute
+            .debounce(2000L)
+            .onEach {
+                try {
+                    getRecommendationsUseCase.refreshRecommendations()
+                } catch (_: Exception) {}
+            }
+            .launchIn(viewModelScope)
+
+        // Initial computation on app start
+        viewModelScope.launch {
+            try {
+                getRecommendationsUseCase.refreshRecommendations()
+            } catch (_: Exception) {}
         }
     }
 
     private fun groupMoviesIntoRails(
         movies: List<Movie>,
-        progress: List<WatchProgress>
+        progress: List<WatchProgress>,
+        likedIds: List<String>,
+        recommendations: List<Movie>
     ): List<MovieRail> {
         val rails = mutableListOf<MovieRail>()
         
-        // Continue Watching
+        // Continue Watching — sorted by user's watch recency, NOT lastUpdated
         val allContinueWatchingMovies = progress
             .filter { it.completionPercent < 95f }
             .sortedByDescending { it.lastUpdated }
@@ -113,38 +159,56 @@ class HomeViewModel @Inject constructor(
         val totalContinueWatching = allContinueWatchingMovies.size
         
         if (continueWatchingMovies.isNotEmpty()) {
-            rails.add(MovieRail("Continue Watching", continueWatchingMovies, totalContinueWatching))
+            rails.add(MovieRail("Continue Watching", continueWatchingMovies, totalContinueWatching, seeMoreQuery = "history:*"))
         }
 
-        // New Releases
-        rails.add(MovieRail("New Releases", movies.sortedByDescending { it.year }.take(10)))
-        
-        // Recommendations
-        val watchedMovieIds = progress.filter { it.completionPercent > 50f }.map { it.movieId }
-        val watchedGenres = movies.filter { watchedMovieIds.contains(it.id) }.flatMap { it.genres }.distinct()
-        
-        if (watchedGenres.isNotEmpty()) {
-            val recommended = movies.filter { it.genres.any { g -> watchedGenres.contains(g) } && !watchedMovieIds.contains(it.id) }.take(10)
-            if (recommended.isNotEmpty()) {
-                rails.add(MovieRail("You Might Like", recommended))
+        // Liked Movies — preserves order from DB (most recently liked first)
+        if (likedIds.isNotEmpty()) {
+            val allLikedMovies = likedIds.mapNotNull { id -> movies.find { it.id == id } }
+            val likedMoviesPreview = allLikedMovies.take(10)
+            if (likedMoviesPreview.isNotEmpty()) {
+                rails.add(MovieRail("Liked Movies", likedMoviesPreview, allLikedMovies.size, seeMoreQuery = "liked:*"))
             }
         }
+
+        // Recommended for You — appears only when user has activity
+        if (recommendations.isNotEmpty()) {
+            rails.add(MovieRail(
+                "Recommended for You",
+                recommendations.take(10),
+                recommendations.size,
+                seeMoreQuery = "recommended:*"
+            ))
+        }
+
+        // New Releases — sorted by last_updated (latest first)
+        rails.add(MovieRail("New Releases", movies.sortedByLastUpdated().take(10), seeMoreQuery = "all:*"))
         
-        // ... (rest of rails logic)
+        // Genre rails — sorted by last_updated
         val allGenres = movies.flatMap { it.genres }.distinct()
         allGenres.take(5).forEach { genre ->
-            val genreMovies = movies.filter { it.genres.contains(genre) }.take(10)
+            val genreMovies = movies.filter { it.genres.contains(genre) }.sortedByLastUpdated().take(10)
             if (genreMovies.isNotEmpty()) {
-                rails.add(MovieRail(genre, genreMovies))
+                rails.add(MovieRail(genre, genreMovies, seeMoreQuery = "genre:$genre"))
             }
         }
         
+        // Year rails — sorted by last_updated
         val years = movies.map { it.year }.distinct().sortedDescending()
         years.take(3).forEach { year ->
-            val yearMovies = movies.filter { it.year == year }.take(10)
-            rails.add(MovieRail("Released in $year", yearMovies))
+            val yearMovies = movies.filter { it.year == year }.sortedByLastUpdated().take(10)
+            rails.add(MovieRail("Released in $year", yearMovies, seeMoreQuery = "year:$year"))
         }
 
         return rails
+    }
+
+    /**
+     * Sorts movies by lastUpdated descending (latest first).
+     * Movies with empty lastUpdated go to the end.
+     */
+    private fun List<Movie>.sortedByLastUpdated(): List<Movie> {
+        return sortedWith(compareByDescending<Movie> { it.lastUpdated.isNotBlank() }
+            .thenByDescending { it.lastUpdated })
     }
 }

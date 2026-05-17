@@ -6,9 +6,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kstream.core.common.NetworkMonitor
+import com.kstream.core.common.toUserMessage
 import com.kstream.core.domain.GetMovieDetailsUseCase
 import com.kstream.core.domain.repository.WatchProgressRepository
 import com.kstream.core.domain.repository.DownloadRepository
+import com.kstream.core.domain.repository.LikedMovieRepository
 import com.kstream.core.model.DownloadStatus
 import com.kstream.core.model.MovieWithMedia
 import com.kstream.feature.downloads.CustomDownloadManager
@@ -28,14 +30,19 @@ data class DetailsUiState(
     val isInDownloads: Boolean = false,
     val error: String? = null,
     val isOnline: Boolean = true,
-    val hasWatchProgress: Boolean = false
+    val hasWatchProgress: Boolean = false,
+    val isRefreshingLinks: Boolean = false,
+    val refreshError: String? = null,
+    val isLiked: Boolean = false
 )
 
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getMovieDetailsUseCase: GetMovieDetailsUseCase,
+    private val refreshMovieMediaUseCase: com.kstream.core.domain.RefreshMovieMediaUseCase,
     private val watchProgressRepository: WatchProgressRepository,
+    private val likedMovieRepository: LikedMovieRepository,
     private val customDownloadManager: CustomDownloadManager,
     private val downloadRepository: DownloadRepository,
     private val networkMonitor: NetworkMonitor,
@@ -52,6 +59,7 @@ class DetailsViewModel @Inject constructor(
         observeDownloads()
         observeNetworkState()
         observeWatchProgress()
+        observeLikedState()
     }
 
     private fun observeNetworkState() {
@@ -64,16 +72,34 @@ class DetailsViewModel @Inject constructor(
 
     private fun observeWatchProgress() {
         viewModelScope.launch {
-            val progress = watchProgressRepository.getProgress(movieId)
-            _uiState.update { 
-                it.copy(hasWatchProgress = progress != null && progress.completionPercent < 95f) 
+            try {
+                val progress = watchProgressRepository.getProgress(movieId)
+                _uiState.update { 
+                    it.copy(hasWatchProgress = progress != null && progress.completionPercent < 95f) 
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    private fun observeLikedState() {
+        likedMovieRepository.isLiked(movieId)
+            .onEach { liked ->
+                _uiState.update { it.copy(isLiked = liked) }
             }
+            .launchIn(viewModelScope)
+    }
+
+    fun toggleLike() {
+        viewModelScope.launch {
+            try {
+                likedMovieRepository.toggleLike(movieId)
+            } catch (_: Exception) { }
         }
     }
 
     private fun observeDownloads() {
         combine(
-            downloadRepository.getDownloads(),
+            downloadRepository.getDownloads().catch { emit(emptyList()) },
             _uiState.map { it.selectedQuality }.distinctUntilChanged()
         ) { downloads, selectedQuality ->
             val movieDownloads = downloads.filter { it.movieId == movieId }
@@ -102,7 +128,7 @@ class DetailsViewModel @Inject constructor(
         }.launchIn(viewModelScope)
     }
 
-    private fun fetchMovieDetails() {
+    fun fetchMovieDetails() {
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
@@ -120,7 +146,7 @@ class DetailsViewModel @Inject constructor(
                     ) 
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -140,8 +166,10 @@ class DetailsViewModel @Inject constructor(
 
     fun onStartOver() {
         viewModelScope.launch {
-            watchProgressRepository.deleteProgress(movieId)
-            _uiState.update { it.copy(hasWatchProgress = false) }
+            try {
+                watchProgressRepository.deleteProgress(movieId)
+                _uiState.update { it.copy(hasWatchProgress = false) }
+            } catch (_: Exception) { }
         }
     }
 
@@ -174,8 +202,53 @@ class DetailsViewModel @Inject constructor(
                     fileSize = media.fileSize,
                     onProgress = { /* Observed via flow */ }
                 ).onFailure { error ->
-                    Toast.makeText(context, "Download failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                    // Check if failure is due to expired URL (HTTP 403/404)
+                    val msg = error.message ?: ""
+                    if (msg.contains("403") || msg.contains("404") || msg.contains("expired")) {
+                        refreshAndRetryDownload(quality)
+                    } else {
+                        Toast.makeText(context, "Download failed. Please try again.", Toast.LENGTH_SHORT).show()
+                    }
                 }
+            }
+        }
+    }
+
+    private fun refreshAndRetryDownload(quality: String) {
+        if (_uiState.value.isRefreshingLinks) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null) }
+            Toast.makeText(context, "Link expired. Refreshing...", Toast.LENGTH_SHORT).show()
+
+            try {
+                val refreshed = refreshMovieMediaUseCase(movieId)
+                if (refreshed != null) {
+                    _uiState.update { it.copy(movieWithMedia = refreshed, isRefreshingLinks = false) }
+                    val freshMedia = refreshed.media.find { it.quality == quality }
+                    val freshUrl = freshMedia?.downloadUrl1 ?: freshMedia?.downloadUrl2
+                    if (freshUrl != null) {
+                        customDownloadManager.downloadMovie(
+                            movieId = movieId,
+                            quality = quality,
+                            url = freshUrl,
+                            movieName = refreshed.movie.movieName,
+                            posterUrl = refreshed.movie.posterUrl,
+                            fileSize = freshMedia?.fileSize ?: "",
+                            onProgress = { }
+                        )
+                        Toast.makeText(context, "Download restarted with fresh link", Toast.LENGTH_SHORT).show()
+                    } else {
+                        _uiState.update { it.copy(refreshError = "No fresh download link available") }
+                        Toast.makeText(context, "No fresh download link found", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Failed to refresh links") }
+                    Toast.makeText(context, "Could not refresh links", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isRefreshingLinks = false, refreshError = e.toUserMessage()) }
+                Toast.makeText(context, "Could not refresh links. Please try again.", Toast.LENGTH_SHORT).show()
             }
         }
     }

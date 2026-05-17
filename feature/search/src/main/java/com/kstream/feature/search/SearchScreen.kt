@@ -11,8 +11,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kstream.core.ui.LocalPlatform
@@ -36,9 +41,9 @@ fun SearchRoute(
     initialQuery: String? = null,
     viewModel: SearchViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val platform = LocalPlatform.current
-    val isOnline by viewModel.isOnline.collectAsState(initial = true)
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle(initialValue = true)
     val isOffline = !isOnline && uiState.query.isNotBlank()
 
     LaunchedEffect(initialQuery) {
@@ -48,11 +53,20 @@ fun SearchRoute(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        SearchBar(
-            query = uiState.query,
-            onQueryChange = viewModel::onQueryChange,
-            modifier = Modifier.padding(16.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 16.dp, bottom = 0.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SearchBar(
+                query = uiState.query,
+                onQueryChange = viewModel::onQueryChange,
+                modifier = Modifier.weight(1f)
+            )
+            SortButton(
+                currentSort = uiState.sortOption,
+                onSortChange = viewModel::onSortChange
+            )
+        }
 
         if (uiState.recentSearches.isNotEmpty() && uiState.query.isBlank()) {
             Row(
@@ -69,12 +83,49 @@ fun SearchRoute(
                 }
             }
         }
+
+        // Type-ahead suggestions from search history
+        if (uiState.recentSearches.isNotEmpty() && uiState.query.isNotBlank()) {
+            val matchingSuggestions = uiState.recentSearches.filter {
+                it.contains(uiState.query, ignoreCase = true) && !it.equals(uiState.query, ignoreCase = true)
+            }
+            if (matchingSuggestions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    matchingSuggestions.take(3).forEach { suggestion ->
+                        SuggestionChip(
+                            onClick = { viewModel.setInitialQuery(suggestion) },
+                            label = { Text(suggestion) }
+                        )
+                    }
+                }
+            }
+        }
         
         if (isOffline) {
             OfflineScreen(
                 onRetry = { viewModel.onQueryChange(uiState.query) },
                 onGoToDownloads = onDownloadsClick
             )
+        } else if (uiState.error != null) {
+            val errorMessage = uiState.error ?: ""
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { viewModel.onQueryChange(uiState.query) }) {
+                        Text("Retry")
+                    }
+                }
+            }
         } else if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize()) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -146,7 +197,7 @@ fun SearchScreenMobile(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(uiState.results) { movie ->
+            items(uiState.results, key = { it.id }) { movie ->
                 MovieTileMobile(movie = movie, onClick = { onMovieClick(movie) })
             }
         }
@@ -174,8 +225,52 @@ fun SearchScreenTv(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            tvItems(uiState.results) { movie ->
+            tvItems(uiState.results, key = { it.id }) { movie ->
                 MovieTileTv(movie = movie, onClick = { onMovieClick(movie) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun SortButton(
+    currentSort: SortOption,
+    onSortChange: (SortOption) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                painter = painterResource(android.R.drawable.ic_menu_sort_by_size),
+                contentDescription = "Sort",
+                tint = if (currentSort != SortOption.NONE)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            SortOption.entries.forEach { option ->
+                val isSelected = option == currentSort
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = option.label,
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    onClick = {
+                        onSortChange(option)
+                        expanded = false
+                    }
+                )
             }
         }
     }

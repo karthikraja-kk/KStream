@@ -118,6 +118,7 @@ fun TvOfflineScreen(
         androidx.tv.material3.Text(
             text = title,
             style = androidx.tv.material3.MaterialTheme.typography.displayMedium,
+            color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(12.dp))

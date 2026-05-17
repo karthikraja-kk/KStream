@@ -8,4 +8,5 @@ interface WatchProgressRepository {
     suspend fun getProgress(movieId: String): WatchProgress?
     fun getAllProgress(): Flow<List<WatchProgress>>
     suspend fun deleteProgress(movieId: String)
+    suspend fun deleteAllProgress()
 }

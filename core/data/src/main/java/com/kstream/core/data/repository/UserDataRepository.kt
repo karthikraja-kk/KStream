@@ -21,4 +21,5 @@ class DefaultUserDataRepository @Inject constructor(
     override suspend fun setFirstLaunchCompleted(completed: Boolean) = dataStore.setFirstLaunchCompleted(completed)
     override suspend fun setWifiOnlyDownload(wifiOnly: Boolean) = dataStore.setWifiOnlyDownload(wifiOnly)
     override suspend fun addRecentSearch(query: String) = dataStore.addRecentSearch(query)
+    override suspend fun clearAllData() = dataStore.clearAll()
 }

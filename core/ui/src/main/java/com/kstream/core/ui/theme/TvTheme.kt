@@ -18,6 +18,12 @@ private val TvDarkColorScheme = tvDarkColorScheme(
     onTertiary = Color.White,
     onBackground = Color.White,
     onSurface = Color.White,
+    surfaceVariant = Color(0xFF2A2A2A),
+    onSurfaceVariant = Color(0xFFB3B3B3),
+    error = Color(0xFFCF6679),
+    onError = Color.White,
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
 )
 
 @OptIn(ExperimentalTvMaterial3Api::class)

@@ -17,5 +17,6 @@ data class Download(
     val progress: Float = 0f,
     val downloadedBytes: Long = 0L,
     val totalBytes: Long = 0L,
-    val statusMessage: String? = null
+    val statusMessage: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
 )

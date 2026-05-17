@@ -33,7 +33,7 @@ class KStreamApp : Application(), ImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.05)
+                    .maxSizeBytes(100L * 1024 * 1024) // 100MB fixed
                     .build()
             }
             .memoryCachePolicy(CachePolicy.ENABLED)

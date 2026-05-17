@@ -30,6 +30,9 @@ class PlayerManager @Inject constructor(
     private var wasPlayingBeforePause = false
     private val scope = CoroutineScope(Dispatchers.Main)
 
+    private val _allUrlsFailed = kotlinx.coroutines.flow.MutableSharedFlow<PlaybackException>(extraBufferCapacity = 1)
+    val allUrlsFailed: kotlinx.coroutines.flow.SharedFlow<PlaybackException> = _allUrlsFailed
+
     fun getPlayer(): Player {
         if (exoPlayer == null) {
             exoPlayer = ExoPlayer.Builder(context).build().apply {
@@ -60,11 +63,16 @@ class PlayerManager @Inject constructor(
                             }
                         }
                         
-                        val next = fallbackUrls.getOrNull(fallbackIndex + 1) ?: return
-                        fallbackIndex += 1
-                        player.setMediaItem(MediaItem.fromUri(next))
-                        player.prepare()
-                        player.play()
+                        val next = fallbackUrls.getOrNull(fallbackIndex + 1)
+                        if (next != null) {
+                            fallbackIndex += 1
+                            player.setMediaItem(MediaItem.fromUri(next))
+                            player.prepare()
+                            player.play()
+                        } else {
+                            // All fallback URLs exhausted — signal for media refresh
+                            _allUrlsFailed.tryEmit(error)
+                        }
                     }
                 })
             }

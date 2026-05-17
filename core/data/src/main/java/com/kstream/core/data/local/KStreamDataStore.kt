@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,12 +28,14 @@ class KStreamDataStore @Inject constructor(
     private val RECENT_SEARCHES = stringPreferencesKey("recent_searches")
     private val DOWNLOAD_LOCATION = stringPreferencesKey("download_location")
     private val DOWNLOAD_LOCATION_URI = stringPreferencesKey("download_location_uri")
+    private val POSTER_BASE_URL = stringPreferencesKey("poster_base_url")
 
     val username: Flow<String> = context.dataStore.data.map { it[USERNAME] ?: "Guest" }
     val isFirstLaunchCompleted: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH_COMPLETED] ?: false }
     val isWifiOnlyDownload: Flow<Boolean> = context.dataStore.data.map { it[WIFI_ONLY_DOWNLOAD] ?: true }
     val downloadLocation: Flow<String> = context.dataStore.data.map { it[DOWNLOAD_LOCATION] ?: "Internal Storage" }
     val downloadLocationUri: Flow<String> = context.dataStore.data.map { it[DOWNLOAD_LOCATION_URI] ?: "" }
+    val posterBaseUrl: Flow<String> = context.dataStore.data.map { it[POSTER_BASE_URL] ?: "" }
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         decodeRecentSearches(it[RECENT_SEARCHES])
     }
@@ -49,12 +52,24 @@ class KStreamDataStore @Inject constructor(
         context.dataStore.edit { it[DOWNLOAD_LOCATION_URI] = uri }
     }
 
+    suspend fun setPosterBaseUrl(url: String) {
+        context.dataStore.edit { it[POSTER_BASE_URL] = url }
+    }
+
+    suspend fun getPosterBaseUrlSync(): String {
+        return context.dataStore.data.map { it[POSTER_BASE_URL] ?: "" }.first()
+    }
+
     suspend fun setFirstLaunchCompleted(completed: Boolean) {
         context.dataStore.edit { it[FIRST_LAUNCH_COMPLETED] = completed }
     }
 
     suspend fun setWifiOnlyDownload(wifiOnly: Boolean) {
         context.dataStore.edit { it[WIFI_ONLY_DOWNLOAD] = wifiOnly }
+    }
+
+    suspend fun clearAll() {
+        context.dataStore.edit { it.clear() }
     }
 
     suspend fun addRecentSearch(query: String) {
@@ -73,10 +88,16 @@ class KStreamDataStore @Inject constructor(
 
     private fun decodeRecentSearches(value: String?): List<String> {
         if (value.isNullOrBlank()) return emptyList()
-        return value.split(RECENT_SEARCH_DELIMITER).filter { it.isNotBlank() }
+        return try {
+            val jsonArray = org.json.JSONArray(value)
+            (0 until jsonArray.length()).map { jsonArray.getString(it) }
+        } catch (_: Exception) {
+            // Backwards-compatible: migrate from old || delimiter format
+            value.split(RECENT_SEARCH_DELIMITER).filter { it.isNotBlank() }
+        }
     }
 
     private fun encodeRecentSearches(values: List<String>): String {
-        return values.joinToString(RECENT_SEARCH_DELIMITER)
+        return org.json.JSONArray(values).toString()
     }
 }

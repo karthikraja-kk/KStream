@@ -30,9 +30,14 @@ import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.Text as TvText
 
 import kotlinx.coroutines.delay
+import android.content.Intent
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.Icons
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun DetailsRoute(
@@ -41,7 +46,7 @@ fun DetailsRoute(
     onGoToDownloads: (String, String) -> Unit,
     viewModel: DetailsViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val platform = LocalPlatform.current
     val isOffline = !uiState.isOnline
 
@@ -61,7 +66,8 @@ fun DetailsRoute(
             isOffline = isOffline,
             onGoToDownloads = { onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "") },
             onRetry = { viewModel.refreshMovieDetails() },
-            onStartOver = { viewModel.onStartOver() }
+            onStartOver = { viewModel.onStartOver() },
+            onLikeClick = { viewModel.toggleLike() }
         )
     } else {
         DetailsScreenMobile(
@@ -79,7 +85,8 @@ fun DetailsRoute(
             isOffline = isOffline,
             onGoToDownloads = { onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "") },
             onRetry = { viewModel.refreshMovieDetails() },
-            onStartOver = { viewModel.onStartOver() }
+            onStartOver = { viewModel.onStartOver() },
+            onLikeClick = { viewModel.toggleLike() }
         )
     }
 }
@@ -95,8 +102,10 @@ fun DetailsScreenMobile(
     isOffline: Boolean = false,
     onGoToDownloads: () -> Unit = {},
     onRetry: () -> Unit = {},
-    onStartOver: () -> Unit = {}
+    onStartOver: () -> Unit = {},
+    onLikeClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,6 +113,27 @@ fun DetailsScreenMobile(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(androidx.compose.material.icons.Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        val movieId = uiState.movieWithMedia?.movie?.id ?: return@IconButton
+                        val movieName = uiState.movieWithMedia?.movie?.movieName ?: "Movie"
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, movieName)
+                            putExtra(Intent.EXTRA_TEXT, "Check out \"$movieName\" on KStream!\nkstream://movie/$movieId")
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share via"))
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share")
+                    }
+                    IconButton(onClick = onLikeClick) {
+                        Icon(
+                            imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (uiState.isLiked) "Unlike" else "Like",
+                            tint = if (uiState.isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
             )
@@ -122,12 +152,17 @@ fun DetailsScreenMobile(
         } else if (uiState.error != null) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Error loading movie", style = MaterialTheme.typography.headlineMedium)
+                    Text(text = "Unable to load movie", style = MaterialTheme.typography.headlineMedium)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = uiState.error, style = MaterialTheme.typography.bodyMedium)
+                    Text(text = uiState.error ?: "Something went wrong", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onBackClick) {
-                        Text("Go Back")
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = onBackClick) {
+                            Text("Go Back")
+                        }
+                        Button(onClick = onRetry) {
+                            Text("Retry")
+                        }
                     }
                 }
             }
@@ -198,6 +233,16 @@ fun DetailsScreenMobile(
                     if (movie.genres.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(text = "Genres: ${movie.genres.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium)
+                    }
+
+                    if (movie.rating.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "Rating: ${movie.rating}", style = MaterialTheme.typography.bodyMedium)
+                    }
+
+                    if (movie.lastUpdated.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "Last Updated: ${movie.lastUpdated}", style = MaterialTheme.typography.bodyMedium)
                     }
                     
                     Spacer(modifier = Modifier.height(24.dp))
@@ -318,7 +363,8 @@ fun DetailsScreenTv(
     isOffline: Boolean = false,
     onGoToDownloads: () -> Unit = {},
     onRetry: () -> Unit = {},
-    onStartOver: () -> Unit = {}
+    onStartOver: () -> Unit = {},
+    onLikeClick: () -> Unit = {}
 ) {
     if (isOffline && uiState.movieWithMedia == null) {
         TvOfflineScreen(
@@ -332,12 +378,17 @@ fun DetailsScreenTv(
     } else if (uiState.error != null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                TvText(text = "Error loading movie", style = TvMaterialTheme.typography.displayMedium)
+                TvText(text = "Unable to load movie", style = TvMaterialTheme.typography.displayMedium, color = TvMaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(16.dp))
-                TvText(text = uiState.error, style = TvMaterialTheme.typography.bodyLarge)
+                TvText(text = uiState.error ?: "Something went wrong", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(32.dp))
-                TvButton(onClick = onBackClick) {
-                    TvText("Go Back")
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    androidx.tv.material3.OutlinedButton(onClick = onBackClick) {
+                        TvText("Go Back")
+                    }
+                    TvButton(onClick = onRetry) {
+                        TvText("Retry")
+                    }
                 }
             }
         }
@@ -386,32 +437,56 @@ fun DetailsScreenTv(
                     .padding(48.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                TvText(text = movie.movieName, style = TvMaterialTheme.typography.displayMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TvText(text = movie.movieName, style = TvMaterialTheme.typography.displayMedium, color = TvMaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onLikeClick) {
+                        Icon(
+                            imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (uiState.isLiked) "Unlike" else "Like",
+                            tint = if (uiState.isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
                 TvText(
                     text = "${movie.year} • ${movie.duration} • ${movie.language} • ${movie.type}",
-                    style = TvMaterialTheme.typography.bodyLarge
+                    style = TvMaterialTheme.typography.bodyLarge,
+                    color = TvMaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(32.dp))
-                TvText(text = movie.synopsis, style = TvMaterialTheme.typography.bodyLarge)
+                TvText(text = movie.synopsis, style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurface)
                 
                 if (movie.director.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(24.dp))
-                    TvText(text = "Director: ${movie.director.joinToString(", ")}", style = TvMaterialTheme.typography.bodyLarge)
+                    TvText(text = "Director: ${movie.director.joinToString(", ")}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 if (movie.castMembers.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    TvText(text = "Cast: ${movie.castMembers.take(5).joinToString(", ")}${if (movie.castMembers.size > 5) "..." else ""}", style = TvMaterialTheme.typography.bodyLarge)
+                    TvText(text = "Cast: ${movie.castMembers.take(5).joinToString(", ")}${if (movie.castMembers.size > 5) "..." else ""}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 if (movie.genres.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    TvText(text = "Genres: ${movie.genres.joinToString(", ")}", style = TvMaterialTheme.typography.bodyLarge)
+                    TvText(text = "Genres: ${movie.genres.joinToString(", ")}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                if (movie.rating.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TvText(text = "Rating: ${movie.rating}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                if (movie.lastUpdated.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TvText(text = "Last Updated: ${movie.lastUpdated}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 Spacer(modifier = Modifier.height(48.dp))
 
-                TvText(text = "Select Quality", style = TvMaterialTheme.typography.titleLarge)
+                TvText(text = "Select Quality", style = TvMaterialTheme.typography.titleLarge, color = TvMaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),

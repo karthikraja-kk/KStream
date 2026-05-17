@@ -12,4 +12,5 @@ interface DownloadRepository {
     suspend fun updateDownloadStatusWithMessage(id: String, status: com.kstream.core.model.DownloadStatus, message: String?)
     suspend fun markDownloadComplete(id: String, localFilePath: String)
     suspend fun deleteDownload(id: String)
+    suspend fun deleteAllDownloads()
 }

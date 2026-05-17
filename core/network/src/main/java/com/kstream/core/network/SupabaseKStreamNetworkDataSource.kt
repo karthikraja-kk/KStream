@@ -5,8 +5,10 @@ import com.kstream.core.network.model.NetworkMovie
 import com.kstream.core.network.model.NetworkMovieWithMedia
 import com.kstream.core.network.model.NetworkMedia
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.ktor.client.call.body
 import javax.inject.Inject
 
 class SupabaseKStreamNetworkDataSource @Inject constructor(
@@ -75,4 +77,101 @@ class SupabaseKStreamNetworkDataSource @Inject constructor(
             throw e
         }
     }
+
+    override suspend fun getBaseUrl(): String {
+        return try {
+            Log.d("KStreamNetwork", "Fetching base URL from source table...")
+            val response = client.postgrest["source"]
+                .select {
+                    filter {
+                        eq("key", "base_url")
+                    }
+                }
+            val result = response.decodeList<SourceEntry>()
+            val url = result.firstOrNull()?.url ?: ""
+            Log.d("KStreamNetwork", "Base URL: $url")
+            url
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error fetching base URL: ${e.message}", e)
+            ""
+        }
+    }
+
+    override suspend fun refreshMovieMedia(movieId: String): List<NetworkMedia> {
+        return try {
+            Log.d("KStreamNetwork", "Calling refresh-media Edge Function for movie: $movieId")
+
+            val response = client.functions.invoke("refresh-media") {
+                body = kotlinx.serialization.json.buildJsonObject {
+                    put("movie_id", kotlinx.serialization.json.JsonPrimitive(movieId))
+                }
+            }
+            val bodyStr = response.body<String>()
+            Log.d("KStreamNetwork", "Edge Function response: $bodyStr")
+
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            val parsed = json.decodeFromString<RefreshMediaResponse>(bodyStr)
+
+            if (parsed.status == "done" || parsed.status == "cached") {
+                // Re-fetch media from DB to get properly typed NetworkMedia
+                val media = client.postgrest["media"]
+                    .select {
+                        filter {
+                            eq("movie_id", movieId)
+                        }
+                    }
+                    .decodeList<NetworkMedia>()
+                Log.d("KStreamNetwork", "Refreshed ${media.size} media entries for movie $movieId")
+                media
+            } else {
+                Log.e("KStreamNetwork", "Refresh failed: ${parsed.error}")
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error refreshing media: ${e.message}", e)
+            emptyList()
+        }
+    }
+    override suspend fun triggerMovieScan(): ScanTriggerResponse {
+        return try {
+            Log.d("KStreamNetwork", "Calling trigger-scan Edge Function")
+            val response = client.functions.invoke("trigger-scan")
+            val bodyStr = response.body<String>()
+            Log.d("KStreamNetwork", "Trigger scan response: $bodyStr")
+
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            json.decodeFromString<ScanTriggerResponse>(bodyStr)
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error triggering scan: ${e.message}", e)
+            ScanTriggerResponse(status = "error", error = e.message)
+        }
+    }
+
+    override suspend fun getScanStatus(): ScanStatusEntry? {
+        return try {
+            val result = client.postgrest["refresh_status"]
+                .select {
+                    order("refresh_time", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+                    limit(1)
+                }
+                .decodeList<ScanStatusEntry>()
+            result.firstOrNull()
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error fetching scan status: ${e.message}", e)
+            null
+        }
+    }
 }
+
+@kotlinx.serialization.Serializable
+private data class SourceEntry(
+    @kotlinx.serialization.SerialName("key") val key: String,
+    @kotlinx.serialization.SerialName("url") val url: String
+)
+
+@kotlinx.serialization.Serializable
+private data class RefreshMediaResponse(
+    val status: String? = null,
+    val error: String? = null,
+    val media: kotlinx.serialization.json.JsonElement? = null
+)

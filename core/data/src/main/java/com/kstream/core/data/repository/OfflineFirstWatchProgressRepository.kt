@@ -39,6 +39,10 @@ class OfflineFirstWatchProgressRepository @Inject constructor(
     override suspend fun deleteProgress(movieId: String) {
         watchProgressDao.deleteProgress(movieId)
     }
+
+    override suspend fun deleteAllProgress() {
+        watchProgressDao.deleteAll()
+    }
 }
 
 private fun WatchProgressEntity.asExternalModel() = WatchProgress(

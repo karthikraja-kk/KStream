@@ -31,38 +31,27 @@ class DownloadRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateDownloadProgress(id: String, progress: Float, downloadedBytes: Long, totalBytes: Long) {
-        val download = downloadDao.getDownloadById(id) ?: return
-        downloadDao.upsertDownload(download.copy(
-            progress = progress,
-            downloadedBytes = downloadedBytes,
-            totalBytes = totalBytes
-        ))
+        downloadDao.updateProgress(id, progress, downloadedBytes, totalBytes)
     }
 
     override suspend fun updateDownloadStatus(id: String, status: DownloadStatus) {
-        val download = downloadDao.getDownloadById(id) ?: return
-        downloadDao.upsertDownload(download.copy(status = status.toEntity(), statusMessage = null))
+        downloadDao.updateStatus(id, status.toEntity())
     }
 
     override suspend fun updateDownloadStatusWithMessage(id: String, status: DownloadStatus, message: String?) {
-        val download = downloadDao.getDownloadById(id) ?: return
-        downloadDao.upsertDownload(download.copy(status = status.toEntity(), statusMessage = message))
+        downloadDao.updateStatusWithMessage(id, status.toEntity(), message)
     }
 
     override suspend fun markDownloadComplete(id: String, localFilePath: String) {
-        val download = downloadDao.getDownloadById(id) ?: return
-        downloadDao.upsertDownload(
-            download.copy(
-                localFilePath = localFilePath,
-                status = EntityDownloadStatus.COMPLETED,
-                progress = 1.0f,
-                statusMessage = null
-            )
-        )
+        downloadDao.markComplete(id, localFilePath, EntityDownloadStatus.COMPLETED)
     }
 
     override suspend fun deleteDownload(id: String) {
         downloadDao.deleteDownloadById(id)
+    }
+
+    override suspend fun deleteAllDownloads() {
+        downloadDao.deleteAll()
     }
 }
 
@@ -97,7 +86,8 @@ private fun DownloadEntity.toDomain() = Download(
     progress = progress,
     downloadedBytes = downloadedBytes,
     totalBytes = totalBytes,
-    statusMessage = statusMessage
+    statusMessage = statusMessage,
+    createdAt = createdAt
 )
 
 private fun Download.toEntity() = DownloadEntity(
@@ -113,5 +103,6 @@ private fun Download.toEntity() = DownloadEntity(
     progress = progress,
     downloadedBytes = downloadedBytes,
     totalBytes = totalBytes,
-    statusMessage = statusMessage
+    statusMessage = statusMessage,
+    createdAt = createdAt
 )

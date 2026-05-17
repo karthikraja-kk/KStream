@@ -5,23 +5,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kstream.core.model.Download
 import com.kstream.core.model.DownloadStatus
-import kotlinx.coroutines.delay
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,27 +30,15 @@ fun DownloadRoute(
     onBackClick: () -> Unit,
     onMovieClick: (String) -> Unit,
     onWatchClick: (String, String) -> Unit,
-    scrollMovieId: String? = null,
-    scrollQuality: String? = null,
     viewModel: DownloadViewModel = hiltViewModel()
 ) {
-    val downloads by viewModel.downloads.collectAsState(initial = emptyList())
-    val searchQuery by viewModel.searchQuery.collectAsState()
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle(initialValue = emptyList())
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val sortOption by viewModel.sortOption.collectAsStateWithLifecycle()
     var isSearching by remember { mutableStateOf(false) }
+    var showSortMenu by remember { mutableStateOf(false) }
     
     var downloadToRemove by remember { mutableStateOf<Download?>(null) }
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(downloads, scrollMovieId, scrollQuality) {
-        if (downloads.isNotEmpty() && scrollMovieId != null) {
-            val index = downloads.indexOfFirst { d ->
-                d.movieId.startsWith(scrollMovieId) && (scrollQuality == null || d.quality == scrollQuality)
-            }
-            if (index != -1) {
-                listState.animateScrollToItem(index)
-            }
-        }
-    }
 
     BackHandler {
         if (isSearching) {
@@ -82,6 +70,18 @@ fun DownloadRoute(
                         }) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
+                    },
+                    actions = {
+                        DownloadSortButton(
+                            currentSort = sortOption,
+                            expanded = showSortMenu,
+                            onToggle = { showSortMenu = !showSortMenu },
+                            onDismiss = { showSortMenu = false },
+                            onSortChange = {
+                                viewModel.onSortChange(it)
+                                showSortMenu = false
+                            }
+                        )
                     }
                 )
             } else {
@@ -93,6 +93,16 @@ fun DownloadRoute(
                         }
                     },
                     actions = {
+                        DownloadSortButton(
+                            currentSort = sortOption,
+                            expanded = showSortMenu,
+                            onToggle = { showSortMenu = !showSortMenu },
+                            onDismiss = { showSortMenu = false },
+                            onSortChange = {
+                                viewModel.onSortChange(it)
+                                showSortMenu = false
+                            }
+                        )
                         IconButton(onClick = { isSearching = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
@@ -126,7 +136,6 @@ fun DownloadRoute(
                 }
             } else {
                 LazyColumn(
-                    state = listState,
                     modifier = mainContentModifier,
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -134,12 +143,8 @@ fun DownloadRoute(
                     items(downloads, key = { it.id }) { download ->
                         var fileExists by remember { mutableStateOf(true) }
                         
-                        LaunchedEffect(download.localFilePath) {
+                        LaunchedEffect(download.localFilePath, download.status) {
                             fileExists = viewModel.checkFileExists(download.localFilePath)
-                            while (true) {
-                                delay(3000)
-                                fileExists = viewModel.checkFileExists(download.localFilePath)
-                            }
                         }
 
                         DownloadItem(
@@ -317,4 +322,43 @@ private fun formatBytes(bytes: Long): String {
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
     val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
     return String.format(Locale.US, "%.2f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+@Composable
+private fun DownloadSortButton(
+    currentSort: DownloadSortOption,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onDismiss: () -> Unit,
+    onSortChange: (DownloadSortOption) -> Unit
+) {
+    Box {
+        IconButton(onClick = onToggle) {
+            Icon(
+                painter = painterResource(android.R.drawable.ic_menu_sort_by_size),
+                contentDescription = "Sort",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onDismiss
+        ) {
+            DownloadSortOption.entries.forEach { option ->
+                val isSelected = option == currentSort
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = option.label,
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    onClick = { onSortChange(option) }
+                )
+            }
+        }
+    }
 }

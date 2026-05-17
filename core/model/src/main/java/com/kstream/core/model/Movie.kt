@@ -16,7 +16,9 @@ data class Movie(
     val rating: String,
     val language: String,
     val type: String,
-    val slug: String
+    val slug: String,
+    val movieUrl: String = "",
+    val lastUpdated: String = ""
 )
 
 @Serializable
@@ -41,4 +43,12 @@ data class DownloadMetadata(
 data class MovieWithMedia(
     val movie: Movie,
     val media: List<Media>
+)
+
+enum class ScanStatus { IDLE, RUNNING, COMPLETED, FAILED }
+
+data class ScanTriggerResult(
+    val status: String,
+    val triggeredAt: String? = null,
+    val message: String? = null
 )

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kstream.core.common.NetworkMonitor
+import com.kstream.core.common.toUserMessage
 import com.kstream.core.domain.GetMovieDetailsUseCase
 import com.kstream.core.domain.GetWatchProgressUseCase
 import com.kstream.core.domain.SaveWatchProgressUseCase
@@ -20,7 +21,11 @@ data class PlayerUiState(
     val currentQuality: String = "",
     val isPlayingLocal: Boolean = false,
     val isOffline: Boolean = false,
-    val isBuffering: Boolean = false
+    val isBuffering: Boolean = false,
+    val isRefreshingLinks: Boolean = false,
+    val refreshError: String? = null,
+    val loadError: String? = null,
+    val localFileMissing: Boolean = false
 )
 
 @HiltViewModel
@@ -29,6 +34,7 @@ class PlayerViewModel @Inject constructor(
     private val getMovieDetailsUseCase: GetMovieDetailsUseCase,
     private val getWatchProgressUseCase: GetWatchProgressUseCase,
     private val saveWatchProgressUseCase: SaveWatchProgressUseCase,
+    private val refreshMovieMediaUseCase: com.kstream.core.domain.RefreshMovieMediaUseCase,
     private val customDownloadManager: CustomDownloadManager,
     private val networkMonitor: NetworkMonitor,
     private val watchProgressRepository: com.kstream.core.domain.repository.WatchProgressRepository,
@@ -37,7 +43,7 @@ class PlayerViewModel @Inject constructor(
 
     private val movieId: String = android.net.Uri.decode(savedStateHandle.get<String>("movieId") ?: "")
     private val initialQuality: String = android.net.Uri.decode(savedStateHandle.get<String>("quality") ?: "")
-    private val source: String = android.net.Uri.decode(savedStateHandle.get<String>("source") ?: "stream")
+    private val source: String = savedStateHandle.get<String>("source") ?: "stream"
 
     private val _uiState = MutableStateFlow(PlayerUiState(currentQuality = initialQuality))
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -49,8 +55,9 @@ class PlayerViewModel @Inject constructor(
         if (movieId.isNotEmpty() && initialQuality.isNotEmpty()) {
             loadMediaAndPlay()
             observeNetworkState()
+            observeUrlFailures()
         } else {
-            android.util.Log.e("PlayerViewModel", "Invalid navigation arguments: movieId=$movieId, quality=$initialQuality")
+            _uiState.update { it.copy(loadError = "Unable to play — missing movie information.") }
         }
     }
 
@@ -59,7 +66,15 @@ class PlayerViewModel @Inject constructor(
     private fun observeNetworkState() {
         networkMonitor.isOnline
             .onEach { isOnline ->
-                if (isOnline) {
+                if (isOnline && wasOffline && !_uiState.value.isPlayingLocal) {
+                    _uiState.update { it.copy(isOffline = false) }
+                    wasOffline = false
+                    try {
+                        val player = playerManager.getPlayer()
+                        player.prepare()
+                        player.play()
+                    } catch (_: Exception) { }
+                } else if (isOnline) {
                     _uiState.update { it.copy(isOffline = false) }
                     wasOffline = false
                 } else {
@@ -67,6 +82,49 @@ class PlayerViewModel @Inject constructor(
                 }
             }
             .launchIn(viewModelScope)
+    }
+
+    private fun observeUrlFailures() {
+        playerManager.allUrlsFailed
+            .onEach { error ->
+                android.util.Log.w("PlayerViewModel", "All URLs failed (${error.errorCode}), attempting media refresh...")
+                refreshAndRetry()
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun refreshAndRetry() {
+        if (_uiState.value.isRefreshingLinks) return // already refreshing
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null) }
+            try {
+                val refreshed = refreshMovieMediaUseCase(movieId)
+                if (refreshed != null) {
+                    movieWithMedia = refreshed
+                    val media = refreshed.media.find { it.quality == _uiState.value.currentQuality }
+                    val freshUrls = listOfNotNull(
+                        media?.watchUrl1,
+                        media?.watchUrl2,
+                        media?.downloadUrl1,
+                        media?.downloadUrl2
+                    )
+                    if (freshUrls.isNotEmpty()) {
+                        val startPosition = playerManager.getPlayer().currentPosition.coerceAtLeast(0)
+                        playerManager.play(freshUrls, startPosition)
+                        _uiState.update { it.copy(isRefreshingLinks = false) }
+                        android.util.Log.d("PlayerViewModel", "Playback resumed with refreshed URLs")
+                    } else {
+                        _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "No working links found. Please try again later.") }
+                    }
+                } else {
+                    _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Could not refresh links. Please try again.") }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PlayerViewModel", "Media refresh failed", e)
+                _uiState.update { it.copy(isRefreshingLinks = false, refreshError = e.toUserMessage()) }
+            }
+        }
     }
 
     fun onBufferingStateChanged(isBuffering: Boolean) {
@@ -80,14 +138,16 @@ class PlayerViewModel @Inject constructor(
 
     fun retryConnection() {
         viewModelScope.launch {
-            val isOnline = networkMonitor.isOnline.first()
-            if (isOnline) {
-                _uiState.update { it.copy(isOffline = false) }
-                wasOffline = false
-                val player = playerManager.getPlayer()
-                player.prepare()
-                player.play()
-            }
+            try {
+                val isOnline = networkMonitor.isOnline.first()
+                if (isOnline) {
+                    _uiState.update { it.copy(isOffline = false) }
+                    wasOffline = false
+                    val player = playerManager.getPlayer()
+                    player.prepare()
+                    player.play()
+                }
+            } catch (_: Exception) { }
         }
     }
 
@@ -103,6 +163,12 @@ class PlayerViewModel @Inject constructor(
                     playerManager.playLocal(localPath, startPosition)
                     _uiState.update { it.copy(isPlayingLocal = true, isOffline = false) }
                     startProgressSync()
+                    return@launch
+                }
+
+                // From downloads page: don't fall back to streaming
+                if (source == "download") {
+                    _uiState.update { it.copy(localFileMissing = true) }
                     return@launch
                 }
 
@@ -129,6 +195,40 @@ class PlayerViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 android.util.Log.e("PlayerViewModel", "Error loading media", e)
+                _uiState.update { it.copy(loadError = e.toUserMessage()) }
+            }
+        }
+    }
+
+    fun watchOnline() {
+        _uiState.update { it.copy(localFileMissing = false) }
+        viewModelScope.launch {
+            try {
+                val isOnline = networkMonitor.isOnline.first()
+                if (!isOnline) {
+                    _uiState.update { it.copy(loadError = "No internet connection. Please connect and try again.") }
+                    return@launch
+                }
+                movieWithMedia = getMovieDetailsUseCase(movieId)
+                val mediaList = movieWithMedia?.media ?: emptyList()
+                _uiState.update { it.copy(
+                    availableQualities = mediaList.map { m -> m.quality },
+                    currentQuality = initialQuality
+                ) }
+                val media = mediaList.find { it.quality == initialQuality }
+                val fallbackUrls = listOfNotNull(
+                    media?.watchUrl1, media?.watchUrl2,
+                    media?.downloadUrl1, media?.downloadUrl2
+                )
+                if (fallbackUrls.isNotEmpty()) {
+                    val startPosition = getWatchProgressUseCase(movieId)
+                    playerManager.play(fallbackUrls, startPosition)
+                    startProgressSync()
+                } else {
+                    _uiState.update { it.copy(loadError = "No streaming links available for this movie.") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(loadError = e.toUserMessage()) }
             }
         }
     }
