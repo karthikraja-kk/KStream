@@ -86,11 +86,10 @@ private fun com.kstream.core.data.local.entities.MovieEntity.toMovie() = Movie(
     language = language,
     type = type,
     slug = slug,
-    movieUrl = movieUrl,
     lastUpdated = lastUpdated
 )
 
-private fun com.kstream.core.data.local.entities.WatchProgressEntity.toWatchProgress() = WatchProgress(
+private fun com.kstream.core.data.local.entities.WatchProgressEntity.toWatchProgress()= WatchProgress(
     movieId = movieId,
     lastPosition = lastPosition,
     duration = duration,

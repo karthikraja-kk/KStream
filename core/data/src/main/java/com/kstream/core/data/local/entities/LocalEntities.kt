@@ -63,7 +63,6 @@ data class MovieEntity(
     val language: String,
     val type: String,
     val slug: String,
-    val movieUrl: String = "",
     val lastUpdated: String = ""
 )
 

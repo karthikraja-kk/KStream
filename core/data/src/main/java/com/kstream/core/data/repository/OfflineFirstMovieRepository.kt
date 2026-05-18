@@ -212,7 +212,6 @@ private fun MovieEntity.asExternalModel(baseUrl: String = "") = Movie(
     language = language,
     type = type,
     slug = slug,
-    movieUrl = movieUrl,
     lastUpdated = lastUpdated
 )
 
@@ -243,6 +242,5 @@ private fun com.kstream.core.network.model.NetworkMovie.asLocalEntity() = MovieE
     language = language ?: "",
     type = type ?: "",
     slug = slug,
-    movieUrl = movieUrl,
     lastUpdated = lastUpdated ?: ""
 )

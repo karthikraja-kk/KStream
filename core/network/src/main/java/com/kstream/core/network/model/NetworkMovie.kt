@@ -18,7 +18,6 @@ data class NetworkMovie(
     @SerialName("language") val language: String?,
     @SerialName("type") val type: String?,
     @SerialName("slug") val slug: String,
-    @SerialName("movie_url") val movieUrl: String,
     @SerialName("last_updated") val lastUpdated: String? = null,
     @Serializable(with = DateTimeAsLongSerializer::class)
     @SerialName("created_at") val createdAt: Long? = null,
@@ -41,7 +40,6 @@ data class NetworkMovieWithMedia(
     @SerialName("language") val language: String?,
     @SerialName("type") val type: String?,
     @SerialName("slug") val slug: String,
-    @SerialName("movie_url") val movieUrl: String? = null,
     @SerialName("last_updated") val lastUpdated: String? = null,
     @Serializable(with = DateTimeAsLongSerializer::class)
     @SerialName("created_at") val createdAt: Long? = null,
