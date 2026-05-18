@@ -1,9 +1,7 @@
 package com.kstream.feature.settings
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,17 +16,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsRoute(
     onBackClick: () -> Unit,
+    onMovieClick: (String) -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -98,8 +99,10 @@ fun SettingsRoute(
             Spacer(modifier = Modifier.height(8.dp))
 
             ScanMoviesButton(
-                scanState = uiState.scanState,
-                scanMessage = uiState.scanMessage,
+                isEnabled = uiState.isScanButtonEnabled,
+                scanStatusText = uiState.scanStatusText,
+                lastRefreshText = uiState.lastRefreshText,
+                scanDetailText = uiState.scanDetailText,
                 onTriggerScan = { viewModel.triggerScan() }
             )
 
@@ -121,7 +124,6 @@ fun SettingsRoute(
 
             OutlinedButton(
                 onClick = {
-                    viewModel.loadWatchHistory()
                     showWatchHistory = true
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -205,6 +207,7 @@ fun SettingsRoute(
             WatchHistoryScreen(
                 items = uiState.watchHistory,
                 isLoading = uiState.isLoadingHistory,
+                onMovieClick = onMovieClick,
                 onRemove = { selectedIds ->
                     viewModel.deleteWatchHistory(selectedIds)
                 },
@@ -268,19 +271,37 @@ fun SettingsRoute(
 private fun WatchHistoryScreen(
     items: List<WatchHistoryItem>,
     isLoading: Boolean,
+    onMovieClick: (String) -> Unit,
     onRemove: (Set<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val selectedIds = remember { androidx.compose.runtime.snapshots.SnapshotStateList<String>() }
+    var isSelecting by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingDeleteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    BackHandler { onDismiss() }
+    // Exit selection mode when all items are gone
+    LaunchedEffect(items.size) {
+        if (items.isEmpty()) {
+            isSelecting = false
+            selectedIds.clear()
+        }
+    }
+
+    BackHandler {
+        if (isSelecting) {
+            isSelecting = false
+            selectedIds.clear()
+        } else {
+            onDismiss()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    if (selectedIds.isNotEmpty()) {
+                    if (isSelecting && selectedIds.isNotEmpty()) {
                         Text("${selectedIds.size} selected")
                     } else {
                         Text("Watch History")
@@ -288,21 +309,21 @@ private fun WatchHistoryScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (selectedIds.isNotEmpty()) {
+                        if (isSelecting) {
+                            isSelecting = false
                             selectedIds.clear()
                         } else {
                             onDismiss()
                         }
                     }) {
                         Icon(
-                            if (selectedIds.isNotEmpty()) Icons.Default.Close else Icons.Default.ArrowBack,
-                            contentDescription = if (selectedIds.isNotEmpty()) "Clear selection" else "Back"
+                            if (isSelecting) Icons.Default.Close else Icons.Default.ArrowBack,
+                            contentDescription = if (isSelecting) "Cancel" else "Back"
                         )
                     }
                 },
                 actions = {
-                    if (items.isNotEmpty()) {
-                        // Select All / Deselect All
+                    if (isSelecting && items.isNotEmpty()) {
                         val allSelected = selectedIds.size == items.size
                         TextButton(onClick = {
                             if (allSelected) {
@@ -314,14 +335,17 @@ private fun WatchHistoryScreen(
                         }) {
                             Text(if (allSelected) "Deselect All" else "Select All")
                         }
-                    }
-                    if (selectedIds.isNotEmpty()) {
-                        IconButton(onClick = { showDeleteConfirm = true }) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Remove selected",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                        if (selectedIds.isNotEmpty()) {
+                            IconButton(onClick = {
+                                pendingDeleteIds = selectedIds.toSet()
+                                showDeleteConfirm = true
+                            }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Remove selected",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }
@@ -347,9 +371,24 @@ private fun WatchHistoryScreen(
                     WatchHistoryListItem(
                         item = item,
                         isSelected = isSelected,
-                        onToggleSelect = {
-                            if (isSelected) selectedIds.remove(item.movieId)
-                            else selectedIds.add(item.movieId)
+                        isSelecting = isSelecting,
+                        onTap = {
+                            if (isSelecting) {
+                                if (isSelected) selectedIds.remove(item.movieId)
+                                else selectedIds.add(item.movieId)
+                            } else {
+                                onMovieClick(item.movieId)
+                            }
+                        },
+                        onLongPress = {
+                            if (!isSelecting) {
+                                isSelecting = true
+                                selectedIds.add(item.movieId)
+                            }
+                        },
+                        onDelete = {
+                            pendingDeleteIds = setOf(item.movieId)
+                            showDeleteConfirm = true
                         }
                     )
                 }
@@ -359,15 +398,18 @@ private fun WatchHistoryScreen(
         if (showDeleteConfirm) {
             AlertDialog(
                 onDismissRequest = { showDeleteConfirm = false },
-                title = { Text("Remove Watch History") },
+                title = { Text("Remove from Watch History") },
                 text = {
-                    Text("Remove ${selectedIds.size} item${if (selectedIds.size > 1) "s" else ""} from watch history?")
+                    val count = pendingDeleteIds.size
+                    Text("Remove $count item${if (count > 1) "s" else ""} from watch history?")
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            onRemove(selectedIds.toSet())
-                            selectedIds.clear()
+                            onRemove(pendingDeleteIds)
+                            selectedIds.removeAll(pendingDeleteIds)
+                            if (selectedIds.isEmpty()) isSelecting = false
+                            pendingDeleteIds = emptySet()
                             showDeleteConfirm = false
                         },
                         colors = ButtonDefaults.textButtonColors(
@@ -387,16 +429,23 @@ private fun WatchHistoryScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WatchHistoryListItem(
     item: WatchHistoryItem,
     isSelected: Boolean,
-    onToggleSelect: () -> Unit
+    isSelecting: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onToggleSelect() },
+            .combinedClickable(
+                onClick = onTap,
+                onLongClick = onLongPress
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected)
                 MaterialTheme.colorScheme.primaryContainer
@@ -405,43 +454,57 @@ private fun WatchHistoryListItem(
         )
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggleSelect() }
+            // Checkbox overlay in selection mode
+            if (isSelecting) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onTap() },
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+
+            // Poster
+            AsyncImage(
+                model = item.posterUrl.ifBlank { null },
+                contentDescription = item.movieName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(72.dp)
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(6.dp))
             )
-            Spacer(modifier = Modifier.width(8.dp))
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Title + last watched
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.movieName,
                     style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LinearProgressIndicator(
-                        progress = (item.completionPercent / 100f).coerceIn(0f, 1f),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${item.completionPercent.toInt()}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = formatTimestamp(item.lastWatched),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            // Per-item delete button (hidden in multi-select mode to reduce clutter)
+            if (!isSelecting) {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Remove",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }
@@ -454,94 +517,40 @@ private fun formatTimestamp(millis: Long): String {
 
 @Composable
 private fun ScanMoviesButton(
-    scanState: ScanState,
-    scanMessage: String,
+    isEnabled: Boolean,
+    scanStatusText: String,
+    lastRefreshText: String,
+    scanDetailText: String,
     onTriggerScan: () -> Unit
 ) {
-    val isActive = scanState in listOf(
-        ScanState.TRIGGERING, ScanState.RUNNING, ScanState.ALREADY_RUNNING
-    )
-    val isEnabled = scanState == ScanState.IDLE
-
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(
             onClick = onTriggerScan,
             enabled = isEnabled,
             modifier = Modifier.fillMaxWidth()
         ) {
-            when (scanState) {
-                ScanState.CHECKING -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Checking status...")
-                }
-                ScanState.TRIGGERING -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Initiating scan...")
-                }
-                ScanState.RUNNING, ScanState.ALREADY_RUNNING -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Scanning...")
-                }
-                ScanState.COMPLETED -> {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Scan Complete ✓")
-                }
-                ScanState.FAILED -> {
-                    Text("Scan Failed")
-                }
-                ScanState.TOO_RECENT -> {
-                    Text("Scanned recently")
-                }
-                ScanState.IDLE -> {
-                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Scan Latest Movies")
-                }
-            }
+            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Scan Latest Movies")
         }
 
-        // Progress bar below button when active
-        AnimatedVisibility(
-            visible = isActive,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-            )
-        }
-
-        // Status message
-        AnimatedVisibility(
-            visible = scanMessage.isNotEmpty(),
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            Text(
-                text = scanMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = when (scanState) {
-                    ScanState.FAILED -> MaterialTheme.colorScheme.error
-                    ScanState.COMPLETED -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-            )
-        }
+        Text(
+            text = scanStatusText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+        )
+        Text(
+            text = lastRefreshText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp, start = 4.dp)
+        )
+        Text(
+            text = scanDetailText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp, start = 4.dp)
+        )
     }
 }

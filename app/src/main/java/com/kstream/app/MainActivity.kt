@@ -224,7 +224,12 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
             )
         }
         composable("settings") {
-            com.kstream.feature.settings.SettingsRoute(onBackClick = { navController.popBackStack() })
+            com.kstream.feature.settings.SettingsRoute(
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId ->
+                    navController.navigate("details/${android.net.Uri.encode(movieId)}")
+                }
+            )
         }
     }
 }

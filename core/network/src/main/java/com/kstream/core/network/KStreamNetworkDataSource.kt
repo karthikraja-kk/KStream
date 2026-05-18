@@ -12,6 +12,7 @@ interface KStreamNetworkDataSource {
     suspend fun refreshMovieMedia(movieId: String): List<NetworkMedia>
     suspend fun triggerMovieScan(): ScanTriggerResponse
     suspend fun getScanStatus(): ScanStatusEntry?
+    suspend fun getLatestCompletedScanStatus(): ScanStatusEntry?
 }
 
 @kotlinx.serialization.Serializable

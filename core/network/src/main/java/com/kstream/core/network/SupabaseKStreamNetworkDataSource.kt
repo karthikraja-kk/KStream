@@ -161,6 +161,24 @@ class SupabaseKStreamNetworkDataSource @Inject constructor(
             null
         }
     }
+
+    override suspend fun getLatestCompletedScanStatus(): ScanStatusEntry? {
+        return try {
+            val result = client.postgrest["refresh_status"]
+                .select {
+                    filter {
+                        eq("status", "completed")
+                    }
+                    order("refresh_time", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+                    limit(1)
+                }
+                .decodeList<ScanStatusEntry>()
+            result.firstOrNull()
+        } catch (e: Exception) {
+            Log.e("KStreamNetwork", "Error fetching latest completed scan status: ${e.message}", e)
+            null
+        }
+    }
 }
 
 @kotlinx.serialization.Serializable

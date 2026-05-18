@@ -17,19 +17,22 @@ import com.kstream.core.domain.TriggerScanUseCase
 import com.kstream.core.domain.GetScanStatusUseCase
 import com.kstream.core.domain.SyncMoviesUseCase
 import com.kstream.core.model.ScanStatus
-import com.kstream.core.model.Movie
-import com.kstream.core.model.WatchProgress
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.util.Date
+import java.util.Locale
 import java.io.File
 import javax.inject.Inject
 
 enum class ScanState {
-    IDLE, CHECKING, TRIGGERING, RUNNING, COMPLETED, FAILED, TOO_RECENT, ALREADY_RUNNING
+    IDLE, TRIGGERING, RUNNING, COOLDOWN, COMPLETED, FAILED
 }
 
 data class WatchHistoryItem(
@@ -42,8 +45,11 @@ data class WatchHistoryItem(
 
 data class SettingsUiState(
     val username: String = "",
-    val scanState: ScanState = ScanState.CHECKING,
-    val scanMessage: String = "",
+    val scanState: ScanState = ScanState.IDLE,
+    val isScanButtonEnabled: Boolean = false,
+    val scanStatusText: String = "Status: Checking",
+    val lastRefreshText: String = "Last refresh: --",
+    val scanDetailText: String = "Checking scan status...",
     val cacheCleared: Boolean = false,
     val watchHistory: List<WatchHistoryItem> = emptyList(),
     val isLoadingHistory: Boolean = false
@@ -67,12 +73,12 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private var pollingJob: Job? = null
-    private var triggeredAt: String? = null
+    private var cooldownTickerJob: Job? = null
+    private var lastObservedScanStatus: ScanStatus? = null
 
     companion object {
         private const val POLL_INTERVAL_MS = 5000L
-        private const val POLL_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutes
-        private const val RESULT_DISPLAY_MS = 3000L
+        private const val COOLDOWN_MS = 15 * 60 * 1000L
     }
 
     init {
@@ -81,7 +87,8 @@ class SettingsViewModel @Inject constructor(
             .onEach { username -> _uiState.update { it.copy(username = username) } }
             .launchIn(viewModelScope)
 
-        checkScanStatus()
+        startLiveScanMonitor()
+        startWatchHistoryMonitor()
     }
 
     fun onUsernameChange(newName: String) {
@@ -117,154 +124,212 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private var watchHistoryJob: Job? = null
-
-    fun loadWatchHistory() {
-        watchHistoryJob?.cancel()
-        watchHistoryJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingHistory = true) }
-            try {
-                val progress = watchProgressRepository.getAllProgress()
-                val allMovies = movieRepository.searchMovies("*")
-                val movieMap = allMovies.associateBy { it.id }
-
-                progress.collect { progressList ->
-                    val items = progressList
-                        .sortedByDescending { it.lastUpdated }
-                        .mapNotNull { p ->
-                            val movie = movieMap[p.movieId]
-                            if (movie != null) {
-                                WatchHistoryItem(
-                                    movieId = p.movieId,
-                                    movieName = movie.movieName,
-                                    posterUrl = movie.posterUrl,
-                                    completionPercent = p.completionPercent,
-                                    lastWatched = p.lastUpdated
-                                )
-                            } else null
-                        }
-                    _uiState.update { it.copy(watchHistory = items, isLoadingHistory = false) }
+    private fun startWatchHistoryMonitor() {
+        combine(
+            movieRepository.getMovies(),
+            watchProgressRepository.getAllProgress()
+        ) { movies, progressList ->
+            val movieMap = movies.associateBy { it.id }
+            progressList
+                .sortedByDescending { it.lastUpdated }
+                .map { p ->
+                    val movie = movieMap[p.movieId]
+                    WatchHistoryItem(
+                        movieId = p.movieId,
+                        movieName = movie?.movieName ?: "Unknown",
+                        posterUrl = movie?.posterUrl ?: "",
+                        completionPercent = p.completionPercent,
+                        lastWatched = p.lastUpdated
+                    )
                 }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoadingHistory = false) }
-            }
         }
+            .catch { emit(emptyList()) }
+            .onEach { items -> _uiState.update { it.copy(watchHistory = items, isLoadingHistory = false) } }
+            .launchIn(viewModelScope)
     }
 
     fun deleteWatchHistory(movieIds: Set<String>) {
         viewModelScope.launch {
             try {
-                movieIds.forEach { id ->
-                    watchProgressRepository.deleteProgress(id)
-                }
-                _uiState.update { state ->
-                    state.copy(watchHistory = state.watchHistory.filter { it.movieId !in movieIds })
-                }
+                movieIds.forEach { id -> watchProgressRepository.deleteProgress(id) }
             } catch (_: Exception) { }
         }
     }
 
-    private fun checkScanStatus() {
-        viewModelScope.launch {
-            try {
-                val status = getScanStatusUseCase()
-                when (status) {
-                    ScanStatus.RUNNING -> {
-                        _uiState.update { it.copy(scanState = ScanState.RUNNING, scanMessage = "Scan in progress") }
-                        startPolling()
-                    }
-                    else -> {
-                        _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
-                    }
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
-            }
-        }
-    }
-
     fun triggerScan() {
-        if (_uiState.value.scanState != ScanState.IDLE) return
+        if (!_uiState.value.isScanButtonEnabled) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(scanState = ScanState.TRIGGERING, scanMessage = "Initiating scan...") }
+            _uiState.update {
+                it.copy(
+                    scanState = ScanState.TRIGGERING,
+                    isScanButtonEnabled = false,
+                    scanDetailText = "Requesting scan trigger..."
+                )
+            }
 
             try {
                 val result = triggerScanUseCase()
 
                 when (result.status) {
                     "started" -> {
-                        triggeredAt = result.triggeredAt
-                        _uiState.update { it.copy(scanState = ScanState.RUNNING, scanMessage = "Scanning for new movies...") }
-                        startPolling()
+                        _uiState.update {
+                            it.copy(scanDetailText = "Scan request accepted. Waiting for status update...")
+                        }
                     }
                     "already_running" -> {
-                        _uiState.update { it.copy(scanState = ScanState.ALREADY_RUNNING, scanMessage = "Scan already in progress") }
-                        startPolling()
+                        _uiState.update {
+                            it.copy(scanDetailText = "A scan is currently running. Please wait.")
+                        }
                     }
                     "too_recent" -> {
-                        _uiState.update { it.copy(scanState = ScanState.TOO_RECENT, scanMessage = result.message ?: "Scanned recently") }
-                        // Auto-reset to IDLE after display period
-                        delay(RESULT_DISPLAY_MS)
-                        _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
+                        _uiState.update {
+                            it.copy(scanDetailText = result.message ?: "Scanned recently. Cooldown active.")
+                        }
                     }
                     else -> {
-                        _uiState.update { it.copy(scanState = ScanState.FAILED, scanMessage = result.message ?: "Failed to trigger scan") }
-                        delay(RESULT_DISPLAY_MS)
-                        _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
+                        _uiState.update {
+                            it.copy(
+                                scanState = ScanState.FAILED,
+                                isScanButtonEnabled = true,
+                                scanDetailText = result.message ?: "Failed to trigger scan."
+                            )
+                        }
                     }
                 }
+
+                refreshScanState()
             } catch (e: Exception) {
-                _uiState.update { it.copy(scanState = ScanState.FAILED, scanMessage = e.toUserMessage()) }
-                delay(RESULT_DISPLAY_MS)
-                _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
+                _uiState.update {
+                    it.copy(
+                        scanState = ScanState.FAILED,
+                        isScanButtonEnabled = true,
+                        scanDetailText = e.toUserMessage()
+                    )
+                }
             }
         }
     }
 
-    private fun startPolling() {
+    private fun startLiveScanMonitor() {
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
-            val startTime = System.currentTimeMillis()
-
-            while (System.currentTimeMillis() - startTime < POLL_TIMEOUT_MS) {
+            while (isActive) {
+                refreshScanState()
                 delay(POLL_INTERVAL_MS)
+            }
+        }
+    }
 
-                try {
-                    val status = getScanStatusUseCase()
-                    when (status) {
-                        ScanStatus.RUNNING -> {
-                            _uiState.update { it.copy(scanState = ScanState.RUNNING, scanMessage = "Scanning for new movies...") }
-                        }
-                        ScanStatus.COMPLETED -> {
-                            _uiState.update { it.copy(scanState = ScanState.COMPLETED, scanMessage = "Scan complete ✓") }
-                            // Sync local cache with new movies
-                            try { syncMoviesUseCase() } catch (_: Exception) {}
-                            delay(RESULT_DISPLAY_MS)
-                            _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
-                            return@launch
-                        }
-                        ScanStatus.FAILED -> {
-                            _uiState.update { it.copy(scanState = ScanState.FAILED, scanMessage = "Scan failed") }
-                            delay(RESULT_DISPLAY_MS)
-                            _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
-                            return@launch
-                        }
-                        ScanStatus.IDLE -> {
-                            // Scraper hasn't started yet (GitHub Actions queuing)
-                            _uiState.update { it.copy(scanMessage = "Waiting for scan to start...") }
-                        }
-                    }
-                } catch (_: Exception) {
-                    // Continue polling on transient errors
-                }
+    private suspend fun refreshScanState() {
+        try {
+            val info = getScanStatusUseCase()
+            val now = System.currentTimeMillis()
+            val latestCompletedMillis = parseIsoMillis(info.latestCompletedTime)
+            val cooldownEndMillis = latestCompletedMillis?.plus(COOLDOWN_MS)
+            val cooldownRemainingMillis = (cooldownEndMillis ?: 0L) - now
+            val isCooldown = cooldownRemainingMillis > 0
+            val isRunning = info.latestStatus == ScanStatus.RUNNING
+
+            val nextState = when {
+                isCooldown -> ScanState.COOLDOWN
+                isRunning -> ScanState.RUNNING
+                info.latestStatus == ScanStatus.COMPLETED -> ScanState.COMPLETED
+                info.latestStatus == ScanStatus.FAILED -> ScanState.FAILED
+                else -> ScanState.IDLE
             }
 
-            // Timeout reached
-            _uiState.update { it.copy(scanState = ScanState.FAILED, scanMessage = "Scan timed out") }
-            delay(RESULT_DISPLAY_MS)
-            _uiState.update { it.copy(scanState = ScanState.IDLE, scanMessage = "") }
+            val statusLabel = when (nextState) {
+                ScanState.RUNNING -> "Status: Running"
+                ScanState.COOLDOWN -> "Status: Cooldown"
+                ScanState.COMPLETED -> "Status: Completed"
+                ScanState.FAILED -> "Status: Failed"
+                ScanState.TRIGGERING -> "Status: Triggering"
+                ScanState.IDLE -> "Status: Idle"
+            }
+
+            val detailText = when (nextState) {
+                ScanState.RUNNING -> "A scan is currently running. Please wait."
+                ScanState.COOLDOWN -> "Available in ${formatRemaining(cooldownRemainingMillis)}"
+                ScanState.COMPLETED -> "Last scan completed successfully."
+                ScanState.FAILED -> "Last scan failed. You can retry now."
+                ScanState.TRIGGERING -> "Requesting scan trigger..."
+                ScanState.IDLE -> "Ready to scan for latest movies."
+            }
+
+            _uiState.update {
+                it.copy(
+                    scanState = nextState,
+                    isScanButtonEnabled = !isCooldown && !isRunning,
+                    scanStatusText = statusLabel,
+                    lastRefreshText = "Last refresh: ${formatIsoTimestamp(info.latestRefreshTime)}",
+                    scanDetailText = detailText
+                )
+            }
+
+            if (isCooldown && cooldownEndMillis != null) {
+                startCooldownTicker(cooldownEndMillis)
+            } else {
+                cooldownTickerJob?.cancel()
+            }
+
+            if (lastObservedScanStatus == ScanStatus.RUNNING && info.latestStatus == ScanStatus.COMPLETED) {
+                try {
+                    syncMoviesUseCase()
+                } catch (_: Exception) {}
+            }
+            lastObservedScanStatus = info.latestStatus
+        } catch (_: Exception) {
+            _uiState.update {
+                it.copy(
+                    scanState = ScanState.FAILED,
+                    isScanButtonEnabled = true,
+                    scanStatusText = "Status: Unknown",
+                    scanDetailText = "Unable to fetch latest scan status."
+                )
+            }
         }
+    }
+
+    private fun startCooldownTicker(cooldownEndMillis: Long) {
+        if (cooldownTickerJob?.isActive == true) return
+
+        cooldownTickerJob = viewModelScope.launch {
+            while (isActive) {
+                val remaining = cooldownEndMillis - System.currentTimeMillis()
+                if (remaining <= 0) {
+                    refreshScanState()
+                    break
+                }
+
+                _uiState.update { state ->
+                    if (state.scanState == ScanState.COOLDOWN) {
+                        state.copy(scanDetailText = "Available in ${formatRemaining(remaining)}")
+                    } else {
+                        state
+                    }
+                }
+                delay(1000L)
+            }
+        }
+    }
+
+    private fun parseIsoMillis(value: String?): Long? {
+        if (value.isNullOrBlank()) return null
+        return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
+    }
+
+    private fun formatIsoTimestamp(value: String?): String {
+        val millis = parseIsoMillis(value) ?: return "--"
+        val sdf = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
+        return sdf.format(Date(millis))
+    }
+
+    private fun formatRemaining(millis: Long): String {
+        val totalSeconds = (millis / 1000L).coerceAtLeast(0L)
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     }
 
     @OptIn(ExperimentalCoilApi::class)
@@ -307,5 +372,6 @@ class SettingsViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         pollingJob?.cancel()
+        cooldownTickerJob?.cancel()
     }
 }

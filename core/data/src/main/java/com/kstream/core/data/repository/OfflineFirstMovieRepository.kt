@@ -10,6 +10,7 @@ import com.kstream.core.network.model.asExternalModel
 import com.kstream.core.model.Movie
 import com.kstream.core.model.MovieWithMedia
 import com.kstream.core.model.ScanStatus
+import com.kstream.core.model.ScanStatusInfo
 import com.kstream.core.model.ScanTriggerResult
 import com.kstream.core.domain.repository.MovieRepository
 import androidx.room.withTransaction
@@ -169,7 +170,8 @@ class OfflineFirstMovieRepository @Inject constructor(
             ScanTriggerResult(
                 status = response.status,
                 triggeredAt = response.triggeredAt,
-                message = response.message
+                message = response.message,
+                lastRun = response.lastRun
             )
         } catch (e: Exception) {
             Log.e("MovieRepository", "Error triggering scan: ${e.message}", e)
@@ -177,18 +179,20 @@ class OfflineFirstMovieRepository @Inject constructor(
         }
     }
 
-    override suspend fun getScanStatus(): ScanStatus {
+    override suspend fun getScanStatus(): ScanStatusInfo {
         return try {
-            val entry = network.getScanStatus()
-            when (entry?.status) {
-                "inprogress" -> ScanStatus.RUNNING
-                "completed" -> ScanStatus.COMPLETED
-                "failed" -> ScanStatus.FAILED
-                else -> ScanStatus.IDLE
-            }
+            val latest = network.getScanStatus()
+            val latestCompleted = network.getLatestCompletedScanStatus()
+
+            ScanStatusInfo(
+                latestStatus = latest?.status.toScanStatus(),
+                latestRefreshTime = latest?.refreshTime,
+                latestCompletedTime = latestCompleted?.refreshTime,
+                triggerBy = latest?.triggerBy
+            )
         } catch (e: Exception) {
             Log.e("MovieRepository", "Error getting scan status: ${e.message}", e)
-            ScanStatus.IDLE
+            ScanStatusInfo()
         }
     }
 
@@ -244,3 +248,12 @@ private fun com.kstream.core.network.model.NetworkMovie.asLocalEntity() = MovieE
     slug = slug,
     lastUpdated = lastUpdated ?: ""
 )
+
+private fun String?.toScanStatus(): ScanStatus {
+    return when (this) {
+        "inprogress" -> ScanStatus.RUNNING
+        "completed" -> ScanStatus.COMPLETED
+        "failed" -> ScanStatus.FAILED
+        else -> ScanStatus.IDLE
+    }
+}

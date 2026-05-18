@@ -46,8 +46,16 @@ data class MovieWithMedia(
 
 enum class ScanStatus { IDLE, RUNNING, COMPLETED, FAILED }
 
+data class ScanStatusInfo(
+    val latestStatus: ScanStatus = ScanStatus.IDLE,
+    val latestRefreshTime: String? = null,
+    val latestCompletedTime: String? = null,
+    val triggerBy: String? = null
+)
+
 data class ScanTriggerResult(
     val status: String,
     val triggeredAt: String? = null,
-    val message: String? = null
+    val message: String? = null,
+    val lastRun: String? = null
 )
