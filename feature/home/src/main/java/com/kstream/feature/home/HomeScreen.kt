@@ -95,9 +95,6 @@ fun HomeRoute(
             uiState = uiState,
             onMovieClick = movieClickHandler,
             onSeeMoreClick = onSeeMoreClick,
-            onSearchClick = onSearchClick,
-            onDownloadsClick = onDownloadsClick,
-            onSettingsClick = onSettingsClick,
             onRetry = viewModel::refreshContent,
             onRefresh = viewModel::refreshContent,
             isOffline = isOffline,
@@ -135,21 +132,29 @@ fun HomeScreenMobile(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                tonalElevation = 0.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Image(
                         painter = painterResource(R.drawable.kstream_logo_horizontal),
                         contentDescription = "KStream",
-                        modifier = Modifier.height(48.dp),
+                        modifier = Modifier.height(40.dp).widthIn(max = 200.dp),
                         contentScale = ContentScale.Fit
                     )
-                },
-                actions = {
                     IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 }
-            )
+            }
         },
         bottomBar = {
             NavigationBar {
@@ -288,9 +293,6 @@ fun HomeScreenTv(
     uiState: HomeUiState,
     onMovieClick: (String) -> Unit,
     onSeeMoreClick: (String) -> Unit,
-    onSearchClick: () -> Unit,
-    onDownloadsClick: () -> Unit,
-    onSettingsClick: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     isOffline: Boolean = false,
@@ -338,34 +340,20 @@ fun HomeScreenTv(
                 Image(
                     painter = painterResource(R.drawable.kstream_logo_horizontal),
                     contentDescription = "KStream",
-                    modifier = Modifier.height(48.dp),
+                    modifier = Modifier.height(56.dp).widthIn(max = 240.dp),
                     contentScale = ContentScale.Fit
                 )
-                Row {
-                    androidx.tv.material3.Button(
-                        onClick = onRefresh,
-                        enabled = !uiState.isLoading
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TvText("Refresh")
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    androidx.tv.material3.Button(onClick = onSearchClick) {
-                        TvText("Search")
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    androidx.tv.material3.Button(onClick = onDownloadsClick) {
-                        TvText("Downloads")
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    androidx.tv.material3.Button(onClick = onSettingsClick) {
-                        TvText("Settings")
-                    }
+                androidx.tv.material3.Button(
+                    onClick = onRefresh,
+                    enabled = !uiState.isLoading
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TvText("Refresh")
                 }
             }
             TvLazyColumn(

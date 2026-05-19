@@ -26,8 +26,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.kstream.core.ui.components.KStreamTvSideNav
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
@@ -95,7 +97,146 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
         } else null
     }
 
-    NavHost(
+    val platform = LocalPlatform.current
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+        ?.substringBefore("/")
+        ?.substringBefore("?")
+
+    val onTvNavigate: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo("home") { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    if (platform == Platform.TV) {
+        KStreamTvSideNav(currentRoute = currentRoute, onNavigate = onTvNavigate) {
+            NavHost(
+                navController = navController,
+                startDestination = startDestination
+            ) {
+                composable("splash") {
+                    SplashScreenWithNav(
+                        isFirstLaunch = isFirstLaunchCompleted != true,
+                        onReady = onLottieReady,
+                        onNavigateToWelcome = {
+                            navController.navigate("welcome") {
+                                popUpTo("splash") { inclusive = true }
+                            }
+                        },
+                        onNavigateToHome = {
+                            navController.navigate("home") {
+                                popUpTo("splash") { inclusive = true }
+                            }
+                            if (!deepLinkMovieId.isNullOrBlank()) {
+                                navController.navigate("details/${Uri.encode(deepLinkMovieId)}")
+                            }
+                        }
+                    )
+                }
+                composable("welcome") {
+                    WelcomeRoute(onNavigateToHome = {
+                        navController.navigate("home") {
+                            popUpTo("welcome") { inclusive = true }
+                        }
+                    })
+                }
+                composable("home") {
+                    HomeRoute(
+                        onMovieClick = { movieId ->
+                            navController.navigate("details/${Uri.encode(movieId)}")
+                        },
+                        onWatchClick = { movieId, quality ->
+                            navController.navigate("player/${Uri.encode(movieId)}/${Uri.encode(quality)}/stream?startOver=false")
+                        },
+                        onSeeMoreClick = { railTitle ->
+                            navController.navigate("search/${Uri.encode(railTitle)}")
+                        },
+                        onSearchClick = { onTvNavigate("search") },
+                        onDownloadsClick = { onTvNavigate("downloads") },
+                        onSettingsClick = { onTvNavigate("settings") }
+                    )
+                }
+                composable(route = "downloads") {
+                    com.kstream.feature.downloads.DownloadRoute(
+                        onBackClick = { navController.popBackStack() },
+                        onMovieClick = { movieId ->
+                            navController.navigate("details/${Uri.encode(movieId)}")
+                        },
+                        onWatchClick = { movieId, quality ->
+                            navController.navigate("player/${Uri.encode(movieId)}/${Uri.encode(quality)}/download?startOver=false")
+                        }
+                    )
+                }
+                composable(
+                    route = "details/{movieId}",
+                    arguments = listOf(navArgument("movieId") { type = NavType.StringType })
+                ) {
+                    DetailsRoute(
+                        onBackClick = { navController.popBackStack() },
+                        onWatchClick = { movieId, quality, startOver ->
+                            navController.navigate("player/${Uri.encode(movieId)}/${Uri.encode(quality)}/stream?startOver=$startOver")
+                        },
+                        onGoToDownloads = { _, _ -> navController.navigate("downloads") }
+                    )
+                }
+                composable(
+                    route = "player/{movieId}/{quality}/{source}?startOver={startOver}",
+                    arguments = listOf(
+                        navArgument("movieId") { type = NavType.StringType },
+                        navArgument("quality") { type = NavType.StringType },
+                        navArgument("source") {
+                            type = NavType.StringType
+                            defaultValue = "stream"
+                        },
+                        navArgument("startOver") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        }
+                    )
+                ) { backStackEntry ->
+                    val startOver = backStackEntry.arguments?.getString("startOver")?.toBoolean() ?: false
+                    PlayerRoute(
+                        onBackClick = { navController.popBackStack() },
+                        onGoToDownloads = { navController.navigate("downloads") },
+                        startOver = startOver
+                    )
+                }
+                composable("search") {
+                    com.kstream.feature.search.SearchRoute(
+                        onMovieClick = { movieId ->
+                            navController.navigate("details/${Uri.encode(movieId)}")
+                        },
+                        onDownloadsClick = { onTvNavigate("downloads") }
+                    )
+                }
+                composable(
+                    route = "search/{seed}",
+                    arguments = listOf(navArgument("seed") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    com.kstream.feature.search.SearchRoute(
+                        onMovieClick = { movieId ->
+                            navController.navigate("details/${Uri.encode(movieId)}")
+                        },
+                        onDownloadsClick = { onTvNavigate("downloads") },
+                        initialQuery = backStackEntry.arguments?.getString("seed")?.let(Uri::decode)
+                    )
+                }
+                composable("settings") {
+                    com.kstream.feature.settings.SettingsRoute(
+                        onBackClick = { navController.popBackStack() },
+                        onMovieClick = { movieId ->
+                            navController.navigate("details/${android.net.Uri.encode(movieId)}")
+                        }
+                    )
+                }
+            }
+        }
+    } else {
+        NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
@@ -232,6 +373,7 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
             )
         }
     }
+    } // end else (mobile)
 }
 
 @Composable
