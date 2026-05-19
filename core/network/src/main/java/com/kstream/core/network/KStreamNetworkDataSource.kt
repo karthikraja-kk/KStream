@@ -9,7 +9,7 @@ interface KStreamNetworkDataSource {
     suspend fun getMovieWithMedia(movieId: String): NetworkMovieWithMedia?
     suspend fun searchMovies(query: String): List<NetworkMovie>
     suspend fun getBaseUrl(): String
-    suspend fun refreshMovieMedia(movieId: String): List<NetworkMedia>
+    suspend fun refreshMovieMedia(slug: String): RefreshMediaResult
     suspend fun triggerMovieScan(): ScanTriggerResponse
     suspend fun getScanStatus(): ScanStatusEntry?
     suspend fun getLatestCompletedScanStatus(): ScanStatusEntry?
@@ -31,3 +31,10 @@ data class ScanStatusEntry(
     val status: String,
     @kotlinx.serialization.SerialName("trigger_by") val triggerBy: String? = null
 )
+
+sealed class RefreshMediaResult {
+    data object Queued : RefreshMediaResult()
+    data object Processing : RefreshMediaResult()
+    data object Done : RefreshMediaResult()
+    data class Failed(val error: String) : RefreshMediaResult()
+}

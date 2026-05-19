@@ -7,7 +7,7 @@ import javax.inject.Inject
 class RefreshMovieMediaUseCase @Inject constructor(
     private val movieRepository: MovieRepository
 ) {
-    suspend operator fun invoke(movieId: String): MovieWithMedia? {
-        return movieRepository.refreshMedia(movieId)
+    suspend operator fun invoke(slug: String): com.kstream.core.model.RefreshMediaResult {
+        return movieRepository.refreshMedia(slug)
     }
 }

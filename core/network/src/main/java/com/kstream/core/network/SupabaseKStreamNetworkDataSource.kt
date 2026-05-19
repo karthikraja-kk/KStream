@@ -97,13 +97,13 @@ class SupabaseKStreamNetworkDataSource @Inject constructor(
         }
     }
 
-    override suspend fun refreshMovieMedia(movieId: String): List<NetworkMedia> {
+    override suspend fun refreshMovieMedia(slug: String): RefreshMediaResult {
         return try {
-            Log.d("KStreamNetwork", "Calling refresh-media Edge Function for movie: $movieId")
+            Log.d("KStreamNetwork", "Calling refresh-media Edge Function for slug: $slug")
 
             val response = client.functions.invoke("refresh-media") {
                 body = kotlinx.serialization.json.buildJsonObject {
-                    put("movie_id", kotlinx.serialization.json.JsonPrimitive(movieId))
+                    put("slug", kotlinx.serialization.json.JsonPrimitive(slug))
                 }
             }
             val bodyStr = response.body<String>()
@@ -112,24 +112,31 @@ class SupabaseKStreamNetworkDataSource @Inject constructor(
             val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
             val parsed = json.decodeFromString<RefreshMediaResponse>(bodyStr)
 
-            if (parsed.status == "done" || parsed.status == "cached") {
-                // Re-fetch media from DB to get properly typed NetworkMedia
-                val media = client.postgrest["media"]
-                    .select {
-                        filter {
-                            eq("movie_id", movieId)
-                        }
-                    }
-                    .decodeList<NetworkMedia>()
-                Log.d("KStreamNetwork", "Refreshed ${media.size} media entries for movie $movieId")
-                media
-            } else {
-                Log.e("KStreamNetwork", "Refresh failed: ${parsed.error}")
-                emptyList()
+            when (parsed.status) {
+                "queued" -> {
+                    Log.d("KStreamNetwork", "Refresh queued for slug: $slug")
+                    RefreshMediaResult.Queued
+                }
+                "processing" -> {
+                    Log.d("KStreamNetwork", "Refresh already processing for slug: $slug")
+                    RefreshMediaResult.Processing
+                }
+                "done", "cached" -> {
+                    Log.d("KStreamNetwork", "Refresh complete (${parsed.status}) for slug: $slug")
+                    RefreshMediaResult.Done
+                }
+                "failed" -> {
+                    Log.e("KStreamNetwork", "Refresh failed: ${parsed.error}")
+                    RefreshMediaResult.Failed(parsed.error ?: "Refresh failed")
+                }
+                else -> {
+                    Log.e("KStreamNetwork", "Unknown refresh status: ${parsed.status}")
+                    RefreshMediaResult.Failed(parsed.error ?: "Unknown error")
+                }
             }
         } catch (e: Exception) {
             Log.e("KStreamNetwork", "Error refreshing media: ${e.message}", e)
-            emptyList()
+            RefreshMediaResult.Failed(e.message ?: "Network error")
         }
     }
     override suspend fun triggerMovieScan(): ScanTriggerResponse {

@@ -11,7 +11,7 @@ interface MovieRepository {
     suspend fun getMovieWithMedia(movieId: String): MovieWithMedia?
     suspend fun syncMovies()
     suspend fun searchMovies(query: String): List<Movie>
-    suspend fun refreshMedia(movieId: String): MovieWithMedia?
+    suspend fun refreshMedia(slug: String): com.kstream.core.model.RefreshMediaResult
     suspend fun triggerScan(): ScanTriggerResult
     suspend fun getScanStatus(): ScanStatusInfo
     suspend fun clearCache()

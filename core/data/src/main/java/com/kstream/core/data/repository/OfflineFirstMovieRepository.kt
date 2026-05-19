@@ -147,20 +147,20 @@ class OfflineFirstMovieRepository @Inject constructor(
         }
     }
 
-    override suspend fun refreshMedia(movieId: String): MovieWithMedia? {
+    override suspend fun refreshMedia(slug: String): com.kstream.core.model.RefreshMediaResult {
         return try {
-            Log.d("MovieRepository", "Refreshing media for movie: $movieId")
-            val refreshedMedia = network.refreshMovieMedia(movieId)
-            if (refreshedMedia.isEmpty()) {
-                Log.w("MovieRepository", "No refreshed media returned")
-                return null
+            Log.d("MovieRepository", "Refreshing media for slug: $slug")
+            val networkResult = network.refreshMovieMedia(slug)
+            // Map network result to model result
+            when (networkResult) {
+                is com.kstream.core.network.RefreshMediaResult.Queued -> com.kstream.core.model.RefreshMediaResult.Queued
+                is com.kstream.core.network.RefreshMediaResult.Processing -> com.kstream.core.model.RefreshMediaResult.Processing
+                is com.kstream.core.network.RefreshMediaResult.Done -> com.kstream.core.model.RefreshMediaResult.Done
+                is com.kstream.core.network.RefreshMediaResult.Failed -> com.kstream.core.model.RefreshMediaResult.Failed(networkResult.error)
             }
-            // Re-fetch the full movie with updated media
-            val baseUrl = dataStore.getPosterBaseUrlSync()
-            network.getMovieWithMedia(movieId)?.asExternalModel(baseUrl)
         } catch (e: Exception) {
             Log.e("MovieRepository", "Error refreshing media: ${e.message}", e)
-            null
+            com.kstream.core.model.RefreshMediaResult.Failed(e.message ?: "Unknown error")
         }
     }
 
