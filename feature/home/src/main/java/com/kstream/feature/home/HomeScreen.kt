@@ -147,7 +147,7 @@ fun HomeScreenMobile(
                     Image(
                         painter = painterResource(R.drawable.kstream_logo_horizontal),
                         contentDescription = "KStream",
-                        modifier = Modifier.height(40.dp).widthIn(max = 200.dp),
+                        modifier = Modifier.height(52.dp).widthIn(max = 240.dp),
                         contentScale = ContentScale.Fit
                     )
                     IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
@@ -189,7 +189,12 @@ fun HomeScreenMobile(
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
             }
-        } else if (uiState.error != null) {
+        } else if (isOffline && uiState.rails.isEmpty()) {
+            OfflineScreen(
+                onRetry = onRetry,
+                onGoToDownloads = onGoToDownloads
+            )
+        } else if (uiState.error != null && !isOffline) {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 Column(
                     modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
@@ -202,12 +207,7 @@ fun HomeScreenMobile(
                     }
                 }
             }
-} else if (isOffline && uiState.rails.isEmpty()) {
-            OfflineScreen(
-                onRetry = onRetry,
-                onGoToDownloads = onGoToDownloads
-            )
-        } else if (uiState.rails.isEmpty()) {
+} else if (uiState.rails.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 Text(
                     text = "No movies found. Pull to refresh or check your connection.",
@@ -302,7 +302,12 @@ fun HomeScreenTv(
         Box(modifier = Modifier.fillMaxSize()) {
             CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
         }
-    } else if (uiState.error != null) {
+    } else if (isOffline && uiState.rails.isEmpty()) {
+        TvOfflineScreen(
+            onRetry = onRetry,
+            onGoToDownloads = onGoToDownloads
+        )
+    } else if (uiState.error != null && !isOffline) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
@@ -315,11 +320,6 @@ fun HomeScreenTv(
                 }
             }
         }
-    } else if (isOffline && uiState.rails.isEmpty()) {
-        TvOfflineScreen(
-            onRetry = onRetry,
-            onGoToDownloads = onGoToDownloads
-        )
     } else if (uiState.rails.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize()) {
             TvText(

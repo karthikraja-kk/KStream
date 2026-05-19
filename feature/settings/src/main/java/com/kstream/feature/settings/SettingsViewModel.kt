@@ -157,6 +157,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun triggerScan() {
+        if (_uiState.value.scanState == ScanState.TRIGGERING || _uiState.value.scanState == ScanState.RUNNING) return
         if (!_uiState.value.isScanButtonEnabled) return
 
         viewModelScope.launch {

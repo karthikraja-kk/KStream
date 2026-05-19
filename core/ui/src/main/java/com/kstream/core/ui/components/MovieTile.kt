@@ -225,12 +225,12 @@ fun HdBadge(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(Color(0xFFFFD600)) // bold yellow
+            .background(Color(0xFF1976D2)) // blue
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Text(
             text = "HD",
-            color = Color.Black,
+            color = Color.White,
             fontSize = 9.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 0.5.sp

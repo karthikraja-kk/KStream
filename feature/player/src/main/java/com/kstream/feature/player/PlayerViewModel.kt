@@ -200,14 +200,27 @@ class PlayerViewModel @Inject constructor(
     private fun fetchFreshUrlsAndResume() {
         viewModelScope.launch {
             try {
+                // Wait briefly for the backend DB to propagate refreshed media URLs
+                delay(2000)
                 val refreshed = getMovieDetailsUseCase(movieId)
                 if (refreshed != null) {
+                    val oldUrls = movieWithMedia?.media
+                        ?.find { it.quality == _uiState.value.currentQuality }
+                        ?.let { listOfNotNull(it.watchUrl1, it.watchUrl2) }
+                        ?: emptyList()
+
                     movieWithMedia = refreshed
                     val media = refreshed.media.find { it.quality == _uiState.value.currentQuality }
                     val freshUrls = listOfNotNull(media?.watchUrl1, media?.watchUrl2)
-                    if (freshUrls.isNotEmpty()) {
+                        .filter { it.isNotBlank() }
+
+                    // Only use URLs that are actually new
+                    val newUrls = freshUrls.filter { it !in oldUrls }
+                    val urlsToPlay = newUrls.ifEmpty { freshUrls }
+
+                    if (urlsToPlay.isNotEmpty()) {
                         val startPosition = playerManager.getPlayer().currentPosition.coerceAtLeast(0)
-                        playerManager.play(freshUrls, startPosition)
+                        playerManager.play(urlsToPlay, startPosition)
                         _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null) }
                         android.util.Log.d("PlayerViewModel", "Playback resumed with refreshed URLs")
                     } else {

@@ -275,7 +275,7 @@ private fun WatchHistoryScreen(
     onRemove: (Set<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val selectedIds = remember { androidx.compose.runtime.snapshots.SnapshotStateList<String>() }
+    val selectedIds = remember { mutableStateListOf<String>() }
     var isSelecting by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pendingDeleteIds by remember { mutableStateOf<Set<String>>(emptySet()) }

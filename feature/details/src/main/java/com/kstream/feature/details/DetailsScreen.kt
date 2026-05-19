@@ -253,6 +253,7 @@ fun DetailsScreenMobile(
                         Text(
                             text = movie.movieName,
                             style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(onClick = onLikeClick) {
@@ -277,34 +278,35 @@ fun DetailsScreenMobile(
                     }
                     Text(
                         text = "${movie.year} • ${movie.duration} • ${movie.language} • ${movie.type}",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = movie.synopsis, style = MaterialTheme.typography.bodyLarge)
+                    Text(text = movie.synopsis, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                     
                     if (movie.director.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(text = "Director: ${movie.director.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Director: ${movie.director.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     
                     if (movie.castMembers.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Cast: ${movie.castMembers.take(5).joinToString(", ")}${if (movie.castMembers.size > 5) "..." else ""}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Cast: ${movie.castMembers.take(5).joinToString(", ")}${if (movie.castMembers.size > 5) "..." else ""}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     
                     if (movie.genres.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Genres: ${movie.genres.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Genres: ${movie.genres.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     if (movie.rating.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Rating: ${movie.rating}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Rating: ${movie.rating}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     if (movie.lastUpdated.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Last Updated: ${movie.lastUpdated}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Last Updated: ${movie.lastUpdated}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     
                     Spacer(modifier = Modifier.height(24.dp))
