@@ -23,10 +23,25 @@ data class PlayerUiState(
     val isOffline: Boolean = false,
     val isBuffering: Boolean = false,
     val isRefreshingLinks: Boolean = false,
+    val showRefreshOverlay: Boolean = false,
+    val funnyMessage: String? = null,
     val refreshError: String? = null,
     val loadError: String? = null,
     val localFileMissing: Boolean = false
-)
+) {
+    companion object {
+        val FUNNY_MESSAGES = listOf(
+            "Link expired! Fetching fresh URLs... 🔗",
+            "Grab some popcorn! This'll take a moment 🍿",
+            "Our movie elves are finding the best link... 🧝",
+            "Almost there! Warming up the stream... 🎬",
+            "Good things come to those who wait... ⏳",
+            "Mixing the perfect streaming cocktail... 🍹",
+            "Polishing the pixels for you... ✨",
+            "Just a moment, negotiating with the servers... 🤝",
+        )
+    }
+}
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
@@ -93,38 +108,145 @@ class PlayerViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
+    private var movieSlug: String? = null
+    private var refreshPollingJob: Job? = null
+    private var funnyMessageJob: Job? = null
+
+    fun retryRefresh() {
+        _uiState.update { it.copy(refreshError = null) }
+        refreshAndRetry()
+    }
+
     private fun refreshAndRetry() {
-        if (_uiState.value.isRefreshingLinks) return // already refreshing
+        if (_uiState.value.isRefreshingLinks) return
+
+        val slug = movieSlug ?: movieWithMedia?.movie?.slug
+        if (slug == null) {
+            _uiState.update { it.copy(refreshError = "Could not refresh links — movie info missing.") }
+            return
+        }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null) }
+            _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null, showRefreshOverlay = false, funnyMessage = null) }
+
+            // Start the delayed funny message overlay (after 2 seconds)
+            startFunnyMessages()
+
             try {
-                val refreshed = refreshMovieMediaUseCase(movieId)
+                val result = refreshMovieMediaUseCase(slug)
+                handleRefreshResult(result, slug)
+            } catch (e: Exception) {
+                android.util.Log.e("PlayerViewModel", "Media refresh failed", e)
+                stopFunnyMessages()
+                _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = e.toUserMessage()) }
+            }
+        }
+    }
+
+    private fun handleRefreshResult(result: com.kstream.core.model.RefreshMediaResult, slug: String) {
+        when (result) {
+            is com.kstream.core.model.RefreshMediaResult.Queued,
+            is com.kstream.core.model.RefreshMediaResult.Processing -> {
+                android.util.Log.d("PlayerViewModel", "Refresh ${if (result is com.kstream.core.model.RefreshMediaResult.Queued) "queued" else "processing"}, starting poll...")
+                startPolling(slug)
+            }
+            is com.kstream.core.model.RefreshMediaResult.Done -> {
+                android.util.Log.d("PlayerViewModel", "Refresh done, fetching fresh URLs...")
+                stopFunnyMessages()
+                fetchFreshUrlsAndResume()
+            }
+            is com.kstream.core.model.RefreshMediaResult.Failed -> {
+                android.util.Log.e("PlayerViewModel", "Refresh failed: ${result.error}")
+                stopFunnyMessages()
+                _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = result.error) }
+            }
+        }
+    }
+
+    private fun startPolling(slug: String) {
+        refreshPollingJob?.cancel()
+        refreshPollingJob = viewModelScope.launch {
+            val maxAttempts = 24 // 24 × 5s = 2 minutes max
+            for (attempt in 1..maxAttempts) {
+                delay(5000)
+                try {
+                    val result = refreshMovieMediaUseCase(slug)
+                    when (result) {
+                        is com.kstream.core.model.RefreshMediaResult.Done -> {
+                            stopFunnyMessages()
+                            fetchFreshUrlsAndResume()
+                            return@launch
+                        }
+                        is com.kstream.core.model.RefreshMediaResult.Failed -> {
+                            stopFunnyMessages()
+                            _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = result.error) }
+                            return@launch
+                        }
+                        else -> {
+                            // Still queued/processing, continue polling
+                            android.util.Log.d("PlayerViewModel", "Poll attempt $attempt: still processing...")
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("PlayerViewModel", "Poll error: ${e.message}")
+                }
+            }
+            // Timeout after 2 minutes
+            stopFunnyMessages()
+            _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = "Refresh timed out. Please try again later.") }
+        }
+    }
+
+    private fun fetchFreshUrlsAndResume() {
+        viewModelScope.launch {
+            try {
+                val refreshed = getMovieDetailsUseCase(movieId)
                 if (refreshed != null) {
                     movieWithMedia = refreshed
                     val media = refreshed.media.find { it.quality == _uiState.value.currentQuality }
-                    val freshUrls = listOfNotNull(
-                        media?.watchUrl1,
-                        media?.watchUrl2,
-                        media?.downloadUrl1,
-                        media?.downloadUrl2
-                    )
+                    val freshUrls = listOfNotNull(media?.watchUrl1, media?.watchUrl2)
                     if (freshUrls.isNotEmpty()) {
                         val startPosition = playerManager.getPlayer().currentPosition.coerceAtLeast(0)
                         playerManager.play(freshUrls, startPosition)
-                        _uiState.update { it.copy(isRefreshingLinks = false) }
+                        _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null) }
                         android.util.Log.d("PlayerViewModel", "Playback resumed with refreshed URLs")
                     } else {
-                        _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "No working links found. Please try again later.") }
+                        _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = "No working links found. Please try again later.") }
                     }
                 } else {
-                    _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Could not refresh links. Please try again.") }
+                    _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = "Could not load refreshed links.") }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("PlayerViewModel", "Media refresh failed", e)
-                _uiState.update { it.copy(isRefreshingLinks = false, refreshError = e.toUserMessage()) }
+                _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = e.toUserMessage()) }
             }
         }
+    }
+
+    private fun startFunnyMessages() {
+        funnyMessageJob?.cancel()
+        funnyMessageJob = viewModelScope.launch {
+            // Wait 2 seconds before showing overlay
+            delay(2000)
+            if (!_uiState.value.isRefreshingLinks) return@launch
+
+            var messageIndex = 0
+            _uiState.update { it.copy(showRefreshOverlay = true, funnyMessage = PlayerUiState.FUNNY_MESSAGES[0]) }
+
+            // Cycle through messages every 3 seconds
+            while (true) {
+                delay(3000)
+                if (!_uiState.value.isRefreshingLinks) return@launch
+                messageIndex = (messageIndex + 1) % PlayerUiState.FUNNY_MESSAGES.size
+                _uiState.update { it.copy(funnyMessage = PlayerUiState.FUNNY_MESSAGES[messageIndex]) }
+            }
+        }
+    }
+
+    private fun stopFunnyMessages() {
+        funnyMessageJob?.cancel()
+        funnyMessageJob = null
+        refreshPollingJob?.cancel()
+        refreshPollingJob = null
     }
 
     fun onBufferingStateChanged(isBuffering: Boolean) {
@@ -173,6 +295,7 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 movieWithMedia = getMovieDetailsUseCase(movieId)
+                movieSlug = movieWithMedia?.movie?.slug
                 val mediaList = movieWithMedia?.media ?: emptyList()
                 _uiState.update { it.copy(
                     availableQualities = mediaList.map { m -> m.quality },
@@ -182,9 +305,7 @@ class PlayerViewModel @Inject constructor(
                 val media = mediaList.find { it.quality == initialQuality }
                 val fallbackUrls = listOfNotNull(
                     media?.watchUrl1,
-                    media?.watchUrl2,
-                    media?.downloadUrl1,
-                    media?.downloadUrl2
+                    media?.watchUrl2
                 )
 
                 if (fallbackUrls.isNotEmpty()) {
@@ -217,8 +338,7 @@ class PlayerViewModel @Inject constructor(
                 ) }
                 val media = mediaList.find { it.quality == initialQuality }
                 val fallbackUrls = listOfNotNull(
-                    media?.watchUrl1, media?.watchUrl2,
-                    media?.downloadUrl1, media?.downloadUrl2
+                    media?.watchUrl1, media?.watchUrl2
                 )
                 if (fallbackUrls.isNotEmpty()) {
                     val startPosition = getWatchProgressUseCase(movieId)
@@ -261,9 +381,7 @@ class PlayerViewModel @Inject constructor(
                     val media = movieWithMedia?.media?.find { it.quality == newQuality } ?: return@launch
                     val fallbackUrls = listOfNotNull(
                         media.watchUrl1,
-                        media.watchUrl2,
-                        media.downloadUrl1,
-                        media.downloadUrl2
+                        media.watchUrl2
                     )
                     
                     if (fallbackUrls.isNotEmpty()) {

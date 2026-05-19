@@ -32,8 +32,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -313,8 +318,12 @@ fun PlayerRoute(
             }
         }
 
-        // Refreshing links overlay
-        if (uiState.isRefreshingLinks) {
+        // Refreshing links overlay — shows funny messages after 2s delay
+        AnimatedVisibility(
+            visible = uiState.showRefreshOverlay,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = Color.Black.copy(alpha = 0.85f)
@@ -329,18 +338,31 @@ fun PlayerRoute(
                         color = Color.White
                     )
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = "Links expired",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Refreshing links...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
+                    AnimatedContent(
+                        targetState = uiState.funnyMessage ?: "",
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(500)) +
+                                    slideInVertically(
+                                        animationSpec = tween(500),
+                                        initialOffsetY = { it / 2 }
+                                    )).togetherWith(
+                                fadeOut(animationSpec = tween(300)) +
+                                        slideOutVertically(
+                                            animationSpec = tween(300),
+                                            targetOffsetY = { -it / 2 }
+                                        )
+                            )
+                        },
+                        label = "funnyMessage"
+                    ) { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 32.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -349,10 +371,10 @@ fun PlayerRoute(
         if (uiState.refreshError != null && !uiState.isRefreshingLinks) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = Color.Black.copy(alpha = 0.85f)
+                color = Color.Black.copy(alpha = 0.9f)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -360,14 +382,41 @@ fun PlayerRoute(
                         imageVector = Icons.Default.Movie,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
-                        tint = Color.White.copy(alpha = 0.5f)
+                        tint = Color.White.copy(alpha = 0.4f)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
-                        text = uiState.refreshError ?: "",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
+                        text = "Couldn't get a working link",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "The stream link couldn't be refreshed right now. You can try again or go back.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.65f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = onBackClick,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                        ) {
+                            Text("Go Back")
+                        }
+                        Button(
+                            onClick = { viewModel.retryRefresh() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Try Again", color = Color.White)
+                        }
+                    }
                 }
             }
         }
