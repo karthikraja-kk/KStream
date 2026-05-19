@@ -31,12 +31,12 @@ import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.Text as TvText
 
 import kotlinx.coroutines.delay
-import android.content.Intent
+
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Share
+
 import androidx.compose.material.icons.Icons
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -262,18 +262,6 @@ fun DetailsScreenMobile(
                                 contentDescription = if (uiState.isLiked) "Unlike" else "Like",
                                 tint = if (uiState.isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                             )
-                        }
-                        IconButton(onClick = {
-                            val movieId = movie.id
-                            val movieName = movie.movieName
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, movieName)
-                                putExtra(Intent.EXTRA_TEXT, "Check out \"$movieName\" on KStream!\nkstream://movie/$movieId")
-                            }
-                            context.startActivity(Intent.createChooser(shareIntent, "Share via"))
-                        }) {
-                            Icon(Icons.Default.Share, contentDescription = "Share")
                         }
                     }
                     Text(

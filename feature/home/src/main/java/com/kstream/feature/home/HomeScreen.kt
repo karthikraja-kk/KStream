@@ -140,7 +140,7 @@ fun HomeScreenMobile(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -215,25 +215,24 @@ fun HomeScreenMobile(
                 )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
                 if (isOffline) {
-                    item {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "📡 You're offline — showing cached content",
-                                modifier = Modifier.padding(12.dp),
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "📡 You're offline — showing cached content",
+                            modifier = Modifier.padding(12.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
                 item {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -282,6 +281,7 @@ fun HomeScreenMobile(
                         }
                     }
                 }
+            }
             }
         }
     }

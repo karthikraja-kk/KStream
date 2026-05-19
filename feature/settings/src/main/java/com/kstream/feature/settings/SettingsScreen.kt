@@ -347,6 +347,12 @@ private fun WatchHistoryScreen(
                                 )
                             }
                         }
+                    } else if (items.isNotEmpty()) {
+                        IconButton(onClick = {
+                            isSelecting = true
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Select items")
+                        }
                     }
                 }
             )

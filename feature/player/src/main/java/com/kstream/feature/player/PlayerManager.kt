@@ -28,6 +28,7 @@ class PlayerManager @Inject constructor(
     private var wasPlayingBeforeNetworkLoss = false
     private var networkObserverJob: Job? = null
     private var wasPlayingBeforePause = false
+    private var hasRetriedCurrentUrl = false
     private val scope = CoroutineScope(Dispatchers.Main)
 
     private val _allUrlsFailed = kotlinx.coroutines.flow.MutableSharedFlow<PlaybackException>(extraBufferCapacity = 1)
@@ -40,6 +41,7 @@ class PlayerManager @Inject constructor(
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_READY && isPlaying) {
                             lastPlaybackPosition = currentPosition
+                            hasRetriedCurrentUrl = false
                         }
                     }
 
@@ -62,6 +64,15 @@ class PlayerManager @Inject constructor(
                                 }
                             }
                         }
+
+                        // On app resume, URLs may still be valid — retry current URL once
+                        if (!hasRetriedCurrentUrl) {
+                            hasRetriedCurrentUrl = true
+                            player.prepare()
+                            player.play()
+                            return
+                        }
+                        hasRetriedCurrentUrl = false
                         
                         val next = fallbackUrls.getOrNull(fallbackIndex + 1)
                         if (next != null) {

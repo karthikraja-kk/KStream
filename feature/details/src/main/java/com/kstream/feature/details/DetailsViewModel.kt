@@ -177,7 +177,13 @@ class DetailsViewModel @Inject constructor(
         val movieWithMedia = _uiState.value.movieWithMedia ?: return
         val quality = _uiState.value.selectedQuality ?: return
         val media = movieWithMedia.media.find { it.quality == quality } ?: return
-        val url = media.downloadUrl1 ?: media.downloadUrl2 ?: return
+        val url = media.downloadUrl1 ?: media.downloadUrl2
+
+        if (url == null) {
+            // URLs expired/empty — trigger refresh flow
+            refreshAndRetryDownload(quality)
+            return
+        }
 
         val downloadId = "${movieId}_$quality"
         
@@ -222,8 +228,11 @@ class DetailsViewModel @Inject constructor(
             return
         }
 
+        val downloadId = "${movieId}_$quality"
+
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null) }
+            downloadRepository.updateDownloadStatusWithMessage(downloadId, DownloadStatus.DOWNLOADING, "Refreshing expired links...")
             Toast.makeText(context, "Link expired. Refreshing...", Toast.LENGTH_SHORT).show()
 
             try {
@@ -252,16 +261,19 @@ class DetailsViewModel @Inject constructor(
                                     Toast.makeText(context, "Download restarted with fresh link", Toast.LENGTH_SHORT).show()
                                 } else {
                                     _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "No fresh download link available") }
+                                    downloadRepository.updateDownloadStatusWithMessage(downloadId, DownloadStatus.FAILED, "No fresh download link available")
                                     Toast.makeText(context, "No fresh download link found", Toast.LENGTH_SHORT).show()
                                 }
                             } else {
                                 _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Failed to reload movie") }
+                                downloadRepository.updateDownloadStatusWithMessage(downloadId, DownloadStatus.FAILED, "Failed to reload movie details")
                                 Toast.makeText(context, "Could not refresh links", Toast.LENGTH_SHORT).show()
                             }
                             return@launch
                         }
                         is com.kstream.core.model.RefreshMediaResult.Failed -> {
                             _uiState.update { it.copy(isRefreshingLinks = false, refreshError = result.error) }
+                            downloadRepository.updateDownloadStatusWithMessage(downloadId, DownloadStatus.FAILED, result.error)
                             Toast.makeText(context, "Could not refresh links. Please try again.", Toast.LENGTH_SHORT).show()
                             return@launch
                         }
@@ -273,9 +285,11 @@ class DetailsViewModel @Inject constructor(
                 }
                 // Timed out
                 _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Refresh timed out") }
+                downloadRepository.updateDownloadStatusWithMessage(downloadId, DownloadStatus.FAILED, "Link refresh timed out")
                 Toast.makeText(context, "Refresh timed out. Please try again.", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isRefreshingLinks = false, refreshError = e.toUserMessage()) }
+                downloadRepository.updateDownloadStatusWithMessage(downloadId, DownloadStatus.FAILED, e.toUserMessage())
                 Toast.makeText(context, "Could not refresh links. Please try again.", Toast.LENGTH_SHORT).show()
             }
         }

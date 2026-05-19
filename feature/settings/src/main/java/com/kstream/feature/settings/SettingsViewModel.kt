@@ -240,6 +240,13 @@ class SettingsViewModel @Inject constructor(
                 else -> ScanState.IDLE
             }
 
+            // If we just triggered a scan but the server hasn't transitioned to RUNNING yet,
+            // keep the TRIGGERING state so the button stays disabled until server catches up.
+            val currentState = _uiState.value.scanState
+            if (currentState == ScanState.TRIGGERING && nextState != ScanState.RUNNING && nextState != ScanState.COOLDOWN) {
+                return
+            }
+
             val statusLabel = when (nextState) {
                 ScanState.RUNNING -> "Status: Running"
                 ScanState.COOLDOWN -> "Status: Cooldown"

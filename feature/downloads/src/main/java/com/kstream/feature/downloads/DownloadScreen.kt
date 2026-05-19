@@ -234,33 +234,43 @@ fun DownloadItem(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 val progressPercent = (download.progress * 100).toInt()
-                val statusText = when (download.status) {
-                    DownloadStatus.DOWNLOADING -> {
+                val isRefreshingLinks = download.statusMessage == "Refreshing expired links..."
+                val statusText = when {
+                    isRefreshingLinks -> "Refreshing expired links..."
+                    download.status == DownloadStatus.DOWNLOADING -> {
                         val downloaded = formatBytes(download.downloadedBytes)
                         val total = formatBytes(download.totalBytes)
                         "Downloading... $downloaded / $total ($progressPercent%)"
                     }
-                    DownloadStatus.PAUSED -> {
+                    download.status == DownloadStatus.PAUSED -> {
                         val downloaded = formatBytes(download.downloadedBytes)
                         val total = formatBytes(download.totalBytes)
                         "${download.statusMessage ?: "Paused"} $downloaded / $total ($progressPercent%)"
                     }
-                    DownloadStatus.COMPLETED -> if (fileExists) "Completed" else "File moved or deleted"
-                    DownloadStatus.QUEUED -> "Queued"
-                    DownloadStatus.FAILED -> download.statusMessage ?: "Failed"
-                    DownloadStatus.DELETED -> "Deleted"
+                    download.status == DownloadStatus.COMPLETED -> if (fileExists) "Completed" else "File moved or deleted"
+                    download.status == DownloadStatus.QUEUED -> "Queued"
+                    download.status == DownloadStatus.FAILED -> download.statusMessage ?: "Failed"
+                    download.status == DownloadStatus.DELETED -> "Deleted"
+                    else -> ""
                 }
                 
                 Text(
                     text = statusText, 
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (!fileExists && download.status == DownloadStatus.COMPLETED) 
-                        MaterialTheme.colorScheme.error 
-                    else 
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                    color = when {
+                        isRefreshingLinks -> MaterialTheme.colorScheme.primary
+                        !fileExists && download.status == DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
                 
-                if (download.status != DownloadStatus.COMPLETED) {
+                if (isRefreshingLinks) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    )
+                } else if (download.status != DownloadStatus.COMPLETED) {
                     LinearProgressIndicator(
                         progress = download.progress,
                         modifier = Modifier
