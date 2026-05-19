@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -106,51 +107,53 @@ fun DetailsScreenMobile(
     onLikeClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(uiState.movieWithMedia?.movie?.movieName ?: "Loading...") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(androidx.compose.material.icons.Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        val movieId = uiState.movieWithMedia?.movie?.id ?: return@IconButton
-                        val movieName = uiState.movieWithMedia?.movie?.movieName ?: "Movie"
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, movieName)
-                            putExtra(Intent.EXTRA_TEXT, "Check out \"$movieName\" on KStream!\nkstream://movie/$movieId")
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share via"))
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share")
-                    }
-                    IconButton(onClick = onLikeClick) {
-                        Icon(
-                            imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (uiState.isLiked) "Unlike" else "Like",
-                            tint = if (uiState.isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+
+    // Floating back button — reused across all states
+    @Composable
+    fun FloatingBackButton() {
+        Box(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(8.dp)
+        ) {
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = androidx.compose.ui.graphics.Color.White
+                    )
                 }
-            )
+            }
         }
-    ) { padding ->
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         if (isOffline && uiState.movieWithMedia == null) {
             OfflineScreen(
                 onRetry = onRetry,
                 onGoToDownloads = onGoToDownloads,
-                modifier = Modifier.padding(padding)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
             )
+            Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
+            Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.error != null) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding(),
+                contentAlignment = Alignment.Center
+            ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = "Unable to load movie", style = MaterialTheme.typography.headlineMedium)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -173,46 +176,105 @@ fun DetailsScreenMobile(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .verticalScroll(rememberScrollState())
             ) {
-                var detailsRetryHash by remember { mutableIntStateOf(0) }
-                val detailsContext = LocalContext.current
+                // Poster — edge to edge, back button floats over it
+                Box {
+                    var detailsRetryHash by remember { mutableIntStateOf(0) }
+                    val detailsContext = LocalContext.current
 
-                SubcomposeAsyncImage(
-                    model = ImageRequest.Builder(detailsContext)
-                        .data(movie.posterUrl)
-                        .setParameter("retry", detailsRetryHash)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = movie.movieName,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(400.dp),
-                    contentScale = ContentScale.Crop,
-                    loading = {
-                        MovieInitialsFallback(title = movie.movieName)
-                    },
-                    error = {
-                        if (detailsRetryHash < 3) {
-                            LaunchedEffect(detailsRetryHash) {
-                                delay(3000L * (detailsRetryHash + 1))
-                                detailsRetryHash++
+                    SubcomposeAsyncImage(
+                        model = ImageRequest.Builder(detailsContext)
+                            .data(movie.posterUrl)
+                            .setParameter("retry", detailsRetryHash)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = movie.movieName,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(400.dp),
+                        contentScale = ContentScale.Crop,
+                        loading = {
+                            KStreamLogoFallback()
+                        },
+                        error = {
+                            if (detailsRetryHash < 3) {
+                                LaunchedEffect(detailsRetryHash) {
+                                    delay(3000L * (detailsRetryHash + 1))
+                                    detailsRetryHash++
+                                }
                             }
+                            KStreamLogoFallback()
+                        },
+                        success = {
+                            Image(
+                                painter = it.painter,
+                                contentDescription = movie.movieName,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
                         }
-                        MovieInitialsFallback(title = movie.movieName)
-                    },
-                    success = {
-                        Image(
-                            painter = it.painter,
-                            contentDescription = movie.movieName,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                    )
+
+                    // Gradient scrim so back button is always visible
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .background(
+                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f),
+                                        androidx.compose.ui.graphics.Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+
+                    // Floating back button pinned to top-start of poster
+                    FloatingBackButton()
+
+                    // HD badge pinned to top-end of poster
+                    if (movie.type.equals("Original HD", ignoreCase = true)) {
+                        com.kstream.core.ui.components.HdBadge(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .statusBarsPadding()
+                                .padding(8.dp)
                         )
                     }
-                )
+                }
+
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = movie.movieName, style = MaterialTheme.typography.headlineMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = movie.movieName,
+                            style = MaterialTheme.typography.headlineMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onLikeClick) {
+                            Icon(
+                                imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = if (uiState.isLiked) "Unlike" else "Like",
+                                tint = if (uiState.isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = {
+                            val movieId = movie.id
+                            val movieName = movie.movieName
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, movieName)
+                                putExtra(Intent.EXTRA_TEXT, "Check out \"$movieName\" on KStream!\nkstream://movie/$movieId")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share via"))
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share")
+                        }
+                    }
                     Text(
                         text = "${movie.year} • ${movie.duration} • ${movie.language} • ${movie.type}",
                         style = MaterialTheme.typography.bodyMedium
@@ -349,6 +411,24 @@ private fun formatSizeString(sizeStr: String): String {
         String.format(java.util.Locale.US, "%.2f GB", numeric / 1024.0)
     } else {
         sizeStr
+    }
+}
+
+@Composable
+private fun KStreamLogoFallback() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(androidx.compose.ui.graphics.Color(0xFF1A1A2E)),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = androidx.compose.ui.res.painterResource(id = com.kstream.core.ui.R.drawable.kstream_logo),
+            contentDescription = "KStream",
+            modifier = Modifier.size(100.dp),
+            contentScale = ContentScale.Fit,
+            alpha = 0.6f
+        )
     }
 }
 

@@ -217,35 +217,63 @@ class DetailsViewModel @Inject constructor(
     private fun refreshAndRetryDownload(quality: String) {
         if (_uiState.value.isRefreshingLinks) return
 
+        val slug = _uiState.value.movieWithMedia?.movie?.slug ?: run {
+            Toast.makeText(context, "Could not refresh links. Movie info missing.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null) }
             Toast.makeText(context, "Link expired. Refreshing...", Toast.LENGTH_SHORT).show()
 
             try {
-                val refreshed = refreshMovieMediaUseCase(movieId)
-                if (refreshed != null) {
-                    _uiState.update { it.copy(movieWithMedia = refreshed, isRefreshingLinks = false) }
-                    val freshMedia = refreshed.media.find { it.quality == quality }
-                    val freshUrl = freshMedia?.downloadUrl1 ?: freshMedia?.downloadUrl2
-                    if (freshUrl != null) {
-                        customDownloadManager.downloadMovie(
-                            movieId = movieId,
-                            quality = quality,
-                            url = freshUrl,
-                            movieName = refreshed.movie.movieName,
-                            posterUrl = refreshed.movie.posterUrl,
-                            fileSize = freshMedia?.fileSize ?: "",
-                            onProgress = { }
-                        )
-                        Toast.makeText(context, "Download restarted with fresh link", Toast.LENGTH_SHORT).show()
-                    } else {
-                        _uiState.update { it.copy(refreshError = "No fresh download link available") }
-                        Toast.makeText(context, "No fresh download link found", Toast.LENGTH_SHORT).show()
+                // Trigger GHA refresh and poll until done (max 2 min)
+                val maxAttempts = 24
+                for (attempt in 0..maxAttempts) {
+                    if (attempt > 0) kotlinx.coroutines.delay(5000)
+                    when (val result = refreshMovieMediaUseCase(slug)) {
+                        is com.kstream.core.model.RefreshMediaResult.Done -> {
+                            // GHA finished — re-fetch movie details for fresh URLs
+                            val refreshed = getMovieDetailsUseCase(movieId)
+                            if (refreshed != null) {
+                                _uiState.update { it.copy(movieWithMedia = refreshed, isRefreshingLinks = false) }
+                                val freshMedia = refreshed.media.find { it.quality == quality }
+                                val freshUrl = freshMedia?.downloadUrl1 ?: freshMedia?.downloadUrl2
+                                if (freshUrl != null) {
+                                    customDownloadManager.downloadMovie(
+                                        movieId = movieId,
+                                        quality = quality,
+                                        url = freshUrl,
+                                        movieName = refreshed.movie.movieName,
+                                        posterUrl = refreshed.movie.posterUrl,
+                                        fileSize = freshMedia?.fileSize ?: "",
+                                        onProgress = { }
+                                    )
+                                    Toast.makeText(context, "Download restarted with fresh link", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "No fresh download link available") }
+                                    Toast.makeText(context, "No fresh download link found", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Failed to reload movie") }
+                                Toast.makeText(context, "Could not refresh links", Toast.LENGTH_SHORT).show()
+                            }
+                            return@launch
+                        }
+                        is com.kstream.core.model.RefreshMediaResult.Failed -> {
+                            _uiState.update { it.copy(isRefreshingLinks = false, refreshError = result.error) }
+                            Toast.makeText(context, "Could not refresh links. Please try again.", Toast.LENGTH_SHORT).show()
+                            return@launch
+                        }
+                        is com.kstream.core.model.RefreshMediaResult.Queued,
+                        is com.kstream.core.model.RefreshMediaResult.Processing -> {
+                            // still in progress, keep polling
+                        }
                     }
-                } else {
-                    _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Failed to refresh links") }
-                    Toast.makeText(context, "Could not refresh links", Toast.LENGTH_SHORT).show()
                 }
+                // Timed out
+                _uiState.update { it.copy(isRefreshingLinks = false, refreshError = "Refresh timed out") }
+                Toast.makeText(context, "Refresh timed out. Please try again.", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isRefreshingLinks = false, refreshError = e.toUserMessage()) }
                 Toast.makeText(context, "Could not refresh links. Please try again.", Toast.LENGTH_SHORT).show()

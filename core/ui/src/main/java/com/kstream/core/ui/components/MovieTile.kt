@@ -130,6 +130,9 @@ fun MovieTileMobile(
                     }
                 }
             )
+            if (movie.type.equals("Original HD", ignoreCase = true)) {
+                HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -200,6 +203,9 @@ fun MovieTileTv(
                         }
                     }
                 )
+                if (movie.type.equals("Original HD", ignoreCase = true)) {
+                    HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             TvText(
@@ -211,5 +217,23 @@ fun MovieTileTv(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
             )
         }
+    }
+}
+
+@Composable
+fun HdBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color(0xFFFFD600)) // bold yellow
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = "HD",
+            color = Color.Black,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.5.sp
+        )
     }
 }
