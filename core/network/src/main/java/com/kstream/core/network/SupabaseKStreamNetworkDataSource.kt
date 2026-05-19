@@ -101,10 +101,15 @@ class SupabaseKStreamNetworkDataSource @Inject constructor(
         return try {
             Log.d("KStreamNetwork", "Calling refresh-media Edge Function for slug: $slug")
 
+            val jsonBody = kotlinx.serialization.json.buildJsonObject {
+                put("slug", kotlinx.serialization.json.JsonPrimitive(slug))
+            }.toString()
+
             val response = client.functions.invoke("refresh-media") {
-                body = kotlinx.serialization.json.buildJsonObject {
-                    put("slug", kotlinx.serialization.json.JsonPrimitive(slug))
-                }
+                body = io.ktor.http.content.TextContent(
+                    jsonBody,
+                    io.ktor.http.ContentType.Application.Json
+                )
             }
             val bodyStr = response.body<String>()
             Log.d("KStreamNetwork", "Edge Function response: $bodyStr")
