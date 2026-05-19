@@ -386,7 +386,7 @@ fun PlayerRoute(
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     Text(
-                        text = "Couldn't get a working link",
+                        text = uiState.refreshError ?: "Couldn't get a working link",
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,

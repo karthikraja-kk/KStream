@@ -166,7 +166,7 @@ class PlayerViewModel @Inject constructor(
     private fun startPolling(slug: String) {
         refreshPollingJob?.cancel()
         refreshPollingJob = viewModelScope.launch {
-            val maxAttempts = 24 // 24 × 5s = 2 minutes max
+            val maxAttempts = 60 // 60 × 5s = 5 minutes max (GHA cold-start needs time)
             for (attempt in 1..maxAttempts) {
                 delay(5000)
                 try {
@@ -326,6 +326,10 @@ class PlayerViewModel @Inject constructor(
                     playerManager.play(fallbackUrls, startPosition)
                     _uiState.update { it.copy(isOffline = !isOnline) }
                     startProgressSync()
+                } else {
+                    // URLs are null/empty — trigger refresh to fetch fresh links
+                    android.util.Log.w("PlayerViewModel", "No watch URLs available, triggering media refresh...")
+                    refreshAndRetry()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("PlayerViewModel", "Error loading media", e)
