@@ -64,11 +64,6 @@ fun WelcomeScreenMobile(
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(100)
-        focusRequester.requestFocus()
-    }
-    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -146,11 +141,6 @@ fun WelcomeScreenTv(
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(100)
-        focusRequester.requestFocus()
-    }
     
     Column(
         modifier = Modifier
