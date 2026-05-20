@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import androidx.compose.material3.LinearProgressIndicator
 import kotlinx.coroutines.delay
 import com.kstream.core.model.Movie
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -81,7 +82,8 @@ private fun getInitials(title: String): String {
 fun MovieTileMobile(
     movie: Movie,
     onClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    watchProgress: Float? = null
 ) {
     val context = LocalContext.current
     var retryHash by remember { mutableIntStateOf(0) }
@@ -133,6 +135,17 @@ fun MovieTileMobile(
             if (movie.type.equals("Original HD", ignoreCase = true)) {
                 HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
             }
+            if (watchProgress != null && watchProgress > 0f) {
+                LinearProgressIndicator(
+                    progress = watchProgress.coerceIn(0f, 1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .align(Alignment.BottomCenter),
+                    color = Color(0xFFE50914),
+                    trackColor = Color.White.copy(alpha = 0.3f)
+                )
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -153,7 +166,8 @@ fun MovieTileMobile(
 fun MovieTileTv(
     movie: Movie,
     onClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    watchProgress: Float? = null
 ) {
     val context = LocalContext.current
     var retryHash by remember { mutableIntStateOf(0) }
@@ -205,6 +219,17 @@ fun MovieTileTv(
                 )
                 if (movie.type.equals("Original HD", ignoreCase = true)) {
                     HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
+                }
+                if (watchProgress != null && watchProgress > 0f) {
+                    LinearProgressIndicator(
+                        progress = watchProgress.coerceIn(0f, 1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .align(Alignment.BottomCenter),
+                        color = Color(0xFFE50914),
+                        trackColor = Color.White.copy(alpha = 0.3f)
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))

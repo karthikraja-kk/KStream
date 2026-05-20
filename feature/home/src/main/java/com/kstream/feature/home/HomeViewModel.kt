@@ -72,9 +72,16 @@ class HomeViewModel @Inject constructor(
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastSyncTime > syncDebounceMs) {
                     lastSyncTime = currentTime
-                    try {
-                        syncMoviesUseCase()
-                    } catch (_: Exception) { }
+                    // If there's an error or no content loaded, do a full refresh
+                    // to clear the error and reload everything
+                    val state = _uiState.value
+                    if (state.error != null || state.rails.isEmpty()) {
+                        refreshContent()
+                    } else {
+                        try {
+                            syncMoviesUseCase()
+                        } catch (_: Exception) { }
+                    }
                 }
             }
             .launchIn(viewModelScope)

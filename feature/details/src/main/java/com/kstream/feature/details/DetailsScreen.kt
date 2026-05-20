@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableIntStateOf
@@ -260,7 +261,7 @@ fun DetailsScreenMobile(
                             Icon(
                                 imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = if (uiState.isLiked) "Unlike" else "Like",
-                                tint = if (uiState.isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                tint = if (uiState.isLiked) Color(0xFFB71C1C) else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -516,7 +517,7 @@ fun DetailsScreenTv(
                         Icon(
                             imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = if (uiState.isLiked) "Unlike" else "Like",
-                            tint = if (uiState.isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                            tint = if (uiState.isLiked) Color(0xFFB71C1C) else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(32.dp)
                         )
                     }

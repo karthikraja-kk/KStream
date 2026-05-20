@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class PlayerUiState(
+    val isLoading: Boolean = true,
     val availableQualities: List<String> = emptyList(),
     val currentQuality: String = "",
     val isPlayingLocal: Boolean = false,
@@ -238,16 +239,16 @@ class PlayerViewModel @Inject constructor(
     private fun startFunnyMessages() {
         funnyMessageJob?.cancel()
         funnyMessageJob = viewModelScope.launch {
-            // Wait 2 seconds before showing overlay
-            delay(2000)
+            // Wait before showing overlay
+            delay(4000)
             if (!_uiState.value.isRefreshingLinks) return@launch
 
             var messageIndex = 0
             _uiState.update { it.copy(showRefreshOverlay = true, funnyMessage = PlayerUiState.FUNNY_MESSAGES[0]) }
 
-            // Cycle through messages every 3 seconds
+            // Cycle through messages every 5 seconds
             while (true) {
-                delay(3000)
+                delay(5000)
                 if (!_uiState.value.isRefreshingLinks) return@launch
                 messageIndex = (messageIndex + 1) % PlayerUiState.FUNNY_MESSAGES.size
                 _uiState.update { it.copy(funnyMessage = PlayerUiState.FUNNY_MESSAGES[messageIndex]) }
@@ -296,14 +297,14 @@ class PlayerViewModel @Inject constructor(
                 if (localPath != null && customDownloadManager.checkFileExists(localPath)) {
                     val startPosition = getWatchProgressUseCase(movieId)
                     playerManager.playLocal(localPath, startPosition)
-                    _uiState.update { it.copy(isPlayingLocal = true, isOffline = false) }
+                    _uiState.update { it.copy(isLoading = false, isPlayingLocal = true, isOffline = false) }
                     startProgressSync()
                     return@launch
                 }
 
                 // From downloads page: don't fall back to streaming
                 if (source == "download") {
-                    _uiState.update { it.copy(localFileMissing = true) }
+                    _uiState.update { it.copy(localFileMissing = true, isLoading = false) }
                     return@launch
                 }
 
@@ -324,16 +325,17 @@ class PlayerViewModel @Inject constructor(
                 if (fallbackUrls.isNotEmpty()) {
                     val startPosition = getWatchProgressUseCase(movieId)
                     playerManager.play(fallbackUrls, startPosition)
-                    _uiState.update { it.copy(isOffline = !isOnline) }
+                    _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
                     startProgressSync()
                 } else {
                     // URLs are null/empty — trigger refresh to fetch fresh links
                     android.util.Log.w("PlayerViewModel", "No watch URLs available, triggering media refresh...")
+                    _uiState.update { it.copy(isLoading = false) }
                     refreshAndRetry()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("PlayerViewModel", "Error loading media", e)
-                _uiState.update { it.copy(loadError = e.toUserMessage()) }
+                _uiState.update { it.copy(isLoading = false, loadError = e.toUserMessage()) }
             }
         }
     }

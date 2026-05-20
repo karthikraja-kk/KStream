@@ -30,6 +30,7 @@ import coil.compose.AsyncImage
 fun SettingsRoute(
     onBackClick: () -> Unit,
     onMovieClick: (String) -> Unit,
+    onTermsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -175,6 +176,29 @@ fun SettingsRoute(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Reset All & Restart")
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            Divider()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            TextButton(
+                onClick = onTermsClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Terms & Conditions",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "App Version 1.0.0",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
 
         if (showClearLikedDialog) {
@@ -335,18 +359,6 @@ private fun WatchHistoryScreen(
                         }) {
                             Text(if (allSelected) "Deselect All" else "Select All")
                         }
-                        if (selectedIds.isNotEmpty()) {
-                            IconButton(onClick = {
-                                pendingDeleteIds = selectedIds.toSet()
-                                showDeleteConfirm = true
-                            }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Remove selected",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
                     } else if (items.isNotEmpty()) {
                         IconButton(onClick = {
                             isSelecting = true
@@ -356,6 +368,35 @@ private fun WatchHistoryScreen(
                     }
                 }
             )
+        },
+        bottomBar = {
+            if (isSelecting && selectedIds.isNotEmpty()) {
+                Surface(
+                    tonalElevation = 3.dp,
+                    shadowElevation = 8.dp
+                ) {
+                    Button(
+                        onClick = {
+                            pendingDeleteIds = selectedIds.toSet()
+                            showDeleteConfirm = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Delete ${selectedIds.size} item${if (selectedIds.size > 1) "s" else ""}")
+                    }
+                }
+            }
         }
     ) { padding ->
         if (isLoading) {

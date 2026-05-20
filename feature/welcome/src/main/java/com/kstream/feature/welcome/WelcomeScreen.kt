@@ -1,12 +1,14 @@
 package com.kstream.feature.welcome
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kstream.core.ui.R
@@ -31,6 +34,7 @@ import com.kstream.core.ui.Platform
 @Composable
 fun WelcomeRoute(
     onNavigateToHome: () -> Unit,
+    onTermsClick: () -> Unit = {},
     viewModel: WelcomeViewModel = hiltViewModel()
 ) {
     val username by viewModel.username.collectAsState()
@@ -40,13 +44,15 @@ fun WelcomeRoute(
         WelcomeScreenTv(
             username = username,
             onUsernameChange = viewModel::onUsernameChange,
-            onContinueClick = { viewModel.onContinueClick(onNavigateToHome) }
+            onContinueClick = { viewModel.onContinueClick(onNavigateToHome) },
+            onTermsClick = onTermsClick
         )
     } else {
         WelcomeScreenMobile(
             username = username,
             onUsernameChange = viewModel::onUsernameChange,
-            onContinueClick = { viewModel.onContinueClick(onNavigateToHome) }
+            onContinueClick = { viewModel.onContinueClick(onNavigateToHome) },
+            onTermsClick = onTermsClick
         )
     }
 }
@@ -55,14 +61,16 @@ fun WelcomeRoute(
 fun WelcomeScreenMobile(
     username: String,
     onUsernameChange: (String) -> Unit,
-    onContinueClick: () -> Unit
+    onContinueClick: () -> Unit,
+    onTermsClick: () -> Unit = {}
 ) {
-    var textFieldValue by remember(username) {
+    var textFieldValue by rememberSaveable(username, stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(text = username, selection = TextRange(username.length)))
     }
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    var termsAccepted by rememberSaveable { mutableStateOf(true) }
     
     Column(
         modifier = Modifier
@@ -103,7 +111,7 @@ fun WelcomeScreenMobile(
                         textFieldValue = textFieldValue.copy(selection = TextRange(textFieldValue.text.length))
                     }
                 },
-            placeholder = { Text("e.g. MovieBuff99") },
+            placeholder = { Text("Guest") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words,
@@ -112,7 +120,7 @@ fun WelcomeScreenMobile(
             keyboardActions = KeyboardActions(
                 onDone = {
                     focusManager.clearFocus()
-                    onContinueClick()
+                    if (termsAccepted) onContinueClick()
                 }
             )
         )
@@ -122,9 +130,33 @@ fun WelcomeScreenMobile(
                 focusManager.clearFocus()
                 onContinueClick()
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = termsAccepted
         ) {
             Text("Continue")
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Checkbox(
+                checked = termsAccepted,
+                onCheckedChange = { termsAccepted = it }
+            )
+            Text(
+                text = "I accept ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Terms & Conditions",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    textDecoration = TextDecoration.Underline
+                ),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { onTermsClick() }
+            )
         }
     }
 }
@@ -133,14 +165,16 @@ fun WelcomeScreenMobile(
 fun WelcomeScreenTv(
     username: String,
     onUsernameChange: (String) -> Unit,
-    onContinueClick: () -> Unit
+    onContinueClick: () -> Unit,
+    onTermsClick: () -> Unit = {}
 ) {
-    var textFieldValue by remember(username) {
+    var textFieldValue by rememberSaveable(username, stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(text = username, selection = TextRange(username.length)))
     }
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    var termsAccepted by rememberSaveable { mutableStateOf(true) }
     
     Column(
         modifier = Modifier
@@ -180,7 +214,7 @@ fun WelcomeScreenTv(
                         textFieldValue = textFieldValue.copy(selection = TextRange(textFieldValue.text.length))
                     }
                 },
-            placeholder = { Text("e.g. MovieBuff99") },
+            placeholder = { Text("Guest") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words,
@@ -189,7 +223,7 @@ fun WelcomeScreenTv(
             keyboardActions = KeyboardActions(
                 onDone = {
                     focusManager.clearFocus()
-                    onContinueClick()
+                    if (termsAccepted) onContinueClick()
                 }
             )
         )
@@ -199,9 +233,32 @@ fun WelcomeScreenTv(
                 focusManager.clearFocus()
                 onContinueClick()
             },
-            modifier = Modifier.width(200.dp)
+            modifier = Modifier.width(200.dp),
+            enabled = termsAccepted
         ) {
             Text("Continue")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = termsAccepted,
+                onCheckedChange = { termsAccepted = it }
+            )
+            Text(
+                text = "I accept ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Terms & Conditions",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    textDecoration = TextDecoration.Underline
+                ),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { onTermsClick() }
+            )
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.kstream.feature.welcome
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kstream.core.domain.repository.UserDataRepository
@@ -12,14 +13,16 @@ import javax.inject.Inject
 
 @HiltViewModel
 class WelcomeViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
     private val userDataRepository: UserDataRepository
 ) : ViewModel() {
 
-    private val _username = MutableStateFlow("Guest")
+    private val _username = MutableStateFlow(savedStateHandle.get<String>("username") ?: "Guest")
     val username: StateFlow<String> = _username.asStateFlow()
 
     fun onUsernameChange(newName: String) {
         _username.value = newName
+        savedStateHandle["username"] = newName
     }
 
     fun onContinueClick(onComplete: () -> Unit) {

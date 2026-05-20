@@ -46,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,9 +84,9 @@ fun PlayerRoute(
             viewModel.clearWatchProgress()
         }
     }
-    var lastBackPressTime by remember { mutableLongStateOf(0L) }
+    var lastBackPressTime by rememberSaveable { mutableLongStateOf(0L) }
     var showQualityMenu by remember { mutableStateOf(false) }
-    var isFullscreen by remember { mutableStateOf(false) }
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
     
     var controlsVisible by remember { mutableStateOf(true) }
 
@@ -185,6 +186,24 @@ fun PlayerRoute(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Initial loading overlay
+        if (uiState.isLoading) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color.Black
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = Color.White
+                    )
+                }
+            }
+        }
 
         if (controlsVisible) {
             Row(

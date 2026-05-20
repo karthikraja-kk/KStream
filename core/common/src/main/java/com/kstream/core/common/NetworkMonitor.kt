@@ -26,7 +26,12 @@ class NetworkMonitor @Inject constructor(
             }
 
             override fun onLost(network: Network) {
-                channel.trySend(false)
+                // onLost fires for a specific Network — another may still be active
+                // (e.g. WiFi lost but cellular still available during app switch)
+                val activeNet = connectivityManager.activeNetwork
+                val caps = connectivityManager.getNetworkCapabilities(activeNet)
+                val stillOnline = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+                channel.trySend(stillOnline)
             }
         }
 

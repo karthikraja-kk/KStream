@@ -1,6 +1,8 @@
 package com.kstream.feature.downloads
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,7 +27,7 @@ import com.kstream.core.model.Download
 import com.kstream.core.model.DownloadStatus
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DownloadRoute(
     onBackClick: () -> Unit,
@@ -40,8 +43,23 @@ fun DownloadRoute(
     
     var downloadToRemove by remember { mutableStateOf<Download?>(null) }
 
+    val selectedIds = remember { mutableStateListOf<String>() }
+    var isSelecting by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingDeleteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    LaunchedEffect(downloads.size) {
+        if (downloads.isEmpty()) {
+            isSelecting = false
+            selectedIds.clear()
+        }
+    }
+
     BackHandler {
-        if (isSearching) {
+        if (isSelecting) {
+            isSelecting = false
+            selectedIds.clear()
+        } else if (isSearching) {
             isSearching = false
             viewModel.onSearchQueryChange("")
         } else {
@@ -51,7 +69,36 @@ fun DownloadRoute(
 
     Scaffold(
         topBar = {
-            if (isSearching) {
+            if (isSelecting) {
+                TopAppBar(
+                    title = {
+                        Text("${selectedIds.size} selected")
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            isSelecting = false
+                            selectedIds.clear()
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                        }
+                    },
+                    actions = {
+                        if (downloads.isNotEmpty()) {
+                            val allSelected = selectedIds.size == downloads.size
+                            TextButton(onClick = {
+                                if (allSelected) {
+                                    selectedIds.clear()
+                                } else {
+                                    selectedIds.clear()
+                                    selectedIds.addAll(downloads.map { it.id })
+                                }
+                            }) {
+                                Text(if (allSelected) "Deselect All" else "Select All")
+                            }
+                        }
+                    }
+                )
+            } else if (isSearching) {
                 TopAppBar(
                     title = {
                         TextField(
@@ -60,7 +107,7 @@ fun DownloadRoute(
                             placeholder = { Text("Search downloads...") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            colors = TextFieldDefaults.textFieldColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
+                            colors = TextFieldDefaults.textFieldColors(containerColor = Color.Transparent)
                         )
                     },
                     navigationIcon = {
@@ -106,8 +153,42 @@ fun DownloadRoute(
                         IconButton(onClick = { isSearching = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
+                        if (downloads.isNotEmpty()) {
+                            IconButton(onClick = { isSelecting = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Select items")
+                            }
+                        }
                     }
                 )
+            }
+        },
+        bottomBar = {
+            if (isSelecting && selectedIds.isNotEmpty()) {
+                Surface(
+                    tonalElevation = 3.dp,
+                    shadowElevation = 8.dp
+                ) {
+                    Button(
+                        onClick = {
+                            pendingDeleteIds = selectedIds.toSet()
+                            showDeleteConfirm = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Delete ${selectedIds.size} item${if (selectedIds.size > 1) "s" else ""}")
+                    }
+                }
             }
         }
     ) { padding ->
@@ -147,10 +228,27 @@ fun DownloadRoute(
                             fileExists = viewModel.checkFileExists(download.localFilePath)
                         }
 
+                        val isSelected = download.id in selectedIds
+                        
                         DownloadItem(
                             download = download,
                             fileExists = fileExists,
-                            onClick = { onMovieClick(download.movieId) },
+                            isSelected = isSelected,
+                            isSelecting = isSelecting,
+                            onClick = {
+                                if (isSelecting) {
+                                    if (isSelected) selectedIds.remove(download.id)
+                                    else selectedIds.add(download.id)
+                                } else {
+                                    onMovieClick(download.movieId)
+                                }
+                            },
+                            onLongPress = {
+                                if (!isSelecting) {
+                                    isSelecting = true
+                                    selectedIds.add(download.id)
+                                }
+                            },
                             onWatch = { quality -> onWatchClick(download.movieId, quality) },
                             onRedownload = { viewModel.redownload(download.id) },
                             onPause = { viewModel.pauseDownload(download.id) },
@@ -186,13 +284,47 @@ fun DownloadRoute(
             }
         )
     }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Downloads") },
+            text = {
+                val count = pendingDeleteIds.size
+                Text("Delete $count download${if (count > 1) "s" else ""}? This action is not recoverable.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.removeDownloads(pendingDeleteIds)
+                        selectedIds.removeAll(pendingDeleteIds)
+                        if (selectedIds.isEmpty()) isSelecting = false
+                        pendingDeleteIds = emptySet()
+                        showDeleteConfirm = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DownloadItem(
     download: Download,
     fileExists: Boolean,
+    isSelected: Boolean = false,
+    isSelecting: Boolean = false,
     onClick: () -> Unit,
+    onLongPress: () -> Unit = {},
     onWatch: (String) -> Unit,
     onRedownload: () -> Unit,
     onPause: () -> Unit,
@@ -202,7 +334,14 @@ fun DownloadItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongPress
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier
@@ -210,15 +349,24 @@ fun DownloadItem(
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AsyncImage(
-                model = download.posterUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .width(80.dp)
-                    .height(120.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                contentScale = ContentScale.Crop
-            )
+            Box {
+                AsyncImage(
+                    model = download.posterUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .width(80.dp)
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                if (isSelecting) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onClick() },
+                        modifier = Modifier.align(Alignment.TopStart)
+                    )
+                }
+            }
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(

@@ -112,6 +112,17 @@ class DownloadViewModel @Inject constructor(
         }
     }
 
+    fun removeDownloads(ids: Set<String>) {
+        viewModelScope.launch {
+            ids.forEach { id ->
+                try {
+                    val download = downloadRepository.getDownload(id) ?: return@forEach
+                    customDownloadManager.deleteDownload(download.movieId, download.quality)
+                } catch (_: Exception) { }
+            }
+        }
+    }
+
     fun pauseDownload(id: String) {
         try {
             customDownloadManager.pauseDownload(id)

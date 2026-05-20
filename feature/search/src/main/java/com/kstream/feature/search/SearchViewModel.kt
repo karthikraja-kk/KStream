@@ -60,7 +60,9 @@ class SearchViewModel @Inject constructor(
     init {
         userDataRepository.recentSearches
             .catch { emit(emptyList()) }
-            .onEach { recents -> _uiState.update { it.copy(recentSearches = recents) } }
+            .onEach { recents ->
+                _uiState.update { it.copy(recentSearches = recents.filter { q -> !isReservedQuery(q) }) }
+            }
             .launchIn(viewModelScope)
         
         networkMonitor.isOnline
@@ -99,10 +101,20 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    private val reservedPrefixes = listOf("history:", "liked:", "all:", "recommended:", "genre:", "year:")
+
+    private fun isReservedQuery(query: String): Boolean {
+        val trimmed = query.trim()
+        return reservedPrefixes.any { trimmed.startsWith(it, ignoreCase = true) }
+    }
+
     fun onMovieClick(movie: Movie, onNavigate: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                userDataRepository.addRecentSearch(_uiState.value.query.trim())
+                val query = _uiState.value.query.trim()
+                if (query.isNotEmpty() && !isReservedQuery(query)) {
+                    userDataRepository.addRecentSearch(query)
+                }
             } catch (_: Exception) { }
             onNavigate(movie.id)
         }

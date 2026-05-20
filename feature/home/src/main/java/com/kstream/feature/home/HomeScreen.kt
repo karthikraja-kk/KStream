@@ -9,7 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -40,7 +40,104 @@ import androidx.tv.material3.Text as TvText
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
+import java.util.Calendar
 import android.app.Activity
+
+private data class Greeting(val title: String, val subtitle: String)
+
+private fun getTimeBasedGreeting(userName: String): Greeting {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val name = userName.trim()
+    val hasName = name.isNotBlank()
+
+    val greetings = when (hour) {
+        in 0..4 -> listOf(
+            Greeting(
+                if (hasName) "Still awake, $name?" else "Still awake?",
+                "The best movies happen after midnight 🌙"
+            ),
+            Greeting(
+                if (hasName) "Midnight movie mode, $name!" else "Midnight movie mode!",
+                "Sleep is overrated anyway 😏"
+            ),
+            Greeting(
+                if (hasName) "Night owl alert, $name!" else "Night owl alert!",
+                "Perfect time for a horror flick 👻"
+            )
+        )
+        in 5..8 -> listOf(
+            Greeting(
+                if (hasName) "Rise and stream, $name!" else "Rise and stream!",
+                "Coffee + movie = perfect morning ☕"
+            ),
+            Greeting(
+                if (hasName) "Up early, $name?" else "Up early?",
+                "Catch a movie before the world wakes up 🌅"
+            ),
+            Greeting(
+                if (hasName) "Early bird, $name!" else "Early bird!",
+                "The remote is all yours 🎬"
+            )
+        )
+        in 9..11 -> listOf(
+            Greeting(
+                if (hasName) "Good morning, $name!" else "Good morning!",
+                "Time to binge something amazing 🍿"
+            ),
+            Greeting(
+                if (hasName) "Morning, $name!" else "Morning!",
+                "Productivity can wait... right? 😄"
+            ),
+            Greeting(
+                if (hasName) "Hey $name!" else "Hey!",
+                "A movie a day keeps the boredom away 🎥"
+            )
+        )
+        in 12..16 -> listOf(
+            Greeting(
+                if (hasName) "Good afternoon, $name!" else "Good afternoon!",
+                "Perfect time for a movie marathon 🎬"
+            ),
+            Greeting(
+                if (hasName) "Afternoon chill, $name!" else "Afternoon chill!",
+                "Grab some snacks and hit play 🍕"
+            ),
+            Greeting(
+                if (hasName) "Hey there, $name!" else "Hey there!",
+                "Siesta + cinema = bliss 😎"
+            )
+        )
+        in 17..20 -> listOf(
+            Greeting(
+                if (hasName) "Good evening, $name!" else "Good evening!",
+                "You've earned some screen time 🛋️"
+            ),
+            Greeting(
+                if (hasName) "Evening vibes, $name!" else "Evening vibes!",
+                "Dinner and a movie? Don't mind if we do 🍽️"
+            ),
+            Greeting(
+                if (hasName) "Welcome back, $name!" else "Welcome back!",
+                "Prime time for prime entertainment 🌟"
+            )
+        )
+        else -> listOf(
+            Greeting(
+                if (hasName) "Movie night, $name!" else "Movie night!",
+                "Lights off, popcorn ready 🍿"
+            ),
+            Greeting(
+                if (hasName) "Settling in, $name?" else "Settling in?",
+                "Time for tonight's feature presentation 🎞️"
+            ),
+            Greeting(
+                if (hasName) "Night mode activated, $name!" else "Night mode activated!",
+                "Let the binge begin 📺"
+            )
+        )
+    }
+    return greetings.random()
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalTvMaterial3Api::class)
 @Composable
@@ -140,7 +237,7 @@ fun HomeScreenMobile(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -173,7 +270,7 @@ fun HomeScreenMobile(
                 NavigationBarItem(
                     selected = false,
                     onClick = onDownloadsClick,
-                    icon = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null) },
+                    icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
                     label = { Text("Downloads") }
                 )
                 NavigationBarItem(
@@ -194,25 +291,39 @@ fun HomeScreenMobile(
                 onRetry = onRetry,
                 onGoToDownloads = onGoToDownloads
             )
-        } else if (uiState.error != null && !isOffline) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                Column(
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-                ) {
-                    Text(text = uiState.error ?: "Something went wrong", color = MaterialTheme.colorScheme.error)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onRetry) {
-                        Text("Retry")
+        } else if (uiState.error != null) {
+            if (isOffline && uiState.rails.isEmpty()) {
+                OfflineScreen(
+                    onRetry = onRetry,
+                    onGoToDownloads = onGoToDownloads
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    Column(
+                        modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                    ) {
+                        Text(text = uiState.error ?: "Something went wrong", color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = onRetry) {
+                            Text("Retry")
+                        }
                     }
                 }
             }
-} else if (uiState.rails.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                Text(
-                    text = "No movies found. Pull to refresh or check your connection.",
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+        } else if (uiState.rails.isEmpty()) {
+            if (isOffline) {
+                OfflineScreen(
+                    onRetry = onRetry,
+                    onGoToDownloads = onGoToDownloads
                 )
+            } else {
+                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    Text(
+                        text = "No movies found. Pull to refresh or check your connection.",
+                        modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+                    )
+                }
             }
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -234,13 +345,14 @@ fun HomeScreenMobile(
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                 item {
+                    val greeting = remember { getTimeBasedGreeting(uiState.userName) }
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = if (uiState.userName.isNotBlank()) "Hello, ${uiState.userName}!" else "Hello!",
+                            text = greeting.title,
                             style = MaterialTheme.typography.headlineSmall
                         )
                         Text(
-                            text = "What would you like to watch today?",
+                            text = greeting.subtitle,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -275,7 +387,8 @@ fun HomeScreenMobile(
                                 MovieTileMobile(
                                     movie = movie,
                                     onClick = onMovieClick,
-                                    modifier = Modifier.width(120.dp)
+                                    modifier = Modifier.width(120.dp),
+                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent
                                 )
                             }
                         }
@@ -307,33 +420,47 @@ fun HomeScreenTv(
             onRetry = onRetry,
             onGoToDownloads = onGoToDownloads
         )
-    } else if (uiState.error != null && !isOffline) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-            ) {
-                TvText(text = uiState.error ?: "Something went wrong", color = TvMaterialTheme.colorScheme.error)
-                Spacer(modifier = Modifier.height(16.dp))
-                androidx.tv.material3.Button(onClick = onRetry) {
-                    TvText("Retry")
+    } else if (uiState.error != null) {
+        if (isOffline && uiState.rails.isEmpty()) {
+            TvOfflineScreen(
+                onRetry = onRetry,
+                onGoToDownloads = onGoToDownloads
+            )
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                ) {
+                    TvText(text = uiState.error ?: "Something went wrong", color = TvMaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    androidx.tv.material3.Button(onClick = onRetry) {
+                        TvText("Retry")
+                    }
                 }
             }
         }
     } else if (uiState.rails.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            TvText(
-                text = "No movies found. Check your connection.",
-                modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                color = TvMaterialTheme.colorScheme.onSurface
+        if (isOffline) {
+            TvOfflineScreen(
+                onRetry = onRetry,
+                onGoToDownloads = onGoToDownloads
             )
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                TvText(
+                    text = "No movies found. Check your connection.",
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                    color = TvMaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     } else {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                    .padding(horizontal = 48.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
@@ -361,14 +488,15 @@ fun HomeScreenTv(
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
                 item {
+                    val greeting = remember { getTimeBasedGreeting(uiState.userName) }
                     Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 24.dp)) {
                         TvText(
-                            text = if (uiState.userName.isNotBlank()) "Hello, ${uiState.userName}!" else "Hello!",
+                            text = greeting.title,
                             style = TvMaterialTheme.typography.displaySmall,
                             color = TvMaterialTheme.colorScheme.onBackground
                         )
                         TvText(
-                            text = "What would you like to watch today?",
+                            text = greeting.subtitle,
                             style = TvMaterialTheme.typography.bodyLarge,
                             color = TvMaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -401,7 +529,11 @@ fun HomeScreenTv(
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             tvItems(rail.movies, key = { it.id }) { movie ->
-                                MovieTileTv(movie = movie, onClick = onMovieClick)
+                                MovieTileTv(
+                                    movie = movie,
+                                    onClick = onMovieClick,
+                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent
+                                )
                             }
                         }
                     }

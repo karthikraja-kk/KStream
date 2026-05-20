@@ -56,6 +56,13 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         
+        // On process death restoration, the splash composable is no longer in the
+        // backstack (it was popped inclusively), so onReady() would never be called.
+        // Skip the splash hold to let the restored navigation state render immediately.
+        if (savedInstanceState != null) {
+            isLottieReady = true
+        }
+
         splashScreen.setKeepOnScreenCondition {
             !isLottieReady
         }
@@ -137,11 +144,14 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
                     )
                 }
                 composable("welcome") {
-                    WelcomeRoute(onNavigateToHome = {
-                        navController.navigate("home") {
-                            popUpTo("welcome") { inclusive = true }
-                        }
-                    })
+                    WelcomeRoute(
+                        onNavigateToHome = {
+                            navController.navigate("home") {
+                                popUpTo("welcome") { inclusive = true }
+                            }
+                        },
+                        onTermsClick = { navController.navigate("terms") }
+                    )
                 }
                 composable("home") {
                     HomeRoute(
@@ -230,7 +240,13 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
                         onBackClick = { navController.popBackStack() },
                         onMovieClick = { movieId ->
                             navController.navigate("details/${android.net.Uri.encode(movieId)}")
-                        }
+                        },
+                        onTermsClick = { navController.navigate("terms") }
+                    )
+                }
+                composable("terms") {
+                    com.kstream.feature.settings.TermsAndConditionsScreen(
+                        onBackClick = { navController.popBackStack() }
                     )
                 }
             }
@@ -260,11 +276,14 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
             )
         }
         composable("welcome") {
-            WelcomeRoute(onNavigateToHome = {
-                navController.navigate("home") {
-                    popUpTo("welcome") { inclusive = true }
-                }
-            })
+            WelcomeRoute(
+                onNavigateToHome = {
+                    navController.navigate("home") {
+                        popUpTo("welcome") { inclusive = true }
+                    }
+                },
+                onTermsClick = { navController.navigate("terms") }
+            )
         }
         composable("home") {
             HomeRoute(
@@ -369,7 +388,13 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
                 onBackClick = { navController.popBackStack() },
                 onMovieClick = { movieId ->
                     navController.navigate("details/${android.net.Uri.encode(movieId)}")
-                }
+                },
+                onTermsClick = { navController.navigate("terms") }
+            )
+        }
+        composable("terms") {
+            com.kstream.feature.settings.TermsAndConditionsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }
