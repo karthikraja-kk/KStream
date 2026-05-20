@@ -1,5 +1,6 @@
 package com.kstream.feature.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -18,6 +19,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kstream.core.ui.LocalPlatform
@@ -106,6 +111,33 @@ fun SearchRoute(
             }
         }
         
+        // "Did you mean?" suggestion banner
+        if (uiState.suggestedQuery != null && uiState.isFuzzyMatch) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clickable { viewModel.setInitialQuery(uiState.suggestedQuery!!) },
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = buildAnnotatedString {
+                        append("Did you mean: ")
+                        withStyle(SpanStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )) {
+                            append(uiState.suggestedQuery!!)
+                        }
+                        append("?")
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
         if (isOffline) {
             OfflineScreen(
                 onRetry = { viewModel.onQueryChange(uiState.query) },

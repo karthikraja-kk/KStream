@@ -442,7 +442,7 @@ fun HomeScreenTv(
             }
         }
     } else {
-        Column {
+        Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -470,7 +470,7 @@ fun HomeScreenTv(
                 }
             }
             TvLazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
                 item {

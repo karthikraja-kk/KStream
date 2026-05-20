@@ -1,6 +1,7 @@
 package com.kstream.core.data.repository
 
 import android.util.Log
+import com.kstream.core.common.FuzzySearch
 import com.kstream.core.data.local.dao.MovieDao
 import com.kstream.core.data.local.entities.MovieEntity
 import com.kstream.core.data.local.KStreamDataStore
@@ -12,6 +13,7 @@ import com.kstream.core.model.MovieWithMedia
 import com.kstream.core.model.ScanStatus
 import com.kstream.core.model.ScanStatusInfo
 import com.kstream.core.model.ScanTriggerResult
+import com.kstream.core.model.SearchResult
 import com.kstream.core.domain.repository.MovieRepository
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
@@ -101,7 +103,7 @@ class OfflineFirstMovieRepository @Inject constructor(
         // Wildcard — return all movies from local cache (used by history:* flow)
         if (normalizedQuery == "*") {
             return try {
-                val localMovies = movieDao.searchMovies("%%")
+                val localMovies = movieDao.getAllMovies()
                 localMovies.map { it.asExternalModel(baseUrl) }
             } catch (e: Exception) {
                 network.getMovies().map { it.asExternalModel(baseUrl) }
@@ -112,7 +114,7 @@ class OfflineFirstMovieRepository @Inject constructor(
         when (normalizedQuery) {
             "New Releases" -> {
                 return try {
-                    val localMovies = movieDao.searchMovies("%%")
+                    val localMovies = movieDao.getAllMovies()
                     localMovies.map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }.take(100)
                 } catch (e: Exception) {
                     network.getMovies().map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }.take(100)
@@ -120,7 +122,7 @@ class OfflineFirstMovieRepository @Inject constructor(
             }
             "You Might Like" -> {
                 return try {
-                    val localMovies = movieDao.searchMovies("%%")
+                    val localMovies = movieDao.getAllMovies()
                     localMovies.map { it.asExternalModel(baseUrl) }.take(100)
                 } catch (e: Exception) {
                     network.getMovies().map { it.asExternalModel(baseUrl) }.take(100)
@@ -198,6 +200,54 @@ class OfflineFirstMovieRepository @Inject constructor(
 
     override suspend fun clearCache() {
         movieDao.clearMovies()
+    }
+
+    override suspend fun searchMoviesWithSuggestion(query: String): SearchResult {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isEmpty()) return SearchResult(movies = emptyList())
+
+        // Skip fuzzy for very short queries — too many false positives
+        if (normalizedQuery.length <= 2) {
+            return SearchResult(movies = searchMovies(normalizedQuery))
+        }
+
+        val exactResults = searchMovies(normalizedQuery)
+        if (exactResults.isNotEmpty()) {
+            return SearchResult(movies = exactResults)
+        }
+
+        // Exact search returned nothing — try fuzzy matching on cached movies
+        Log.d("MovieRepository", "No exact results for '$normalizedQuery', trying fuzzy search")
+        return try {
+            val baseUrl = dataStore.getPosterBaseUrlSync()
+            val allCached = movieDao.getAllMovies().map { it.asExternalModel(baseUrl) }
+            if (allCached.isEmpty()) return SearchResult(movies = emptyList())
+
+            val scored = allCached
+                .map { movie -> movie to FuzzySearch.scoreQuery(normalizedQuery, movie.movieName) }
+                .filter { (_, score) -> score >= FUZZY_THRESHOLD }
+                .sortedByDescending { (_, score) -> score }
+                .take(FUZZY_MAX_RESULTS)
+
+            if (scored.isEmpty()) return SearchResult(movies = emptyList())
+
+            val bestMatch = scored.first().first.movieName
+            Log.d("MovieRepository", "Fuzzy search found ${scored.size} results, best match: '$bestMatch'")
+
+            SearchResult(
+                movies = scored.map { it.first },
+                suggestedQuery = bestMatch,
+                isFuzzyMatch = true
+            )
+        } catch (e: Exception) {
+            Log.e("MovieRepository", "Fuzzy search failed: ${e.message}", e)
+            SearchResult(movies = emptyList())
+        }
+    }
+
+    companion object {
+        private const val FUZZY_THRESHOLD = 0.55
+        private const val FUZZY_MAX_RESULTS = 20
     }
 }
 

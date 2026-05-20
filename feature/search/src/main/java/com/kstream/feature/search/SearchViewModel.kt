@@ -34,7 +34,9 @@ data class SearchUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val recentSearches: List<String> = emptyList(),
-    val sortOption: SortOption = SortOption.NONE
+    val sortOption: SortOption = SortOption.NONE,
+    val suggestedQuery: String? = null,
+    val isFuzzyMatch: Boolean = false
 )
 
 @HiltViewModel
@@ -148,7 +150,7 @@ class SearchViewModel @Inject constructor(
     }
 
     private suspend fun executeSearch(query: String) {
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        _uiState.update { it.copy(isLoading = true, error = null, suggestedQuery = null, isFuzzyMatch = false) }
         try {
             val results = when {
                 query.trim() == "history:*" -> {
@@ -171,9 +173,22 @@ class SearchViewModel @Inject constructor(
                 query.trim() == "recommended:*" -> {
                     getRecommendationsUseCase().first()
                 }
-                else -> movieRepository.searchMovies(query)
+                else -> null // handled below with fuzzy search
             }
-            _uiState.update { it.copy(results = applySorting(results, it.sortOption), isLoading = false) }
+
+            if (results != null) {
+                _uiState.update { it.copy(results = applySorting(results, it.sortOption), isLoading = false) }
+            } else {
+                val searchResult = movieRepository.searchMoviesWithSuggestion(query)
+                _uiState.update {
+                    it.copy(
+                        results = applySorting(searchResult.movies, it.sortOption),
+                        suggestedQuery = searchResult.suggestedQuery,
+                        isFuzzyMatch = searchResult.isFuzzyMatch,
+                        isLoading = false
+                    )
+                }
+            }
         } catch (e: Exception) {
             _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
         }

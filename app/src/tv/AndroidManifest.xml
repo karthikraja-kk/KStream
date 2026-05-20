@@ -4,7 +4,7 @@
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
-    <application>
+    <application android:banner="@drawable/app_banner">
         <activity
             android:name=".MainActivity"
             android:banner="@drawable/app_banner">

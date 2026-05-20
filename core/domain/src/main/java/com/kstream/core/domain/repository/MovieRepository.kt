@@ -4,6 +4,7 @@ import com.kstream.core.model.Movie
 import com.kstream.core.model.MovieWithMedia
 import com.kstream.core.model.ScanStatusInfo
 import com.kstream.core.model.ScanTriggerResult
+import com.kstream.core.model.SearchResult
 import kotlinx.coroutines.flow.Flow
 
 interface MovieRepository {
@@ -11,6 +12,7 @@ interface MovieRepository {
     suspend fun getMovieWithMedia(movieId: String): MovieWithMedia?
     suspend fun syncMovies()
     suspend fun searchMovies(query: String): List<Movie>
+    suspend fun searchMoviesWithSuggestion(query: String): SearchResult
     suspend fun refreshMedia(slug: String): com.kstream.core.model.RefreshMediaResult
     suspend fun triggerScan(): ScanTriggerResult
     suspend fun getScanStatus(): ScanStatusInfo

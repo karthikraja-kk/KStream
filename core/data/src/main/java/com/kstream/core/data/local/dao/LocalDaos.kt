@@ -14,6 +14,9 @@ interface MovieDao {
     @Query("SELECT * FROM movies_cache")
     fun getMovies(): Flow<List<MovieEntity>>
 
+    @Query("SELECT * FROM movies_cache")
+    suspend fun getAllMovies(): List<MovieEntity>
+
     @Query("""
         SELECT * FROM movies_cache 
         WHERE movieName LIKE :query 

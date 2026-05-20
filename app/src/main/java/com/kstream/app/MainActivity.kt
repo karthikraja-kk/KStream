@@ -122,7 +122,8 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
         KStreamTvSideNav(currentRoute = currentRoute, onNavigate = onTvNavigate) {
             NavHost(
                 navController = navController,
-                startDestination = startDestination
+                startDestination = startDestination,
+                modifier = Modifier.fillMaxSize()
             ) {
                 composable("splash") {
                     SplashScreenWithNav(

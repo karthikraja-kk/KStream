@@ -3,6 +3,8 @@ package com.kstream.feature.welcome
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -176,89 +178,95 @@ fun WelcomeScreenTv(
     val focusManager = LocalFocusManager.current
     var termsAccepted by rememberSaveable { mutableStateOf(true) }
     
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(R.drawable.kstream_logo_with_name),
-            contentDescription = "KStream Logo",
+        Column(
             modifier = Modifier
-                .width(500.dp)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = "Your cinematic journey begins here.",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(64.dp))
-        OutlinedTextField(
-            value = textFieldValue,
-            onValueChange = { newValue ->
-                textFieldValue = newValue.copy(selection = TextRange(newValue.text.length))
-                onUsernameChange(newValue.text)
-            },
-            label = { Text("What should we call you?") },
-            modifier = Modifier
-                .width(600.dp)
-                .focusRequester(focusRequester)
-                .onFocusChanged { focusState ->
-                    if (focusState.isFocused && !isFocused) {
-                        isFocused = true
-                        textFieldValue = textFieldValue.copy(selection = TextRange(textFieldValue.text.length))
-                    }
-                },
-            placeholder = { Text("Guest") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    focusManager.clearFocus()
-                    if (termsAccepted) onContinueClick()
-                }
-            )
-        )
-        Spacer(modifier = Modifier.height(48.dp))
-        Button(
-            onClick = {
-                focusManager.clearFocus()
-                onContinueClick()
-            },
-            modifier = Modifier.width(200.dp),
-            enabled = termsAccepted
+                .widthIn(max = 560.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Continue")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = termsAccepted,
-                onCheckedChange = { termsAccepted = it }
+            Image(
+                painter = painterResource(R.drawable.kstream_logo_with_name),
+                contentDescription = "KStream Logo",
+                modifier = Modifier
+                    .widthIn(max = 400.dp)
             )
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "I accept ",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Terms & Conditions",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    textDecoration = TextDecoration.Underline
-                ),
+                text = "Your cinematic journey begins here.",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { onTermsClick() }
+                textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(32.dp))
+            OutlinedTextField(
+                value = textFieldValue,
+                onValueChange = { newValue ->
+                    textFieldValue = newValue.copy(selection = TextRange(newValue.text.length))
+                    onUsernameChange(newValue.text)
+                },
+                label = { Text("What should we call you?") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused && !isFocused) {
+                            isFocused = true
+                            textFieldValue = textFieldValue.copy(selection = TextRange(textFieldValue.text.length))
+                        }
+                    },
+                placeholder = { Text("Guest") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        if (termsAccepted) onContinueClick()
+                    }
+                )
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = {
+                    focusManager.clearFocus()
+                    onContinueClick()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = termsAccepted
+            ) {
+                Text("Continue")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(
+                    checked = termsAccepted,
+                    onCheckedChange = { termsAccepted = it }
+                )
+                Text(
+                    text = "I accept ",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Terms & Conditions",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        textDecoration = TextDecoration.Underline
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { onTermsClick() }
+                )
+            }
         }
     }
 }
