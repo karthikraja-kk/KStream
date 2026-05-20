@@ -53,6 +53,13 @@ class SearchViewModel @Inject constructor(
 
     private var searchJob: Job? = null
 
+    private val reservedPrefixes = listOf("history:", "liked:", "all:", "recommended:", "genre:", "year:")
+
+    private fun isReservedQuery(query: String): Boolean {
+        val trimmed = query.trim()
+        return reservedPrefixes.any { trimmed.startsWith(it, ignoreCase = true) }
+    }
+
     companion object {
         private const val DEBOUNCE_MS = 300L
     }
@@ -99,13 +106,6 @@ class SearchViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(results = emptyList(), isLoading = false) }
         }
-    }
-
-    private val reservedPrefixes = listOf("history:", "liked:", "all:", "recommended:", "genre:", "year:")
-
-    private fun isReservedQuery(query: String): Boolean {
-        val trimmed = query.trim()
-        return reservedPrefixes.any { trimmed.startsWith(it, ignoreCase = true) }
     }
 
     fun onMovieClick(movie: Movie, onNavigate: (String) -> Unit) {

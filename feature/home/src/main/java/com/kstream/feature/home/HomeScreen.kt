@@ -291,23 +291,16 @@ fun HomeScreenMobile(
                 onRetry = onRetry,
                 onGoToDownloads = onGoToDownloads
             )
-        } else if (uiState.error != null) {
-            if (isOffline && uiState.rails.isEmpty()) {
-                OfflineScreen(
-                    onRetry = onRetry,
-                    onGoToDownloads = onGoToDownloads
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                    Column(
-                        modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-                    ) {
-                        Text(text = uiState.error ?: "Something went wrong", color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = onRetry) {
-                            Text("Retry")
-                        }
+        } else if (uiState.error != null && !isOffline) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Column(
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                ) {
+                    Text(text = uiState.error ?: "Something went wrong", color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = onRetry) {
+                        Text("Retry")
                     }
                 }
             }
@@ -388,7 +381,7 @@ fun HomeScreenMobile(
                                     movie = movie,
                                     onClick = onMovieClick,
                                     modifier = Modifier.width(120.dp),
-                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent
+                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent?.div(100f)
                                 )
                             }
                         }
@@ -420,23 +413,16 @@ fun HomeScreenTv(
             onRetry = onRetry,
             onGoToDownloads = onGoToDownloads
         )
-    } else if (uiState.error != null) {
-        if (isOffline && uiState.rails.isEmpty()) {
-            TvOfflineScreen(
-                onRetry = onRetry,
-                onGoToDownloads = onGoToDownloads
-            )
-        } else {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-                ) {
-                    TvText(text = uiState.error ?: "Something went wrong", color = TvMaterialTheme.colorScheme.error)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    androidx.tv.material3.Button(onClick = onRetry) {
-                        TvText("Retry")
-                    }
+    } else if (uiState.error != null && !isOffline) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+            ) {
+                TvText(text = uiState.error ?: "Something went wrong", color = TvMaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(16.dp))
+                androidx.tv.material3.Button(onClick = onRetry) {
+                    TvText("Retry")
                 }
             }
         }
@@ -532,7 +518,7 @@ fun HomeScreenTv(
                                 MovieTileTv(
                                     movie = movie,
                                     onClick = onMovieClick,
-                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent
+                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent?.div(100f)
                                 )
                             }
                         }

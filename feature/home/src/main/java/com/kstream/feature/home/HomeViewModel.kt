@@ -47,7 +47,8 @@ class HomeViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-    val isOnline: StateFlow<Boolean> = MutableStateFlow(true)
+    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     
     private var lastSyncTime = 0L
     private val syncDebounceMs = 5000L
@@ -60,14 +61,8 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun observeNetworkChanges() {
-        networkMonitor.isOnline
-            .onEach { online ->
-                (isOnline as MutableStateFlow).value = online
-            }
-            .launchIn(viewModelScope)
-        
-        networkMonitor.isOnline
-            .filter { isOnline -> isOnline }
+        isOnline
+            .filter { online -> online }
             .onEach {
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastSyncTime > syncDebounceMs) {
@@ -114,7 +109,12 @@ class HomeViewModel @Inject constructor(
                 syncMoviesUseCase()
                 getRecommendationsUseCase.refreshRecommendations()
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.toUserMessage(), isLoading = false) }
+                if (isOnline.value) {
+                    _uiState.update { it.copy(error = e.toUserMessage(), isLoading = false) }
+                } else {
+                    // Offline sync failure is expected — don't show error
+                    _uiState.update { it.copy(isLoading = false) }
+                }
             }
         }
     }
@@ -189,7 +189,9 @@ class HomeViewModel @Inject constructor(
         }
 
         // New Releases — sorted by last_updated (latest first)
-        rails.add(MovieRail("New Releases", movies.sortedByLastUpdated().take(10), seeMoreQuery = "all:*"))
+        if (movies.isNotEmpty()) {
+            rails.add(MovieRail("New Releases", movies.sortedByLastUpdated().take(10), seeMoreQuery = "all:*"))
+        }
         
         // Genre rails — sorted by last_updated
         val allGenres = movies.flatMap { it.genres }.distinct()
@@ -204,7 +206,9 @@ class HomeViewModel @Inject constructor(
         val years = movies.map { it.year }.distinct().sortedDescending()
         years.take(3).forEach { year ->
             val yearMovies = movies.filter { it.year == year }.sortedByLastUpdated().take(10)
-            rails.add(MovieRail("Released in $year", yearMovies, seeMoreQuery = "year:$year"))
+            if (yearMovies.isNotEmpty()) {
+                rails.add(MovieRail("Released in $year", yearMovies, seeMoreQuery = "year:$year"))
+            }
         }
 
         return rails
