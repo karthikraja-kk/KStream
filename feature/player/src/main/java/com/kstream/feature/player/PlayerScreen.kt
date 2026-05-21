@@ -1,6 +1,8 @@
 package com.kstream.feature.player
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +54,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -227,28 +233,58 @@ fun PlayerRoute(
         }
 
         if (controlsVisible) {
+            val fullscreenFocusRequester = remember { FocusRequester() }
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 96.dp, end = 16.dp)
             ) {
-                IconButton(
-                    onClick = { 
-                        if (isFullscreen) exitFullscreen() else enterFullscreen()
-                    },
-                    colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f))
+                var fsBtnFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (fsBtnFocused) Color(0xFFE50914) else Color.Black.copy(alpha = 0.5f))
+                        .focusRequester(fullscreenFocusRequester)
+                        .focusable()
+                        .onFocusChanged { fsBtnFocused = it.isFocused }
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown &&
+                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                            ) {
+                                if (isFullscreen) exitFullscreen() else enterFullscreen()
+                                true
+                            } else false
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen, 
-                        contentDescription = "Fullscreen", 
+                        if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        contentDescription = "Fullscreen",
                         tint = Color.White
                     )
                 }
-                
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                var qualBtnFocused by remember { mutableStateOf(false) }
                 Box {
-                    IconButton(
-                        onClick = { showQualityMenu = true },
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f))
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(if (qualBtnFocused) Color(0xFFE50914) else Color.Black.copy(alpha = 0.5f))
+                            .focusable()
+                            .onFocusChanged { qualBtnFocused = it.isFocused }
+                            .onPreviewKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown &&
+                                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                                ) {
+                                    showQualityMenu = true
+                                    true
+                                } else false
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Movie, contentDescription = "Quality", tint = Color.White)
                     }

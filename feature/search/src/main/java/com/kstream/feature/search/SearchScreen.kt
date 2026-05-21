@@ -1,11 +1,13 @@
 package com.kstream.feature.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -19,7 +21,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -295,15 +299,27 @@ private fun SortButton(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.focusable()) {
+    var sortFocused by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .then(
+                if (sortFocused) Modifier.background(Color(0xFFE50914))
+                else Modifier
+            )
+            .focusable()
+            .onFocusChanged { sortFocused = it.isFocused }
+    ) {
         IconButton(onClick = { expanded = true }) {
             Icon(
                 painter = painterResource(android.R.drawable.ic_menu_sort_by_size),
                 contentDescription = "Sort",
-                tint = if (currentSort != SortOption.NONE)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                tint = when {
+                    sortFocused -> Color.White
+                    currentSort != SortOption.NONE -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
             )
         }
         DropdownMenu(

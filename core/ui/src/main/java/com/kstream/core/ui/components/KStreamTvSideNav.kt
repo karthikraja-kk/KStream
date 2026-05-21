@@ -1,11 +1,9 @@
 package com.kstream.core.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,11 +12,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
@@ -39,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -48,7 +47,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -65,98 +64,143 @@ fun KStreamTvSideNav(
     content: @Composable () -> Unit
 ) {
     var sidebarExpanded by remember { mutableStateOf(false) }
-    val firstItemFocusRequester = remember { FocusRequester() }
+    val navFocusRequesters = remember {
+        mapOf(
+            "home" to FocusRequester(),
+            "search" to FocusRequester(),
+            "downloads" to FocusRequester(),
+            "settings" to FocusRequester()
+        )
+    }
 
-    // Request focus on the selected nav item when sidebar expands
     LaunchedEffect(sidebarExpanded) {
         if (sidebarExpanded) {
-            try { firstItemFocusRequester.requestFocus() } catch (_: Exception) {}
+            val target = navFocusRequesters[currentRoute] ?: navFocusRequesters["home"]
+            try { target?.requestFocus() } catch (_: Exception) {}
         }
     }
 
     Row(modifier = Modifier.fillMaxSize()) {
+        // Sidebar — always visible on top-level routes
         if (currentRoute in topLevelRoutes) {
-            AnimatedVisibility(
-                visible = sidebarExpanded,
-                enter = expandHorizontally(expandFrom = Alignment.Start),
-                exit = shrinkHorizontally(shrinkTowards = Alignment.Start)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(72.dp)
-                        .background(TvMaterialTheme.colorScheme.surfaceVariant)
-                        .padding(vertical = 16.dp, horizontal = 4.dp)
-                        .selectableGroup()
-                        .onPreviewKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
-                                sidebarExpanded = false
-                                true
-                            } else false
-                        },
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier.padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(R.drawable.kstream_logo),
-                            contentDescription = "KStream",
-                            modifier = Modifier.size(28.dp),
-                            contentScale = ContentScale.Fit
+            val sidebarWidth = if (sidebarExpanded) 200.dp else 56.dp
+
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(sidebarWidth)
+                    .animateContentSize(animationSpec = tween(250))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF1A1A1A),
+                                Color(0xFF111111)
+                            )
                         )
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-
-                    SideNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Home",
-                        selected = currentRoute == "home",
-                        onClick = { onNavigate("home"); sidebarExpanded = false },
-                        focusRequester = if (currentRoute == "home") firstItemFocusRequester else null
                     )
-                    SideNavItem(
-                        icon = Icons.Default.Search,
-                        label = "Search",
-                        selected = currentRoute == "search",
-                        onClick = { onNavigate("search"); sidebarExpanded = false },
-                        focusRequester = if (currentRoute == "search") firstItemFocusRequester else null
-                    )
-                    SideNavItem(
-                        icon = Icons.Default.Download,
-                        label = "Downloads",
-                        selected = currentRoute == "downloads",
-                        onClick = { onNavigate("downloads"); sidebarExpanded = false },
-                        focusRequester = if (currentRoute == "downloads") firstItemFocusRequester else null
-                    )
-                    SideNavItem(
-                        icon = Icons.Default.Settings,
-                        label = "Settings",
-                        selected = currentRoute == "settings",
-                        onClick = { onNavigate("settings"); sidebarExpanded = false },
-                        focusRequester = if (currentRoute == "settings") firstItemFocusRequester else null
+                    .padding(vertical = 20.dp)
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
+                            sidebarExpanded = false
+                            true
+                        } else false
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Logo
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 16.dp)
+                        .then(if (sidebarExpanded) Modifier.fillMaxWidth().padding(horizontal = 24.dp) else Modifier),
+                    contentAlignment = if (sidebarExpanded) Alignment.CenterStart else Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.kstream_logo),
+                        contentDescription = "KStream",
+                        modifier = Modifier.size(if (sidebarExpanded) 36.dp else 28.dp),
+                        contentScale = ContentScale.Fit
                     )
                 }
+
+                Spacer(Modifier.height(24.dp))
+
+                SideNavItem(
+                    icon = Icons.Default.Home,
+                    label = "Home",
+                    selected = currentRoute == "home",
+                    expanded = sidebarExpanded,
+                    onClick = { onNavigate("home") },
+                    focusRequester = navFocusRequesters["home"]!!
+                )
+                SideNavItem(
+                    icon = Icons.Default.Search,
+                    label = "Search",
+                    selected = currentRoute == "search",
+                    expanded = sidebarExpanded,
+                    onClick = { onNavigate("search") },
+                    focusRequester = navFocusRequesters["search"]!!
+                )
+                SideNavItem(
+                    icon = Icons.Default.Download,
+                    label = "Downloads",
+                    selected = currentRoute == "downloads",
+                    expanded = sidebarExpanded,
+                    onClick = { onNavigate("downloads") },
+                    focusRequester = navFocusRequesters["downloads"]!!
+                )
+
+                Spacer(Modifier.weight(1f))
+
+                SideNavItem(
+                    icon = Icons.Default.Settings,
+                    label = "Settings",
+                    selected = currentRoute == "settings",
+                    expanded = sidebarExpanded,
+                    onClick = { onNavigate("settings") },
+                    focusRequester = navFocusRequesters["settings"]!!
+                )
             }
         }
 
+        // Content area
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .onPreviewKeyEvent { keyEvent ->
+                    // Only open sidebar when D-pad Left is pressed and sidebar is collapsed
                     if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
                         if (!sidebarExpanded && currentRoute in topLevelRoutes) {
-                            sidebarExpanded = true
-                            true
+                            // Let the event propagate first — if nothing consumes it,
+                            // the focus system will fail and we open sidebar
+                            false
                         } else false
                     } else false
                 }
+                .onFocusChanged { focusState ->
+                    // When content gains focus, collapse sidebar
+                    if (focusState.hasFocus && sidebarExpanded) {
+                        sidebarExpanded = false
+                    }
+                }
         ) {
             content()
+
+            // Invisible left-edge focus catcher — opens sidebar when focus reaches left edge
+            if (!sidebarExpanded && currentRoute in topLevelRoutes) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .focusable()
+                        .onFocusChanged { state ->
+                            if (state.isFocused) {
+                                sidebarExpanded = true
+                            }
+                        }
+                )
+            }
         }
     }
 }
@@ -167,45 +211,77 @@ private fun SideNavItem(
     icon: ImageVector,
     label: String,
     selected: Boolean,
+    expanded: Boolean,
     onClick: () -> Unit,
-    focusRequester: FocusRequester? = null
+    focusRequester: FocusRequester
 ) {
     var isFocused by remember { mutableStateOf(false) }
+
     val bgColor = when {
-        isFocused -> TvMaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-        selected -> TvMaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        isFocused -> Color(0xFFE50914)
+        selected -> Color.White.copy(alpha = 0.1f)
         else -> Color.Transparent
     }
-    val contentColor = when {
-        isFocused || selected -> TvMaterialTheme.colorScheme.primary
-        else -> TvMaterialTheme.colorScheme.onSurfaceVariant
+    val iconColor = when {
+        isFocused -> Color.White
+        selected -> Color(0xFFE50914)
+        else -> Color(0xFF808080)
+    }
+    val textColor = when {
+        isFocused -> Color.White
+        selected -> Color.White
+        else -> Color(0xFF808080)
     }
 
-    Column(
-        modifier = Modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bgColor)
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
-            .clickable(onClick = onClick)
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            modifier = Modifier.size(20.dp),
-            tint = contentColor
-        )
-        Text(
-            text = label,
-            fontSize = 9.sp,
-            color = contentColor,
-            textAlign = TextAlign.Center,
-            maxLines = 1
-        )
+    val itemModifier = Modifier
+        .then(if (expanded) Modifier.fillMaxWidth().padding(horizontal = 12.dp) else Modifier.width(56.dp))
+        .height(48.dp)
+        .clip(RoundedCornerShape(12.dp))
+        .background(bgColor)
+        .focusRequester(focusRequester)
+        .focusable()
+        .onFocusChanged { isFocused = it.isFocused }
+        .onPreviewKeyEvent { keyEvent ->
+            if (keyEvent.type == KeyEventType.KeyDown &&
+                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+            ) {
+                onClick()
+                true
+            } else false
+        }
+
+    if (expanded) {
+        Row(
+            modifier = itemModifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(22.dp),
+                tint = iconColor
+            )
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = label,
+                fontSize = 15.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = textColor,
+                maxLines = 1
+            )
+        }
+    } else {
+        Box(
+            modifier = itemModifier,
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(22.dp),
+                tint = iconColor
+            )
+        }
     }
 }

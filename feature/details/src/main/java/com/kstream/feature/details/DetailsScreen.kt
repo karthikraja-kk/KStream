@@ -12,6 +12,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableIntStateOf
@@ -609,7 +615,9 @@ fun DetailsScreenTv(
                                 enabled = uiState.selectedQuality != null,
                                 colors = androidx.tv.material3.ButtonDefaults.colors(
                                     containerColor = Color(0xFFE50914),
-                                    contentColor = Color.White
+                                    contentColor = Color.White,
+                                    focusedContainerColor = Color(0xFFFF1A1A),
+                                    focusedContentColor = Color.White
                                 ),
                                 shape = androidx.tv.material3.ButtonDefaults.shape(
                                     shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
@@ -620,22 +628,32 @@ fun DetailsScreenTv(
                                 }
                             }
                             Spacer(modifier = Modifier.width(2.dp))
+                            var dropdownFocused by remember { mutableStateOf(false) }
                             Box(
                                 modifier = Modifier
                                     .width(48.dp)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
-                                    .background(Color(0xFFE50914))
-                                    .clickable { showMenu = true },
+                                    .background(if (dropdownFocused) Color(0xFFFF1A1A) else Color(0xFFE50914))
+                                    .focusable()
+                                    .onFocusChanged { dropdownFocused = it.isFocused }
+                                    .onPreviewKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown &&
+                                            (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                                        ) {
+                                            showMenu = true
+                                            true
+                                        } else false
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = "More options", tint = TvMaterialTheme.colorScheme.onPrimary)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "More options", tint = Color.White)
                                 DropdownMenu(
                                     expanded = showMenu,
                                     onDismissRequest = { showMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { TvText("Start Over") },
+                                        text = { Text("Start Over", color = Color.White) },
                                         onClick = {
                                             showMenu = false
                                             onStartOver()
@@ -652,7 +670,9 @@ fun DetailsScreenTv(
                             enabled = uiState.selectedQuality != null,
                             colors = androidx.tv.material3.ButtonDefaults.colors(
                                 containerColor = Color(0xFFE50914),
-                                contentColor = Color.White
+                                contentColor = Color.White,
+                                focusedContainerColor = Color(0xFFFF1A1A),
+                                focusedContentColor = Color.White
                             )
                         ) {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -674,16 +694,25 @@ fun DetailsScreenTv(
 
                     androidx.tv.material3.OutlinedButton(
                         onClick = onDownloadClick,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).height(48.dp),
                         enabled = uiState.selectedQuality != null,
+                        colors = androidx.tv.material3.ButtonDefaults.colors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color(0xFFE50914),
+                            focusedContainerColor = Color(0xFFE50914),
+                            focusedContentColor = Color.White
+                        ),
                         border = androidx.tv.material3.ButtonDefaults.border(
                             border = androidx.tv.material3.Border(
                                 border = BorderStroke(2.dp, Color(0xFFE50914))
+                            ),
+                            focusedBorder = androidx.tv.material3.Border(
+                                border = BorderStroke(2.dp, Color(0xFFFF1A1A))
                             )
                         )
                     ) {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            TvText(text = downloadBtnText, color = Color(0xFFE50914))
+                            TvText(text = downloadBtnText)
                         }
                     }
                 }

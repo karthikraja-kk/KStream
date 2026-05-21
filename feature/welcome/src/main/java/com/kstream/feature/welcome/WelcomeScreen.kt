@@ -1,9 +1,12 @@
 package com.kstream.feature.welcome
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -13,9 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -254,15 +259,36 @@ fun WelcomeScreenTv(
                 )
             )
             Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = {
-                    focusManager.clearFocus()
-                    onContinueClick()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = termsAccepted
+            var continueFocused by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        if (continueFocused) Color(0xFFFF1A1A)
+                        else if (termsAccepted) Color(0xFFE50914)
+                        else Color(0xFF444444)
+                    )
+                    .focusable()
+                    .onFocusChanged { continueFocused = it.isFocused }
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown &&
+                            (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter) &&
+                            termsAccepted
+                        ) {
+                            focusManager.clearFocus()
+                            onContinueClick()
+                            true
+                        } else false
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Text("Continue")
+                Text(
+                    "Continue",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
