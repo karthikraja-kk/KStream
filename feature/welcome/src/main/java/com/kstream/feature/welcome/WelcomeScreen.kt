@@ -193,17 +193,17 @@ fun WelcomeScreenTv(
                 painter = painterResource(R.drawable.kstream_logo_with_name),
                 contentDescription = "KStream Logo",
                 modifier = Modifier
-                    .widthIn(max = 400.dp)
+                    .widthIn(max = 240.dp)
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Your cinematic journey begins here.",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             OutlinedTextField(
                 value = textFieldValue,
                 onValueChange = { newValue ->

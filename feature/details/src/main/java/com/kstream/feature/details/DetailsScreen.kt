@@ -1,13 +1,16 @@
 package com.kstream.feature.details
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -513,11 +516,20 @@ fun DetailsScreenTv(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TvText(text = movie.movieName, style = TvMaterialTheme.typography.displayMedium, color = TvMaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onLikeClick) {
+                    var heartFocused by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = onLikeClick,
+                        modifier = Modifier
+                            .onFocusChanged { heartFocused = it.isFocused }
+                            .then(
+                                if (heartFocused) Modifier.border(2.dp, Color(0xFFE50914), RoundedCornerShape(50))
+                                else Modifier
+                            )
+                    ) {
                         Icon(
                             imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = if (uiState.isLiked) "Unlike" else "Like",
-                            tint = if (uiState.isLiked) Color(0xFFB71C1C) else MaterialTheme.colorScheme.onSurface,
+                            tint = if (uiState.isLiked) Color(0xFFE50914) else if (heartFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -564,10 +576,20 @@ fun DetailsScreenTv(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     mediaList.forEach { media ->
+                        val isSelected = uiState.selectedQuality == media.quality
                         androidx.tv.material3.FilterChip(
-                            selected = uiState.selectedQuality == media.quality,
+                            selected = isSelected,
                             onClick = { onQualitySelected(media.quality) },
-                            content = { TvText(media.quality) }
+                            content = {
+                                TvText(
+                                    media.quality,
+                                    color = if (isSelected) Color.White else TvMaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            colors = androidx.tv.material3.FilterChipDefaults.colors(
+                                selectedContainerColor = Color(0xFFE50914),
+                                selectedContentColor = Color.White
+                            )
                         )
                     }
                 }
@@ -585,11 +607,15 @@ fun DetailsScreenTv(
                                 onClick = { uiState.selectedQuality?.let { onWatchClick(movie.id, it, false) } },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                                 enabled = uiState.selectedQuality != null,
+                                colors = androidx.tv.material3.ButtonDefaults.colors(
+                                    containerColor = Color(0xFFE50914),
+                                    contentColor = Color.White
+                                ),
                                 shape = androidx.tv.material3.ButtonDefaults.shape(
                                     shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
                                 )
                             ) {
-                                TvText(text = "Resume")
+                                TvText(text = "Resume", color = Color.White)
                             }
                             Spacer(modifier = Modifier.width(2.dp))
                             Box(
@@ -597,7 +623,7 @@ fun DetailsScreenTv(
                                     .width(48.dp)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
-                                    .background(TvMaterialTheme.colorScheme.primary)
+                                    .background(Color(0xFFE50914))
                                     .clickable { showMenu = true },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -621,9 +647,13 @@ fun DetailsScreenTv(
                         TvButton(
                             onClick = { uiState.selectedQuality?.let { onWatchClick(movie.id, it, false) } },
                             modifier = Modifier.weight(1f).height(48.dp),
-                            enabled = uiState.selectedQuality != null
+                            enabled = uiState.selectedQuality != null,
+                            colors = androidx.tv.material3.ButtonDefaults.colors(
+                                containerColor = Color(0xFFE50914),
+                                contentColor = Color.White
+                            )
                         ) {
-                            TvText(text = "Watch Now")
+                            TvText(text = "Watch Now", color = Color.White)
                         }
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -641,9 +671,14 @@ fun DetailsScreenTv(
                     androidx.tv.material3.OutlinedButton(
                         onClick = onDownloadClick,
                         modifier = Modifier.weight(1f),
-                        enabled = uiState.selectedQuality != null
+                        enabled = uiState.selectedQuality != null,
+                        border = androidx.tv.material3.ButtonDefaults.border(
+                            border = androidx.tv.material3.Border(
+                                border = BorderStroke(2.dp, Color(0xFFE50914))
+                            )
+                        )
                     ) {
-                        TvText(text = downloadBtnText)
+                        TvText(text = downloadBtnText, color = Color(0xFFE50914))
                     }
                 }
             }

@@ -1,8 +1,12 @@
 package com.kstream.core.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,11 +28,21 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -47,60 +61,81 @@ fun KStreamTvSideNav(
     onNavigate: (String) -> Unit,
     content: @Composable () -> Unit
 ) {
+    var sidebarExpanded by remember { mutableStateOf(false) }
+
     Row(modifier = Modifier.fillMaxSize()) {
         if (currentRoute in topLevelRoutes) {
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(72.dp)
-                    .background(TvMaterialTheme.colorScheme.surfaceVariant)
-                    .padding(vertical = 16.dp, horizontal = 4.dp)
-                    .selectableGroup(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            AnimatedVisibility(
+                visible = sidebarExpanded,
+                enter = expandHorizontally(expandFrom = Alignment.Start),
+                exit = shrinkHorizontally(shrinkTowards = Alignment.Start)
             ) {
-                Box(
-                    modifier = Modifier.padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(72.dp)
+                        .background(TvMaterialTheme.colorScheme.surfaceVariant)
+                        .padding(vertical = 16.dp, horizontal = 4.dp)
+                        .selectableGroup()
+                        .onFocusChanged { if (!it.hasFocus) sidebarExpanded = false },
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.kstream_logo),
-                        contentDescription = "KStream",
-                        modifier = Modifier.size(28.dp),
-                        contentScale = ContentScale.Fit
+                    Box(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.kstream_logo),
+                            contentDescription = "KStream",
+                            modifier = Modifier.size(28.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    SideNavItem(
+                        icon = Icons.Default.Home,
+                        label = "Home",
+                        selected = currentRoute == "home",
+                        onClick = { onNavigate("home"); sidebarExpanded = false }
+                    )
+                    SideNavItem(
+                        icon = Icons.Default.Search,
+                        label = "Search",
+                        selected = currentRoute == "search",
+                        onClick = { onNavigate("search"); sidebarExpanded = false }
+                    )
+                    SideNavItem(
+                        icon = Icons.Default.Download,
+                        label = "Downloads",
+                        selected = currentRoute == "downloads",
+                        onClick = { onNavigate("downloads"); sidebarExpanded = false }
+                    )
+                    SideNavItem(
+                        icon = Icons.Default.Settings,
+                        label = "Settings",
+                        selected = currentRoute == "settings",
+                        onClick = { onNavigate("settings"); sidebarExpanded = false }
                     )
                 }
-
-                Spacer(Modifier.height(8.dp))
-
-                SideNavItem(
-                    icon = Icons.Default.Home,
-                    label = "Home",
-                    selected = currentRoute == "home",
-                    onClick = { onNavigate("home") }
-                )
-                SideNavItem(
-                    icon = Icons.Default.Search,
-                    label = "Search",
-                    selected = currentRoute == "search",
-                    onClick = { onNavigate("search") }
-                )
-                SideNavItem(
-                    icon = Icons.Default.Download,
-                    label = "Downloads",
-                    selected = currentRoute == "downloads",
-                    onClick = { onNavigate("downloads") }
-                )
-                SideNavItem(
-                    icon = Icons.Default.Settings,
-                    label = "Settings",
-                    selected = currentRoute == "settings",
-                    onClick = { onNavigate("settings") }
-                )
             }
         }
 
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
+                        if (!sidebarExpanded && currentRoute in topLevelRoutes) {
+                            sidebarExpanded = true
+                            true
+                        } else false
+                    } else false
+                }
+        ) {
             content()
         }
     }
@@ -114,16 +149,24 @@ private fun SideNavItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val bgColor = if (selected) TvMaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-    else Color.Transparent
-    val contentColor = if (selected) TvMaterialTheme.colorScheme.primary
-    else TvMaterialTheme.colorScheme.onSurfaceVariant
+    var isFocused by remember { mutableStateOf(false) }
+    val bgColor = when {
+        isFocused -> TvMaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+        selected -> TvMaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        else -> Color.Transparent
+    }
+    val contentColor = when {
+        isFocused || selected -> TvMaterialTheme.colorScheme.primary
+        else -> TvMaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Column(
         modifier = Modifier
             .size(56.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick)
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

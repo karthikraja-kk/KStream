@@ -53,6 +53,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -172,6 +177,19 @@ fun PlayerRoute(
         modifier = Modifier
             .fillMaxSize()
             .clickable { controlsVisible = !controlsVisible }
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.DirectionCenter, Key.Enter,
+                        Key.DirectionUp, Key.DirectionDown,
+                        Key.DirectionLeft, Key.DirectionRight -> {
+                            controlsVisible = true
+                            false // let the event propagate to PlayerView controls
+                        }
+                        else -> false
+                    }
+                } else false
+            }
     ) {
         AndroidView(
             factory = {

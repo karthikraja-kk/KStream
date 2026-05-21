@@ -1,6 +1,7 @@
 package com.kstream.feature.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -271,7 +272,7 @@ private fun SortButton(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box {
+    Box(modifier = Modifier.focusable()) {
         IconButton(onClick = { expanded = true }) {
             Icon(
                 painter = painterResource(android.R.drawable.ic_menu_sort_by_size),

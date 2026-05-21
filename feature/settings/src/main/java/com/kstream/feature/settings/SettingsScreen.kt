@@ -194,8 +194,14 @@ fun SettingsRoute(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val versionName = remember {
+                try {
+                    context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                } catch (_: Exception) { "1.0.0" }
+            }
             Text(
-                text = "App Version 1.0.0",
+                text = "App Version $versionName",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),

@@ -221,15 +221,20 @@ fun MovieTileTv(
                     HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
                 }
                 if (watchProgress != null && watchProgress > 0f) {
-                    LinearProgressIndicator(
-                        progress = watchProgress.coerceIn(0f, 1f),
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.dp)
-                            .align(Alignment.BottomCenter),
-                        color = Color(0xFFE50914),
-                        trackColor = Color.White.copy(alpha = 0.3f)
-                    )
+                            .height(4.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(Color.White.copy(alpha = 0.3f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(watchProgress.coerceIn(0f, 1f))
+                                .background(Color(0xFFE50914))
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
