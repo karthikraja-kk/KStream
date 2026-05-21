@@ -270,7 +270,7 @@ fun DetailsScreenMobile(
                             Icon(
                                 imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = if (uiState.isLiked) "Unlike" else "Like",
-                                tint = if (uiState.isLiked) Color(0xFFB71C1C) else MaterialTheme.colorScheme.onSurface
+                                tint = if (uiState.isLiked) Color(0xFFE50914) else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -594,7 +594,11 @@ fun DetailsScreenTv(
                             },
                             colors = androidx.tv.material3.FilterChipDefaults.colors(
                                 selectedContainerColor = Color(0xFFE50914),
-                                selectedContentColor = Color.White
+                                selectedContentColor = Color.White,
+                                focusedContainerColor = Color(0xFFFF1A1A),
+                                focusedContentColor = Color.White,
+                                focusedSelectedContainerColor = Color(0xFFFF1A1A),
+                                focusedSelectedContentColor = Color.White
                             )
                         )
                     }
@@ -650,7 +654,8 @@ fun DetailsScreenTv(
                                 Icon(Icons.Default.ArrowDropDown, contentDescription = "More options", tint = Color.White)
                                 DropdownMenu(
                                     expanded = showMenu,
-                                    onDismissRequest = { showMenu = false }
+                                    onDismissRequest = { showMenu = false },
+                                    modifier = Modifier.background(Color(0xFF2A2A2A))
                                 ) {
                                     DropdownMenuItem(
                                         text = { Text("Start Over", color = Color.White) },
@@ -658,7 +663,8 @@ fun DetailsScreenTv(
                                             showMenu = false
                                             onStartOver()
                                             uiState.selectedQuality?.let { onWatchClick(movie.id, it, true) }
-                                        }
+                                        },
+                                        modifier = Modifier.background(Color.Transparent)
                                     )
                                 }
                             }

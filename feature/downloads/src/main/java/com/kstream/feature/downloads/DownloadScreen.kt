@@ -2,6 +2,7 @@ package com.kstream.feature.downloads
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -331,9 +333,11 @@ fun DownloadItem(
     onResume: () -> Unit,
     onRemove: () -> Unit
 ) {
+    var cardFocused by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .onFocusChanged { cardFocused = it.hasFocus }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress
@@ -341,7 +345,8 @@ fun DownloadItem(
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = if (cardFocused) BorderStroke(2.dp, Color(0xFFE50914)) else null
     ) {
         Row(
             modifier = Modifier
@@ -363,7 +368,11 @@ fun DownloadItem(
                     Checkbox(
                         checked = isSelected,
                         onCheckedChange = { onClick() },
-                        modifier = Modifier.align(Alignment.TopStart)
+                        modifier = Modifier.align(Alignment.TopStart),
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color(0xFFE50914),
+                            checkmarkColor = Color.White
+                        )
                     )
                 }
             }
@@ -454,16 +463,31 @@ fun DownloadItem(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (download.status == DownloadStatus.DOWNLOADING) {
-                    IconButton(onClick = onPause) {
+                    IconButton(
+                        onClick = onPause,
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
                         Icon(imageVector = Icons.Default.Pause, contentDescription = "Pause")
                     }
                 } else if (download.status == DownloadStatus.PAUSED || download.status == DownloadStatus.QUEUED) {
-                    IconButton(onClick = onResume) {
+                    IconButton(
+                        onClick = onResume,
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
                     }
                 }
                 
-                IconButton(onClick = onRemove) {
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.size(48.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Remove",

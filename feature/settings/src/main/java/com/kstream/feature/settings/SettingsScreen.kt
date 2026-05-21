@@ -1,6 +1,7 @@
 package com.kstream.feature.settings
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -111,11 +114,17 @@ fun SettingsRoute(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            var clearLikedFocused by remember { mutableStateOf(false) }
             OutlinedButton(
                 onClick = { showClearLikedDialog = true },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+                    .onFocusChanged { clearLikedFocused = it.isFocused },
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
+                ),
+                border = BorderStroke(
+                    width = if (clearLikedFocused) 2.dp else 1.dp,
+                    color = if (clearLikedFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.error
                 )
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -125,11 +134,17 @@ fun SettingsRoute(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            var watchHistoryFocused by remember { mutableStateOf(false) }
             OutlinedButton(
                 onClick = {
                     showWatchHistory = true
                 },
                 modifier = Modifier.fillMaxWidth()
+                    .onFocusChanged { watchHistoryFocused = it.isFocused },
+                border = BorderStroke(
+                    width = if (watchHistoryFocused) 2.dp else 1.dp,
+                    color = if (watchHistoryFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline
+                )
             ) {
                 Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -149,10 +164,15 @@ fun SettingsRoute(
             
             Spacer(modifier = Modifier.height(24.dp))
             
+            var clearCacheFocused by remember { mutableStateOf(false) }
             Button(
                 onClick = { viewModel.clearCache() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.cacheCleared
+                modifier = Modifier.fillMaxWidth()
+                    .onFocusChanged { clearCacheFocused = it.isFocused },
+                enabled = !uiState.cacheCleared,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (clearCacheFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.primary
+                )
             ) {
                 if (uiState.cacheCleared) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -167,11 +187,13 @@ fun SettingsRoute(
             Divider()
             Spacer(modifier = Modifier.height(16.dp))
 
+            var resetFocused by remember { mutableStateOf(false) }
             Button(
                 onClick = { showResetDialog = true },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+                    .onFocusChanged { resetFocused = it.isFocused },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
+                    containerColor = if (resetFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.error
                 )
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -494,9 +516,11 @@ private fun WatchHistoryListItem(
     onLongPress: () -> Unit,
     onDelete: () -> Unit
 ) {
+    var historyCardFocused by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .onFocusChanged { historyCardFocused = it.hasFocus }
             .combinedClickable(
                 onClick = onTap,
                 onLongClick = onLongPress
@@ -506,7 +530,8 @@ private fun WatchHistoryListItem(
                 MaterialTheme.colorScheme.primaryContainer
             else
                 MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = if (historyCardFocused) BorderStroke(2.dp, Color(0xFFE50914)) else null
     ) {
         Row(
             modifier = Modifier.padding(8.dp),
@@ -553,7 +578,10 @@ private fun WatchHistoryListItem(
 
             // Per-item delete button (hidden in multi-select mode to reduce clutter)
             if (!isSelecting) {
-                IconButton(onClick = onDelete) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(48.dp)
+                ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Remove",
@@ -579,10 +607,16 @@ private fun ScanMoviesButton(
     onTriggerScan: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        var scanFocused by remember { mutableStateOf(false) }
         OutlinedButton(
             onClick = onTriggerScan,
             enabled = isEnabled,
             modifier = Modifier.fillMaxWidth()
+                .onFocusChanged { scanFocused = it.isFocused },
+            border = BorderStroke(
+                width = if (scanFocused) 2.dp else 1.dp,
+                color = if (scanFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline
+            )
         ) {
             Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))

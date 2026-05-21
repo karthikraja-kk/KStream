@@ -295,22 +295,58 @@ fun WelcomeScreenTv(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Checkbox(
-                    checked = termsAccepted,
-                    onCheckedChange = { termsAccepted = it }
-                )
+                var checkboxFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .then(
+                            if (checkboxFocused) Modifier.background(Color(0xFFE50914).copy(alpha = 0.3f))
+                            else Modifier
+                        )
+                        .focusable()
+                        .onFocusChanged { checkboxFocused = it.isFocused }
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown &&
+                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                            ) {
+                                termsAccepted = !termsAccepted
+                                true
+                            } else false
+                        }
+                ) {
+                    Checkbox(
+                        checked = termsAccepted,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color(0xFFE50914),
+                            uncheckedColor = if (checkboxFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            checkmarkColor = Color.White
+                        )
+                    )
+                }
                 Text(
                     text = "I accept ",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                var termsFocused by remember { mutableStateOf(false) }
                 Text(
                     text = "Terms & Conditions",
                     style = MaterialTheme.typography.bodySmall.copy(
                         textDecoration = TextDecoration.Underline
                     ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onTermsClick() }
+                    color = if (termsFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .focusable()
+                        .onFocusChanged { termsFocused = it.isFocused }
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown &&
+                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                            ) {
+                                onTermsClick()
+                                true
+                            } else false
+                        }
                 )
             }
         }

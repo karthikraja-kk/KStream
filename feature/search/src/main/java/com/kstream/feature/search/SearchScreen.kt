@@ -93,9 +93,19 @@ fun SearchRoute(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 uiState.recentSearches.take(5).forEach { recent ->
+                    var chipFocused by remember { mutableStateOf(false) }
                     SuggestionChip(
                         onClick = { viewModel.setInitialQuery(recent) },
-                        label = { Text(recent) }
+                        label = { Text(recent, color = if (chipFocused) Color.White else Color.Unspecified) },
+                        modifier = Modifier
+                            .onFocusChanged { chipFocused = it.isFocused },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        border = SuggestionChipDefaults.suggestionChipBorder(
+                            borderColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline,
+                            borderWidth = if (chipFocused) 2.dp else 1.dp
+                        )
                     )
                 }
             }
@@ -114,9 +124,19 @@ fun SearchRoute(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     matchingSuggestions.take(3).forEach { suggestion ->
+                        var chipFocused by remember { mutableStateOf(false) }
                         SuggestionChip(
                             onClick = { viewModel.setInitialQuery(suggestion) },
-                            label = { Text(suggestion) }
+                            label = { Text(suggestion, color = if (chipFocused) Color.White else Color.Unspecified) },
+                            modifier = Modifier
+                                .onFocusChanged { chipFocused = it.isFocused },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                borderColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline,
+                                borderWidth = if (chipFocused) 2.dp else 1.dp
+                            )
                         )
                     }
                 }
@@ -125,12 +145,22 @@ fun SearchRoute(
         
         // "Did you mean?" suggestion banner
         if (uiState.suggestedQuery != null && uiState.isFuzzyMatch) {
+            var bannerFocused by remember { mutableStateOf(false) }
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clickable { viewModel.setInitialQuery(uiState.suggestedQuery!!) },
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                    .focusable()
+                    .onFocusChanged { bannerFocused = it.isFocused }
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown &&
+                            (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                        ) {
+                            viewModel.setInitialQuery(uiState.suggestedQuery!!)
+                            true
+                        } else false
+                    },
+                color = if (bannerFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.surfaceVariant,
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
@@ -280,7 +310,7 @@ fun SearchScreenTv(
         )
     } else {
         TvLazyVerticalGrid(
-            columns = TvGridCells.Fixed(5),
+            columns = TvGridCells.Fixed(4),
             contentPadding = PaddingValues(48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)

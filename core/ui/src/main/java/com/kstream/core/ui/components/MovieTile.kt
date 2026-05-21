@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +23,10 @@ import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
+import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.delay
 import com.kstream.core.model.Movie
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -98,7 +103,7 @@ fun MovieTileMobile(
             modifier = Modifier
                 .aspectRatio(2f / 3f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(OttConstants.TileCornerRadius))
         ) {
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
@@ -132,6 +137,28 @@ fun MovieTileMobile(
                     }
                 }
             )
+            // Gradient scrim at bottom for title readability
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(OttConstants.GradientScrimColors)
+                    )
+            )
+            // Title over poster
+            Text(
+                text = movie.movieName,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            )
             if (movie.type.equals("Original HD", ignoreCase = true)) {
                 HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
             }
@@ -147,17 +174,6 @@ fun MovieTileMobile(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = movie.movieName,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp)
-        )
     }
 }
 
@@ -171,15 +187,33 @@ fun MovieTileTv(
 ) {
     val context = LocalContext.current
     var retryHash by remember { mutableIntStateOf(0) }
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) OttConstants.FocusScaleFactor else 1f,
+        animationSpec = tween(durationMillis = 200),
+        label = "tileScale"
+    )
 
     TvSurface(
         onClick = { onClick(movie.id) },
         modifier = modifier
-            .width(160.dp)
-            .padding(8.dp),
-        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp))
+            .width(OttConstants.TileSizeTv)
+            .padding(8.dp)
+            .onFocusChanged { isFocused = it.isFocused || it.hasFocus }
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .then(
+                if (isFocused) Modifier.border(
+                    OttConstants.FocusBorderWidth,
+                    OttConstants.BrandRed,
+                    RoundedCornerShape(OttConstants.TileCornerRadius)
+                ) else Modifier
+            ),
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(OttConstants.TileCornerRadius))
     ) {
-        Column {
+        Box {
             Box(
                 modifier = Modifier
                     .aspectRatio(2f / 3f)
@@ -217,8 +251,40 @@ fun MovieTileTv(
                         }
                     }
                 )
+                // Gradient scrim at bottom
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(88.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(OttConstants.GradientScrimColors)
+                        )
+                )
+                // Title over poster
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    TvText(
+                        text = movie.movieName,
+                        style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (isFocused && movie.year > 0) {
+                        TvText(
+                            text = movie.year.toString(),
+                            style = androidx.tv.material3.MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 1
+                        )
+                    }
+                }
                 if (movie.type.equals("Original HD", ignoreCase = true)) {
-                    HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
+                    HdBadge(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
                 }
                 if (watchProgress != null && watchProgress > 0f) {
                     Box(
@@ -237,15 +303,6 @@ fun MovieTileTv(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            TvText(
-                text = movie.movieName,
-                style = androidx.tv.material3.MaterialTheme.typography.labelMedium,
-                color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-            )
         }
     }
 }
@@ -255,7 +312,7 @@ fun HdBadge(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(Color(0xFF1976D2)) // blue
+            .background(Color(0xFF1976D2))
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Text(

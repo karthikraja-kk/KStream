@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -458,7 +459,13 @@ fun HomeScreenTv(
                 )
                 androidx.tv.material3.Button(
                     onClick = onRefresh,
-                    enabled = !uiState.isLoading
+                    enabled = !uiState.isLoading,
+                    colors = androidx.tv.material3.ButtonDefaults.colors(
+                        containerColor = Color(0xFFE50914),
+                        contentColor = Color.White,
+                        focusedContainerColor = Color(0xFFFF1A1A),
+                        focusedContentColor = Color.White
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
@@ -505,7 +512,15 @@ fun HomeScreenTv(
                             val showSeeMore = true
                             if (showSeeMore) {
                                 val query = rail.seeMoreQuery ?: "all:*"
-                                androidx.tv.material3.Button(onClick = { onSeeMoreClick(query) }) {
+                                androidx.tv.material3.Button(
+                                    onClick = { onSeeMoreClick(query) },
+                                    colors = androidx.tv.material3.ButtonDefaults.colors(
+                                        containerColor = Color(0xFFE50914),
+                                        contentColor = Color.White,
+                                        focusedContainerColor = Color(0xFFFF1A1A),
+                                        focusedContentColor = Color.White
+                                    )
+                                ) {
                                     TvText("See More")
                                 }
                             }

@@ -291,7 +291,8 @@ fun PlayerRoute(
 
                     DropdownMenu(
                         expanded = showQualityMenu,
-                        onDismissRequest = { showQualityMenu = false }
+                        onDismissRequest = { showQualityMenu = false },
+                        modifier = Modifier.background(Color(0xFF2A2A2A))
                     ) {
                         uiState.availableQualities.forEach { quality: String ->
                             DropdownMenuItem(
@@ -299,13 +300,14 @@ fun PlayerRoute(
                                     Text(
                                         text = quality,
                                         fontWeight = if (quality == uiState.currentQuality) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (quality == uiState.currentQuality) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (quality == uiState.currentQuality) Color(0xFFE50914) else Color.White
                                     ) 
                                 },
                                 onClick = {
                                     viewModel.switchQuality(quality)
                                     showQualityMenu = false
-                                }
+                                },
+                                modifier = Modifier.background(Color.Transparent)
                             )
                         }
                     }
