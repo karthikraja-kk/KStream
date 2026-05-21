@@ -245,6 +245,20 @@ fun PlayerRoute(
             }
         }
 
+        // Mid-playback buffering spinner (seek / slow network — not the initial load)
+        if (uiState.isBuffering && !uiState.isLoading && !uiState.isOffline) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(52.dp),
+                    color = Color(0xFFE50914),
+                    strokeWidth = 3.dp
+                )
+            }
+        }
+
         if (controlsVisible) {
             val fullscreenFocusRequester = remember { FocusRequester() }
             Row(

@@ -74,7 +74,7 @@ class PlayerViewModel @Inject constructor(
             observeNetworkState()
             observeUrlFailures()
         } else {
-            _uiState.update { it.copy(loadError = "Unable to play — missing movie information.") }
+            _uiState.update { it.copy(isLoading = false, loadError = "Unable to play — missing movie information.") }
         }
     }
 
@@ -343,7 +343,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun watchOnline() {
-        _uiState.update { it.copy(localFileMissing = false) }
+        _uiState.update { it.copy(localFileMissing = false, loadError = null) }
         viewModelScope.launch {
             try {
                 val isOnline = networkMonitor.isOnline.first()

@@ -52,7 +52,8 @@ class SearchViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
-    val isOnline: StateFlow<Boolean> = MutableStateFlow(true)
+    private val _isOnline = MutableStateFlow(true)
+    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
     private var searchJob: Job? = null
 
@@ -76,9 +77,7 @@ class SearchViewModel @Inject constructor(
             .launchIn(viewModelScope)
         
         networkMonitor.isOnline
-            .onEach { online ->
-                (isOnline as MutableStateFlow).value = online
-            }
+            .onEach { online -> _isOnline.value = online }
             .launchIn(viewModelScope)
     }
 
@@ -192,7 +191,7 @@ class SearchViewModel @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
+            _uiState.update { it.copy(isLoading = false, error = e.toUserMessage(), results = emptyList()) }
         }
     }
 }

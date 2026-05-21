@@ -19,7 +19,7 @@ object OttConstants {
     )
 
     // Tile sizes
-    val TileSizeTv = 220.dp
+    val TileSizeTv = 240.dp
     val TileSizeMobile = 140.dp
     val TileCornerRadius = 8.dp
 

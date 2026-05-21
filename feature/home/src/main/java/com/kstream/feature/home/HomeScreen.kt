@@ -488,7 +488,9 @@ fun HomeScreenTv(
                     TvText("Refresh")
                 }
             }
+            val tvListState = androidx.tv.foundation.lazy.list.rememberTvLazyListState()
             TvLazyColumn(
+                state = tvListState,
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {

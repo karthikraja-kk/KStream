@@ -1,8 +1,14 @@
 package com.kstream.feature.welcome
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -83,7 +89,7 @@ fun WelcomeScreenMobile(
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    var termsAccepted by rememberSaveable { mutableStateOf(true) }
+    var termsAccepted by rememberSaveable { mutableStateOf(false) }
     
     Column(
         modifier = Modifier
@@ -187,8 +193,20 @@ fun WelcomeScreenTv(
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    var termsAccepted by rememberSaveable { mutableStateOf(true) }
+    var termsAccepted by rememberSaveable { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
+
+    // Pulse animation on the Continue button once terms are accepted
+    val pulseTransition = rememberInfiniteTransition(label = "continuePulse")
+    val pulseScale by pulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (termsAccepted) 1.04f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScaleVal"
+    )
     
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -265,6 +283,10 @@ fun WelcomeScreenTv(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
+                    .graphicsLayer {
+                        scaleX = if (termsAccepted && !continueFocused) pulseScale else 1f
+                        scaleY = if (termsAccepted && !continueFocused) pulseScale else 1f
+                    }
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         if (continueFocused) Color(0xFFFF1A1A)

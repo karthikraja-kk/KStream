@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -169,18 +170,20 @@ fun KStreamTvSideNav(
         }
 
         // Content area
+        // onKeyEvent fires AFTER children have had a chance to consume the event.
+        // If no child consumed D-pad Left (we're at the leftmost focusable), we open the sidebar.
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .onPreviewKeyEvent { keyEvent ->
-                    // Only open sidebar when D-pad Left is pressed and sidebar is collapsed
-                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
-                        if (!sidebarExpanded && currentRoute in topLevelRoutes) {
-                            // Let the event propagate first — if nothing consumes it,
-                            // the focus system will fail and we open sidebar
-                            false
-                        } else false
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown &&
+                        keyEvent.key == Key.DirectionLeft &&
+                        !sidebarExpanded &&
+                        currentRoute in topLevelRoutes
+                    ) {
+                        sidebarExpanded = true
+                        true
                     } else false
                 }
                 .onFocusChanged { focusState ->
@@ -191,22 +194,6 @@ fun KStreamTvSideNav(
                 }
         ) {
             content()
-
-            // Invisible left-edge focus catcher — opens sidebar when focus reaches left edge
-            if (!sidebarExpanded && currentRoute in topLevelRoutes) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .width(2.dp)
-                        .fillMaxHeight()
-                        .focusable()
-                        .onFocusChanged { state ->
-                            if (state.isFocused) {
-                                sidebarExpanded = true
-                            }
-                        }
-                )
-            }
         }
     }
 }
@@ -313,6 +300,17 @@ private fun SideNavItem(
                 modifier = Modifier.size(22.dp),
                 tint = iconColor
             )
+            // Red dot indicator at bottom when selected in collapsed state
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 4.dp)
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE50914))
+                )
+            }
         }
     }
 }

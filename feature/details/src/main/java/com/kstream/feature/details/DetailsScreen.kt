@@ -1,5 +1,6 @@
 package com.kstream.feature.details
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -274,11 +275,29 @@ fun DetailsScreenMobile(
                             )
                         }
                     }
-                    Text(
-                        text = "${movie.year} • ${movie.duration} • ${movie.language} • ${movie.type}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // Metadata pill badges
+                    androidx.compose.foundation.layout.Column {
+                        // First row: year, duration, language, rating, type
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (movie.year > 0) MetadataBadge(movie.year.toString())
+                            if (movie.duration.isNotBlank()) MetadataBadge(movie.duration)
+                            if (movie.language.isNotBlank()) MetadataBadge(movie.language)
+                            if (movie.rating.isNotBlank()) MetadataBadge("⭐ ${movie.rating}", highlight = true)
+                            if (movie.type.isNotBlank()) MetadataBadge(movie.type)
+                        }
+                        if (movie.genres.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                movie.genres.forEach { MetadataBadge(it) }
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(text = movie.synopsis, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                     
@@ -290,21 +309,6 @@ fun DetailsScreenMobile(
                     if (movie.castMembers.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(text = "Cast: ${movie.castMembers.take(5).joinToString(", ")}${if (movie.castMembers.size > 5) "..." else ""}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    
-                    if (movie.genres.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Genres: ${movie.genres.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
-                    if (movie.rating.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Rating: ${movie.rating}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
-                    if (movie.lastUpdated.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Last Updated: ${movie.lastUpdated}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     
                     Spacer(modifier = Modifier.height(24.dp))
@@ -432,6 +436,27 @@ private fun KStreamLogoFallback() {
     }
 }
 
+/** Pill badge used to display metadata items on the details screen. */
+@Composable
+private fun MetadataBadge(label: String, highlight: Boolean = false) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                if (highlight) Color(0xFFE50914).copy(alpha = 0.15f)
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (highlight) Color(0xFFE50914) else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun DetailsScreenTv(
@@ -539,11 +564,26 @@ fun DetailsScreenTv(
                         )
                     }
                 }
-                TvText(
-                    text = "${movie.year} • ${movie.duration} • ${movie.language} • ${movie.type}",
-                    style = TvMaterialTheme.typography.bodyLarge,
-                    color = TvMaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // TV metadata pill badges
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (movie.year > 0) MetadataBadge(movie.year.toString())
+                    if (movie.duration.isNotBlank()) MetadataBadge(movie.duration)
+                    if (movie.language.isNotBlank()) MetadataBadge(movie.language)
+                    if (movie.rating.isNotBlank()) MetadataBadge("⭐ ${movie.rating}", highlight = true)
+                    if (movie.type.isNotBlank()) MetadataBadge(movie.type)
+                }
+                if (movie.genres.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        movie.genres.forEach { MetadataBadge(it) }
+                    }
+                }
                 Spacer(modifier = Modifier.height(32.dp))
                 TvText(text = movie.synopsis, style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurface)
                 
@@ -555,21 +595,6 @@ fun DetailsScreenTv(
                 if (movie.castMembers.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     TvText(text = "Cast: ${movie.castMembers.take(5).joinToString(", ")}${if (movie.castMembers.size > 5) "..." else ""}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                
-                if (movie.genres.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TvText(text = "Genres: ${movie.genres.joinToString(", ")}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                if (movie.rating.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TvText(text = "Rating: ${movie.rating}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                if (movie.lastUpdated.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TvText(text = "Last Updated: ${movie.lastUpdated}", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 Spacer(modifier = Modifier.height(48.dp))

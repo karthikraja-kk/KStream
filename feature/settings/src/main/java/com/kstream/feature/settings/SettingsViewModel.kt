@@ -148,6 +148,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun startWatchHistoryMonitor() {
+        _uiState.update { it.copy(isLoadingHistory = true) }
         combine(
             movieRepository.getMovies(),
             watchProgressRepository.getAllProgress()

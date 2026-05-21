@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -94,11 +95,12 @@ fun AppErrorScreen(
     onSecondaryAction: (() -> Unit)? = null,
     icon: ImageVector = Icons.Default.ErrorOutline,
     onOpenDownloads: (() -> Unit)? = null,
+    connectivityType: ConnectivityType? = null,
     modifier: Modifier = Modifier
 ) {
-    val connectivityType = message.detectConnectivityType()
+    val effectiveConnectivityType = connectivityType ?: message.detectConnectivityType()
 
-    val (effectiveIcon, effectivePrimary, effectivePrimaryLabel, effectiveSecondary, effectiveSecondaryLabel) = when (connectivityType) {
+    val (effectiveIcon, effectivePrimary, effectivePrimaryLabel, effectiveSecondary, effectiveSecondaryLabel) = when (effectiveConnectivityType) {
         ConnectivityType.OFFLINE -> ErrorScreenConfig(
             icon = Icons.Default.CloudOff,
             primaryAction = if (onOpenDownloads != null) onOpenDownloads else onPrimaryAction,
@@ -372,21 +374,38 @@ fun AppSkeletonLoadingScreen(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val shimmerAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.7f,
+    // Animate the horizontal offset of the shimmer sweep (0 → 1 → 0)
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
         animationSpec = infiniteRepeatable(
-            animation = tween(900),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(1200),
+            repeatMode = RepeatMode.Restart
         ),
-        label = "shimmerAlpha"
+        label = "shimmerOffset"
     )
 
-    val shimmerColor = Color.Gray.copy(alpha = shimmerAlpha)
     val tileW: Dp = if (isTv) 240.dp else 120.dp
     val tileH: Dp = if (isTv) 160.dp else 90.dp
     val hPad: Dp = if (isTv) 48.dp else 16.dp
     val vPad: Dp = if (isTv) 48.dp else 16.dp
+
+    /** Build a sweeping gradient brush for a placeholder of the given [width]. */
+    @Composable
+    fun shimmerBrush(width: Float = 300f): Brush {
+        val sweepX = shimmerOffset * width
+        return Brush.linearGradient(
+            colors = listOf(
+                Color(0xFF2A2A2A),
+                Color(0xFF3D3D3D),
+                Color(0xFF4A4A4A),
+                Color(0xFF3D3D3D),
+                Color(0xFF2A2A2A)
+            ),
+            start = Offset(sweepX - width * 0.5f, 0f),
+            end = Offset(sweepX + width * 0.5f, 0f)
+        )
+    }
 
     Column(
         modifier = modifier
@@ -399,7 +418,7 @@ fun AppSkeletonLoadingScreen(
                     .width(200.dp)
                     .height(if (isTv) 28.dp else 20.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(shimmerColor)
+                    .background(shimmerBrush(200f))
             )
             Spacer(modifier = Modifier.height(if (isTv) 24.dp else 16.dp))
         }
@@ -411,7 +430,7 @@ fun AppSkeletonLoadingScreen(
                     .width(160.dp)
                     .height(if (isTv) 22.dp else 16.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(shimmerColor)
+                    .background(shimmerBrush(160f))
             )
             Spacer(modifier = Modifier.height(if (isTv) 16.dp else 12.dp))
 
@@ -423,7 +442,7 @@ fun AppSkeletonLoadingScreen(
                             .width(tileW)
                             .height(tileH)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(shimmerColor)
+                            .background(shimmerBrush(tileW.value))
                     )
                 }
             }
