@@ -25,7 +25,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.time.Instant
 import java.util.Date
 import java.util.Locale
 import java.io.File
@@ -324,7 +323,22 @@ class SettingsViewModel @Inject constructor(
 
     private fun parseIsoMillis(value: String?): Long? {
         if (value.isNullOrBlank()) return null
-        return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
+        val formats = arrayOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'"
+        )
+        for (pattern in formats) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.getDefault())
+                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                return sdf.parse(value)?.time
+            } catch (_: Exception) { }
+        }
+        return null
     }
 
     private fun formatIsoTimestamp(value: String?): String {

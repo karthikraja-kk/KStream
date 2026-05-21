@@ -8,48 +8,47 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import java.time.Instant
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 // Serializer to handle ISO 8601 strings and convert them to Long (epoch milliseconds)
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class) // Added opt-in annotation
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 object DateTimeAsLongSerializer : KSerializer<Long?> {
-    // A formatter that can parse the ISO 8601 format with timezone offset
-    private val formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+    private val isoFormats = arrayOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    )
 
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("Long?", PrimitiveKind.LONG)
 
     override fun serialize(encoder: Encoder, value: Long?) {
-        // We don't need to serialize from Long to String in this case,
-        // as we are primarily concerned with deserialization from API response.
-        // If needed, this could be implemented to convert Long to String.
         if (value == null) {
             encoder.encodeNull()
         } else {
-            // Convert Long (epoch millis) to Instant, then format to ISO string if needed for sending
-            // For now, focus on deserialization
             encoder.encodeLong(value)
         }
     }
 
     override fun deserialize(decoder: Decoder): Long? {
-        val stringValue = decoder.decodeString() // Decode as String first
-        return try {
-            // Parse the ISO 8601 string to Instant
-            val instant = Instant.parse(stringValue)
-            // Convert Instant to epoch milliseconds (Long)
-            instant.toEpochMilli()
-        } catch (e: DateTimeParseException) {
-            // Handle cases where the string might not be a valid ISO 8601 format
-            // or if it's an unexpected format. Log error or return null.
-            // For simplicity, we return null on error.
-            println("DateTimeAsLongSerializer: Failed to parse date string '$stringValue': ${e.message}")
-            null
-        } catch (e: Exception) {
-            println("DateTimeAsLongSerializer: Unexpected error parsing date string '$stringValue': ${e.message}")
-            null
+        val stringValue = decoder.decodeString()
+        return parseIso8601(stringValue)
+    }
+
+    private fun parseIso8601(value: String): Long? {
+        for (pattern in isoFormats) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.US)
+                sdf.timeZone = TimeZone.getTimeZone("UTC")
+                return sdf.parse(value)?.time
+            } catch (_: Exception) { }
         }
+        println("DateTimeAsLongSerializer: Failed to parse date string '$value'")
+        return null
     }
 }
