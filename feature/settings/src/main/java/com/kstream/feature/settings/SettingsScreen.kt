@@ -28,7 +28,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import coil.compose.AsyncImage
+import com.kstream.core.ui.components.AppEmptyScreen
+import com.kstream.core.ui.components.AppLoadingScreen
+import com.kstream.core.ui.components.tvFocusBorder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,9 +48,16 @@ fun SettingsRoute(
     var showClearLikedDialog by remember { mutableStateOf(false) }
     var showWatchHistory by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
-    
+    val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(uiState.username) {
         tempUsername = uiState.username
+    }
+
+    LaunchedEffect(uiState.successMessage) {
+        val msg = uiState.successMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message = msg, duration = SnackbarDuration.Short)
+        viewModel.clearSuccessMessage()
     }
 
     BackHandler {
@@ -58,12 +69,13 @@ fun SettingsRoute(
             TopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder()) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState())) {
             Text(text = "Profile", style = MaterialTheme.typography.titleMedium)
@@ -85,7 +97,7 @@ fun SettingsRoute(
                         viewModel.onUsernameChange(tempUsername)
                         viewModel.saveUsername()
                         isEditingUsername = false
-                    }) {
+                    }, modifier = Modifier.tvFocusBorder()) {
                         Icon(Icons.Default.Check, contentDescription = "Save")
                     }
                 } else {
@@ -94,7 +106,7 @@ fun SettingsRoute(
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = { isEditingUsername = true }) {
+                    IconButton(onClick = { isEditingUsername = true }, modifier = Modifier.tvFocusBorder()) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
                 }
@@ -118,7 +130,8 @@ fun SettingsRoute(
             OutlinedButton(
                 onClick = { showClearLikedDialog = true },
                 modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { clearLikedFocused = it.isFocused },
+                    .onFocusChanged { clearLikedFocused = it.isFocused }
+                    .tvFocusBorder(),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
                 ),
@@ -140,7 +153,8 @@ fun SettingsRoute(
                     showWatchHistory = true
                 },
                 modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { watchHistoryFocused = it.isFocused },
+                    .onFocusChanged { watchHistoryFocused = it.isFocused }
+                    .tvFocusBorder(),
                 border = BorderStroke(
                     width = if (watchHistoryFocused) 2.dp else 1.dp,
                     color = if (watchHistoryFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline
@@ -168,7 +182,8 @@ fun SettingsRoute(
             Button(
                 onClick = { viewModel.clearCache() },
                 modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { clearCacheFocused = it.isFocused },
+                    .onFocusChanged { clearCacheFocused = it.isFocused }
+                    .tvFocusBorder(),
                 enabled = !uiState.cacheCleared,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (clearCacheFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.primary
@@ -191,7 +206,8 @@ fun SettingsRoute(
             Button(
                 onClick = { showResetDialog = true },
                 modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { resetFocused = it.isFocused },
+                    .onFocusChanged { resetFocused = it.isFocused }
+                    .tvFocusBorder(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (resetFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.error
                 )
@@ -207,7 +223,7 @@ fun SettingsRoute(
 
             TextButton(
                 onClick = onTermsClick,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().tvFocusBorder()
             ) {
                 Text(
                     text = "Terms & Conditions",
@@ -234,8 +250,13 @@ fun SettingsRoute(
         if (showClearLikedDialog) {
             AlertDialog(
                 onDismissRequest = { showClearLikedDialog = false },
-                title = { Text("Clear Liked Movies") },
-                text = { Text("This will remove all your liked movies. Are you sure?") },
+                title = { Text("Clear Liked Movies?") },
+                text = {
+                    Text(
+                        "This will permanently remove all movies from your Liked list.\n\n" +
+                        "You can re-like them later, but this cannot be undone."
+                    )
+                },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -246,12 +267,12 @@ fun SettingsRoute(
                             contentColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("Yes")
+                        Text("Clear All")
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showClearLikedDialog = false }) {
-                        Text("No")
+                        Text("Keep")
                     }
                 }
             )
@@ -262,8 +283,8 @@ fun SettingsRoute(
                 items = uiState.watchHistory,
                 isLoading = uiState.isLoadingHistory,
                 onMovieClick = onMovieClick,
-                onRemove = { selectedIds ->
-                    viewModel.deleteWatchHistory(selectedIds)
+                onRemove = { ids: Set<String> ->
+                    viewModel.deleteWatchHistory(ids)
                 },
                 onDismiss = { showWatchHistory = false }
             )
@@ -369,7 +390,7 @@ private fun WatchHistoryScreen(
                         } else {
                             onDismiss()
                         }
-                    }) {
+                    }, modifier = Modifier.tvFocusBorder()) {
                         Icon(
                             if (isSelecting) Icons.Default.Close else Icons.Default.ArrowBack,
                             contentDescription = if (isSelecting) "Cancel" else "Back"
@@ -386,13 +407,13 @@ private fun WatchHistoryScreen(
                                 selectedIds.clear()
                                 selectedIds.addAll(items.map { it.movieId })
                             }
-                        }) {
+                        }, modifier = Modifier.tvFocusBorder()) {
                             Text(if (allSelected) "Deselect All" else "Select All")
                         }
                     } else if (items.isNotEmpty()) {
                         IconButton(onClick = {
                             isSelecting = true
-                        }) {
+                        }, modifier = Modifier.tvFocusBorder()) {
                             Icon(Icons.Default.Edit, contentDescription = "Select items")
                         }
                     }
@@ -430,13 +451,22 @@ private fun WatchHistoryScreen(
         }
     ) { padding ->
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            AppLoadingScreen(
+                title = "Loading History",
+                message = "Fetching your watch history...",
+                isTv = false,
+                modifier = Modifier.padding(padding)
+            )
         } else if (items.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No watch history", style = MaterialTheme.typography.bodyLarge)
-            }
+            AppEmptyScreen(
+                title = "No Watch History",
+                message = "Movies you watch will appear here. Start browsing and enjoy!",
+                isTv = false,
+                icon = Icons.Default.Info,
+                primaryActionLabel = "Browse Content",
+                onPrimaryAction = onDismiss,
+                modifier = Modifier.padding(padding)
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -475,10 +505,14 @@ private fun WatchHistoryScreen(
         if (showDeleteConfirm) {
             AlertDialog(
                 onDismissRequest = { showDeleteConfirm = false },
-                title = { Text("Remove from Watch History") },
+                title = { Text("Remove from Watch History?") },
                 text = {
                     val count = pendingDeleteIds.size
-                    Text("Remove $count item${if (count > 1) "s" else ""} from watch history?")
+                    if (count == 1) {
+                        Text("This will remove 1 item from your watch history. Your progress for this movie will be lost.")
+                    } else {
+                        Text("This will remove $count items from your watch history. Watch progress for these movies will be lost.")
+                    }
                 },
                 confirmButton = {
                     TextButton(
@@ -491,14 +525,15 @@ private fun WatchHistoryScreen(
                         },
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
-                        )
+                        ),
+                        modifier = Modifier.tvFocusBorder()
                     ) {
                         Text("Remove")
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteConfirm = false }) {
-                        Text("Cancel")
+                    TextButton(onClick = { showDeleteConfirm = false }, modifier = Modifier.tvFocusBorder()) {
+                        Text("Keep")
                     }
                 }
             )
@@ -578,10 +613,10 @@ private fun WatchHistoryListItem(
 
             // Per-item delete button (hidden in multi-select mode to reduce clutter)
             if (!isSelecting) {
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(48.dp)
-                ) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(48.dp).tvFocusBorder()
+                    ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Remove",
@@ -612,7 +647,8 @@ private fun ScanMoviesButton(
             onClick = onTriggerScan,
             enabled = isEnabled,
             modifier = Modifier.fillMaxWidth()
-                .onFocusChanged { scanFocused = it.isFocused },
+                .onFocusChanged { scanFocused = it.isFocused }
+                .tvFocusBorder(),
             border = BorderStroke(
                 width = if (scanFocused) 2.dp else 1.dp,
                 color = if (scanFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline

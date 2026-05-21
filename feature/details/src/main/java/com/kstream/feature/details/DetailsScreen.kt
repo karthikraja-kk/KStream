@@ -32,9 +32,13 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
+import com.kstream.core.ui.components.AppErrorScreen
+import com.kstream.core.ui.components.AppLoadingScreen
 import com.kstream.core.ui.components.MovieInitialsFallback
 import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
+import com.kstream.core.ui.components.tvFocusBorder
+import com.kstream.core.ui.components.tvFocusScale
 import androidx.tv.material3.Button as TvButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
@@ -153,32 +157,28 @@ fun DetailsScreenMobile(
             )
             Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }
+            AppLoadingScreen(
+                title = "Loading Movie",
+                message = "Fetching details and available quality options...",
+                isTv = false,
+                modifier = Modifier.fillMaxSize()
+            )
             Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.error != null) {
-            Box(
+            AppErrorScreen(
+                title = "Couldn't Load Movie",
+                message = uiState.error ?: "Something went wrong.",
+                isTv = false,
+                primaryActionLabel = "Retry",
+                onPrimaryAction = onRetry,
+                secondaryActionLabel = "Go Back",
+                onSecondaryAction = onBackClick,
+                onOpenDownloads = onGoToDownloads,
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Unable to load movie", style = MaterialTheme.typography.headlineMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = uiState.error ?: "Something went wrong", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(onClick = onBackClick) {
-                            Text("Go Back")
-                        }
-                        Button(onClick = onRetry) {
-                            Text("Retry")
-                        }
-                    }
-                }
-            }
+                    .statusBarsPadding()
+            )
+            Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.movieWithMedia != null) {
             val movie = uiState.movieWithMedia.movie
             val mediaList = uiState.movieWithMedia.media
@@ -452,26 +452,24 @@ fun DetailsScreenTv(
             onGoToDownloads = onGoToDownloads
         )
     } else if (uiState.isLoading) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        }
+        AppLoadingScreen(
+            title = "Loading Movie",
+            message = "Fetching details and available quality options...",
+            isTv = true,
+            modifier = Modifier.fillMaxSize()
+        )
     } else if (uiState.error != null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                TvText(text = "Unable to load movie", style = TvMaterialTheme.typography.displayMedium, color = TvMaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(16.dp))
-                TvText(text = uiState.error ?: "Something went wrong", style = TvMaterialTheme.typography.bodyLarge, color = TvMaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(32.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    androidx.tv.material3.OutlinedButton(onClick = onBackClick) {
-                        TvText("Go Back")
-                    }
-                    TvButton(onClick = onRetry) {
-                        TvText("Retry")
-                    }
-                }
-            }
-        }
+        AppErrorScreen(
+            title = "Couldn't Load Movie",
+            message = uiState.error ?: "Something went wrong.",
+            isTv = true,
+            primaryActionLabel = "Retry",
+            onPrimaryAction = onRetry,
+            secondaryActionLabel = "Go Back",
+            onSecondaryAction = onBackClick,
+            onOpenDownloads = onGoToDownloads,
+            modifier = Modifier.fillMaxSize()
+        )
     } else if (uiState.movieWithMedia != null) {
         val movie = uiState.movieWithMedia.movie
         val mediaList = uiState.movieWithMedia.media
@@ -526,6 +524,7 @@ fun DetailsScreenTv(
                     IconButton(
                         onClick = onLikeClick,
                         modifier = Modifier
+                            .tvFocusScale()
                             .onFocusChanged { heartFocused = it.isFocused }
                             .then(
                                 if (heartFocused) Modifier.border(2.dp, Color(0xFFE50914), RoundedCornerShape(50))
@@ -586,6 +585,7 @@ fun DetailsScreenTv(
                         androidx.tv.material3.FilterChip(
                             selected = isSelected,
                             onClick = { onQualitySelected(media.quality) },
+                            modifier = Modifier.tvFocusScale(),
                             content = {
                                 TvText(
                                     media.quality,
@@ -615,7 +615,7 @@ fun DetailsScreenTv(
                         ) {
                             TvButton(
                                 onClick = { uiState.selectedQuality?.let { onWatchClick(movie.id, it, false) } },
-                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                modifier = Modifier.weight(1f).fillMaxHeight().tvFocusBorder(shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)),
                                 enabled = uiState.selectedQuality != null,
                                 colors = androidx.tv.material3.ButtonDefaults.colors(
                                     containerColor = Color(0xFFE50914),
@@ -639,6 +639,7 @@ fun DetailsScreenTv(
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
                                     .background(if (dropdownFocused) Color(0xFFFF1A1A) else Color(0xFFE50914))
+                                    .tvFocusScale()
                                     .focusable()
                                     .onFocusChanged { dropdownFocused = it.isFocused }
                                     .onPreviewKeyEvent { keyEvent ->
@@ -672,7 +673,7 @@ fun DetailsScreenTv(
                     } else {
                         TvButton(
                             onClick = { uiState.selectedQuality?.let { onWatchClick(movie.id, it, false) } },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier.weight(1f).height(48.dp).tvFocusBorder(shape = RoundedCornerShape(24.dp)),
                             enabled = uiState.selectedQuality != null,
                             colors = androidx.tv.material3.ButtonDefaults.colors(
                                 containerColor = Color(0xFFE50914),
@@ -700,7 +701,7 @@ fun DetailsScreenTv(
 
                     androidx.tv.material3.OutlinedButton(
                         onClick = onDownloadClick,
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier.weight(1f).height(48.dp).tvFocusBorder(shape = RoundedCornerShape(24.dp)),
                         enabled = uiState.selectedQuality != null,
                         colors = androidx.tv.material3.ButtonDefaults.colors(
                             containerColor = Color.Transparent,

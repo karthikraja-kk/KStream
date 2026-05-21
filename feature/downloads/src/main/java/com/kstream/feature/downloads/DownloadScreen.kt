@@ -5,6 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +29,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kstream.core.model.Download
 import com.kstream.core.model.DownloadStatus
+import com.kstream.core.ui.components.AppEmptyScreen
+import com.kstream.core.ui.components.tvFocusBorder
+import com.kstream.core.ui.components.tvFocusScale
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -49,6 +54,13 @@ fun DownloadRoute(
     var isSelecting by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pendingDeleteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { message ->
+            snackbarHostState.showSnackbar(message = message, duration = SnackbarDuration.Short)
+        }
+    }
 
     LaunchedEffect(downloads.size) {
         if (downloads.isEmpty()) {
@@ -192,31 +204,32 @@ fun DownloadRoute(
                     }
                 }
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             val mainContentModifier = Modifier.fillMaxSize()
 
             if (downloads.isEmpty() && searchQuery.isEmpty()) {
-                Box(
-                    modifier = mainContentModifier,
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No downloads yet.",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
+                AppEmptyScreen(
+                    title = "No Downloads Yet",
+                    message = "Movies you download will appear here. Tap Download on any movie to save it for offline viewing.",
+                    isTv = false,
+                    icon = Icons.Default.Download,
+                    primaryActionLabel = "Browse Content",
+                    onPrimaryAction = onBackClick,
+                    modifier = mainContentModifier
+                )
             } else if (downloads.isEmpty() && searchQuery.isNotEmpty()) {
-                Box(
-                    modifier = mainContentModifier,
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No results found for \"$searchQuery\"",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
+                AppEmptyScreen(
+                    title = "No Results",
+                    message = "No downloads match \"$searchQuery\". Try a different title.",
+                    isTv = false,
+                    icon = Icons.Default.Search,
+                    primaryActionLabel = "Clear Search",
+                    onPrimaryAction = { viewModel.onSearchQueryChange("") },
+                    modifier = mainContentModifier
+                )
             } else {
                 LazyColumn(
                     modifier = mainContentModifier,
@@ -264,10 +277,16 @@ fun DownloadRoute(
     }
 
     if (downloadToRemove != null) {
+        val movieTitle = downloadToRemove?.title ?: "this movie"
         AlertDialog(
             onDismissRequest = { downloadToRemove = null },
-            title = { Text("Delete Download") },
-            text = { Text("Are you sure you want to delete this download? This action is not recoverable.") },
+            title = { Text("Delete Download?") },
+            text = {
+                Text(
+                    "\"$movieTitle\" will be permanently deleted from your device. " +
+                    "You will need to download it again to watch offline."
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -281,19 +300,23 @@ fun DownloadRoute(
             },
             dismissButton = {
                 TextButton(onClick = { downloadToRemove = null }) {
-                    Text("Cancel")
+                    Text("Keep")
                 }
             }
         )
     }
 
     if (showDeleteConfirm) {
+        val count = pendingDeleteIds.size
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Downloads") },
+            title = { Text("Delete ${if (count == 1) "Download" else "$count Downloads"}?") },
             text = {
-                val count = pendingDeleteIds.size
-                Text("Delete $count download${if (count > 1) "s" else ""}? This action is not recoverable.")
+                if (count == 1) {
+                    Text("This movie will be permanently deleted from your device. You will need to download it again to watch offline.")
+                } else {
+                    Text("$count movies will be permanently deleted from your device. You will need to re-download them to watch offline.")
+                }
             },
             confirmButton = {
                 TextButton(
@@ -306,12 +329,12 @@ fun DownloadRoute(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Delete")
+                    Text("Delete All")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
+                    Text("Keep")
                 }
             }
         )
@@ -337,11 +360,13 @@ fun DownloadItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .focusable()
             .onFocusChanged { cardFocused = it.hasFocus }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress
-            ),
+            )
+            .tvFocusScale(),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surface
@@ -437,7 +462,9 @@ fun DownloadItem(
                 } else if (fileExists) {
                     Button(
                         onClick = { onWatch(download.quality) },
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .tvFocusBorder(shape = RoundedCornerShape(20.dp)),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -451,6 +478,7 @@ fun DownloadItem(
                     ) {
                         Button(
                             onClick = onRedownload,
+                            modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(20.dp)),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -465,7 +493,7 @@ fun DownloadItem(
                 if (download.status == DownloadStatus.DOWNLOADING) {
                     IconButton(
                         onClick = onPause,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(48.dp).tvFocusBorder(),
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
@@ -475,7 +503,7 @@ fun DownloadItem(
                 } else if (download.status == DownloadStatus.PAUSED || download.status == DownloadStatus.QUEUED) {
                     IconButton(
                         onClick = onResume,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(48.dp).tvFocusBorder(),
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
@@ -486,7 +514,9 @@ fun DownloadItem(
                 
                 IconButton(
                     onClick = onRemove,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier
+                        .size(48.dp)
+                        .tvFocusBorder(shape = RoundedCornerShape(50))
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -515,7 +545,7 @@ private fun DownloadSortButton(
     onSortChange: (DownloadSortOption) -> Unit
 ) {
     Box {
-        IconButton(onClick = onToggle) {
+        IconButton(onClick = onToggle, modifier = Modifier.tvFocusBorder()) {
             Icon(
                 painter = painterResource(android.R.drawable.ic_menu_sort_by_size),
                 contentDescription = "Sort",

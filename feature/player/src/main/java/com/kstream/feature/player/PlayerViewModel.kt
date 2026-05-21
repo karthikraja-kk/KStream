@@ -18,6 +18,7 @@ import javax.inject.Inject
 
 data class PlayerUiState(
     val isLoading: Boolean = true,
+    val movieTitle: String = "",
     val availableQualities: List<String> = emptyList(),
     val currentQuality: String = "",
     val isPlayingLocal: Boolean = false,
@@ -312,6 +313,7 @@ class PlayerViewModel @Inject constructor(
                 movieSlug = movieWithMedia?.movie?.slug
                 val mediaList = movieWithMedia?.media ?: emptyList()
                 _uiState.update { it.copy(
+                    movieTitle = movieWithMedia?.movie?.movieName ?: "",
                     availableQualities = mediaList.map { m -> m.quality },
                     currentQuality = initialQuality
                 ) }

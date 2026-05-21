@@ -51,7 +51,8 @@ data class SettingsUiState(
     val scanDetailText: String = "Checking scan status...",
     val cacheCleared: Boolean = false,
     val watchHistory: List<WatchHistoryItem> = emptyList(),
-    val isLoadingHistory: Boolean = false
+    val isLoadingHistory: Boolean = false,
+    val successMessage: String? = null
 )
 
 @HiltViewModel
@@ -96,15 +97,19 @@ class SettingsViewModel @Inject constructor(
 
     fun saveUsername() {
         viewModelScope.launch {
-            try { userDataRepository.setUsername(_uiState.value.username) }
-            catch (_: Exception) { }
+            try {
+                userDataRepository.setUsername(_uiState.value.username)
+                showSuccess("Username saved")
+            } catch (_: Exception) { }
         }
     }
 
     fun clearLikedMovies() {
         viewModelScope.launch {
-            try { likedMovieRepository.clearAll() }
-            catch (_: Exception) { }
+            try {
+                likedMovieRepository.clearAll()
+                showSuccess("Liked movies cleared")
+            } catch (_: Exception) { }
         }
     }
 
@@ -117,10 +122,29 @@ class SettingsViewModel @Inject constructor(
                 imageLoader.diskCache?.clear()
                 movieRepository.clearCache()
                 _uiState.update { it.copy(cacheCleared = true) }
+                showSuccess("Cache cleared successfully")
                 delay(2000L)
                 _uiState.update { it.copy(cacheCleared = false) }
             } catch (_: Exception) { }
         }
+    }
+
+    fun deleteWatchHistory(movieIds: Set<String>) {
+        viewModelScope.launch {
+            try {
+                movieIds.forEach { id -> watchProgressRepository.deleteProgress(id) }
+                val count = movieIds.size
+                showSuccess(if (count == 1) "Removed 1 item from history" else "Removed $count items from history")
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun clearSuccessMessage() {
+        _uiState.update { it.copy(successMessage = null) }
+    }
+
+    private fun showSuccess(message: String) {
+        _uiState.update { it.copy(successMessage = message) }
     }
 
     private fun startWatchHistoryMonitor() {
@@ -145,14 +169,6 @@ class SettingsViewModel @Inject constructor(
             .catch { emit(emptyList()) }
             .onEach { items -> _uiState.update { it.copy(watchHistory = items, isLoadingHistory = false) } }
             .launchIn(viewModelScope)
-    }
-
-    fun deleteWatchHistory(movieIds: Set<String>) {
-        viewModelScope.launch {
-            try {
-                movieIds.forEach { id -> watchProgressRepository.deleteProgress(id) }
-            } catch (_: Exception) { }
-        }
     }
 
     fun triggerScan() {

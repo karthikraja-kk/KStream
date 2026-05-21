@@ -220,13 +220,26 @@ fun PlayerRoute(
                 modifier = Modifier.fillMaxSize(),
                 color = Color.Black
             ) {
-                Box(
+                Column(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(56.dp),
+                        color = Color(0xFFE50914)
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = uiState.movieTitle.ifBlank { "Loading…" },
+                        style = MaterialTheme.typography.titleMedium,
                         color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Preparing your stream…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.6f)
                     )
                 }
             }

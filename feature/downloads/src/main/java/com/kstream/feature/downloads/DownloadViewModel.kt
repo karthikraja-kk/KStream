@@ -34,6 +34,9 @@ class DownloadViewModel @Inject constructor(
     private val _sortOption = MutableStateFlow(DownloadSortOption.DATE_DESC)
     val sortOption: StateFlow<DownloadSortOption> = _sortOption.asStateFlow()
 
+    private val _events = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val events: SharedFlow<String> = _events.asSharedFlow()
+
     init {
         // Auto-resume paused downloads when connectivity returns
         networkMonitor.isOnline
@@ -108,17 +111,23 @@ class DownloadViewModel @Inject constructor(
             try {
                 val download = downloadRepository.getDownload(id) ?: return@launch
                 customDownloadManager.deleteDownload(download.movieId, download.quality)
+                _events.emit("\"${download.title}\" removed from downloads")
             } catch (_: Exception) { }
         }
     }
 
     fun removeDownloads(ids: Set<String>) {
         viewModelScope.launch {
+            var removed = 0
             ids.forEach { id ->
                 try {
                     val download = downloadRepository.getDownload(id) ?: return@forEach
                     customDownloadManager.deleteDownload(download.movieId, download.quality)
+                    removed++
                 } catch (_: Exception) { }
+            }
+            if (removed > 0) {
+                _events.emit(if (removed == 1) "1 download removed" else "$removed downloads removed")
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.kstream.core.ui.components
 
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
@@ -40,6 +42,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -53,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import com.kstream.core.ui.R
+import com.kstream.core.ui.components.OttConstants
 
 private val topLevelRoutes = setOf("home", "search", "downloads", "settings")
 
@@ -64,6 +68,11 @@ fun KStreamTvSideNav(
     content: @Composable () -> Unit
 ) {
     var sidebarExpanded by remember { mutableStateOf(false) }
+    val sidebarWidth by animateDpAsState(
+        targetValue = if (sidebarExpanded) 208.dp else 64.dp,
+        animationSpec = tween(250),
+        label = "sidebarWidth"
+    )
     val navFocusRequesters = remember {
         mapOf(
             "home" to FocusRequester(),
@@ -83,13 +92,10 @@ fun KStreamTvSideNav(
     Row(modifier = Modifier.fillMaxSize()) {
         // Sidebar — always visible on top-level routes
         if (currentRoute in topLevelRoutes) {
-            val sidebarWidth = if (sidebarExpanded) 200.dp else 56.dp
-
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(sidebarWidth)
-                    .animateContentSize(animationSpec = tween(250))
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -216,6 +222,16 @@ private fun SideNavItem(
     focusRequester: FocusRequester
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val indicatorWidth by animateDpAsState(
+        targetValue = if (selected || isFocused) 6.dp else 0.dp,
+        animationSpec = tween(180),
+        label = "navIndicatorWidth"
+    )
+    val indicatorAlpha by animateFloatAsState(
+        targetValue = if (selected || isFocused) 1f else 0f,
+        animationSpec = tween(180),
+        label = "navIndicatorAlpha"
+    )
 
     val bgColor = when {
         isFocused -> Color(0xFFE50914)
@@ -256,6 +272,21 @@ private fun SideNavItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start
         ) {
+            Box(
+                modifier = Modifier
+                    .width(8.dp)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(indicatorWidth)
+                        .fillMaxHeight(0.6f)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE50914).copy(alpha = indicatorAlpha))
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = icon,
                 contentDescription = label,

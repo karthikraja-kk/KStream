@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
@@ -15,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,8 +32,12 @@ import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.MovieTileMobile
 import com.kstream.core.ui.components.MovieTileTv
+import com.kstream.core.ui.components.AppEmptyScreen
+import com.kstream.core.ui.components.AppErrorScreen
+import com.kstream.core.ui.components.AppLoadingScreen
 import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
+import com.kstream.core.ui.components.tvFocusScale
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.TvLazyRow
 import androidx.tv.foundation.lazy.list.items as tvItems
@@ -284,27 +290,28 @@ fun HomeScreenMobile(
         }
     ) { padding ->
         if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
-            }
+            AppLoadingScreen(
+                title = "Loading your home",
+                message = "Fetching your rails and recommendations...",
+                isTv = false,
+                modifier = Modifier.padding(padding)
+            )
         } else if (isOffline && uiState.rails.isEmpty()) {
             OfflineScreen(
                 onRetry = onRetry,
                 onGoToDownloads = onGoToDownloads
             )
         } else if (uiState.error != null && !isOffline) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                Column(
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-                ) {
-                    Text(text = uiState.error ?: "Something went wrong", color = MaterialTheme.colorScheme.error)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onRetry) {
-                        Text("Retry")
-                    }
-                }
-            }
+            AppErrorScreen(
+                title = "Couldn't load home",
+                message = uiState.error ?: "Something went wrong.",
+                isTv = false,
+                primaryActionLabel = "Retry",
+                onPrimaryAction = onRetry,
+                secondaryActionLabel = if (isOffline) "Downloads" else null,
+                onSecondaryAction = if (isOffline) onGoToDownloads else null,
+                modifier = Modifier.padding(padding)
+            )
         } else if (uiState.rails.isEmpty()) {
             if (isOffline) {
                 OfflineScreen(
@@ -312,12 +319,16 @@ fun HomeScreenMobile(
                     onGoToDownloads = onGoToDownloads
                 )
             } else {
-                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                    Text(
-                        text = "No movies found. Pull to refresh or check your connection.",
-                        modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
-                    )
-                }
+                AppEmptyScreen(
+                    title = "Nothing here yet",
+                    message = "We couldn't find any movies to show right now. Try refreshing or search for something new.",
+                    isTv = false,
+                    primaryActionLabel = "Refresh",
+                    onPrimaryAction = onRetry,
+                    secondaryActionLabel = "Search",
+                    onSecondaryAction = onSearchClick,
+                    modifier = Modifier.padding(padding)
+                )
             }
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -335,6 +346,7 @@ fun HomeScreenMobile(
                     }
                 }
                 LazyColumn(
+                    state = rememberLazyListState(),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
@@ -406,27 +418,24 @@ fun HomeScreenTv(
     onGoToDownloads: () -> Unit = {}
 ) {
     if (uiState.isLoading) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
-        }
+        AppLoadingScreen(
+            title = "Loading your home",
+            message = "Fetching your rails and recommendations...",
+            isTv = true
+        )
     } else if (isOffline && uiState.rails.isEmpty()) {
         TvOfflineScreen(
             onRetry = onRetry,
             onGoToDownloads = onGoToDownloads
         )
     } else if (uiState.error != null && !isOffline) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-            ) {
-                TvText(text = uiState.error ?: "Something went wrong", color = TvMaterialTheme.colorScheme.error)
-                Spacer(modifier = Modifier.height(16.dp))
-                androidx.tv.material3.Button(onClick = onRetry) {
-                    TvText("Retry")
-                }
-            }
-        }
+        AppErrorScreen(
+            title = "Couldn't load home",
+            message = uiState.error ?: "Something went wrong.",
+            isTv = true,
+            primaryActionLabel = "Retry",
+            onPrimaryAction = onRetry
+        )
     } else if (uiState.rails.isEmpty()) {
         if (isOffline) {
             TvOfflineScreen(
@@ -434,13 +443,15 @@ fun HomeScreenTv(
                 onGoToDownloads = onGoToDownloads
             )
         } else {
-            Box(modifier = Modifier.fillMaxSize()) {
-                TvText(
-                    text = "No movies found. Check your connection.",
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                    color = TvMaterialTheme.colorScheme.onSurface
-                )
-            }
+            AppEmptyScreen(
+                title = "Nothing here yet",
+                message = "We couldn't find any movies to show right now. Try refreshing or open downloads.",
+                isTv = true,
+                primaryActionLabel = "Refresh",
+                onPrimaryAction = onRetry,
+                secondaryActionLabel = "Downloads",
+                onSecondaryAction = onGoToDownloads
+            )
         }
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -457,12 +468,13 @@ fun HomeScreenTv(
                     modifier = Modifier.height(56.dp).widthIn(max = 240.dp),
                     contentScale = ContentScale.Fit
                 )
-                androidx.tv.material3.Button(
-                    onClick = onRefresh,
-                    enabled = !uiState.isLoading,
-                    colors = androidx.tv.material3.ButtonDefaults.colors(
-                        containerColor = Color(0xFFE50914),
-                        contentColor = Color.White,
+                                androidx.tv.material3.Button(
+                                    onClick = onRefresh,
+                                    enabled = !uiState.isLoading,
+                                    modifier = Modifier.tvFocusScale(),
+                                    colors = androidx.tv.material3.ButtonDefaults.colors(
+                                        containerColor = Color(0xFFE50914),
+                                        contentColor = Color.White,
                         focusedContainerColor = Color(0xFFFF1A1A),
                         focusedContentColor = Color.White
                     )
@@ -514,6 +526,7 @@ fun HomeScreenTv(
                                 val query = rail.seeMoreQuery ?: "all:*"
                                 androidx.tv.material3.Button(
                                     onClick = { onSeeMoreClick(query) },
+                                    modifier = Modifier.tvFocusScale(),
                                     colors = androidx.tv.material3.ButtonDefaults.colors(
                                         containerColor = Color(0xFFE50914),
                                         contentColor = Color.White,

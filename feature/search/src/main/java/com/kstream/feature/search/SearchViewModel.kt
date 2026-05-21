@@ -36,7 +36,8 @@ data class SearchUiState(
     val recentSearches: List<String> = emptyList(),
     val sortOption: SortOption = SortOption.NONE,
     val suggestedQuery: String? = null,
-    val isFuzzyMatch: Boolean = false
+    val isFuzzyMatch: Boolean = false,
+    val sortGeneration: Int = 0
 )
 
 @HiltViewModel
@@ -126,7 +127,8 @@ class SearchViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 sortOption = option,
-                results = applySorting(state.results, option)
+                results = applySorting(state.results, option),
+                sortGeneration = state.sortGeneration + 1
             )
         }
     }

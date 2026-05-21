@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -18,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,8 +42,12 @@ import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.MovieTileMobile
 import com.kstream.core.ui.components.MovieTileTv
+import com.kstream.core.ui.components.AppEmptyScreen
+import com.kstream.core.ui.components.AppErrorScreen
+import com.kstream.core.ui.components.AppLoadingScreen
 import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
+import com.kstream.core.ui.components.tvFocusScale
 import com.kstream.core.model.Movie
 import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
@@ -98,9 +104,10 @@ fun SearchRoute(
                         onClick = { viewModel.setInitialQuery(recent) },
                         label = { Text(recent, color = if (chipFocused) Color.White else Color.Unspecified) },
                         modifier = Modifier
+                            .tvFocusScale()
                             .onFocusChanged { chipFocused = it.isFocused },
                         colors = SuggestionChipDefaults.suggestionChipColors(
-                            containerColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = if (chipFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.surfaceVariant
                         ),
                         border = SuggestionChipDefaults.suggestionChipBorder(
                             borderColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline,
@@ -129,9 +136,10 @@ fun SearchRoute(
                             onClick = { viewModel.setInitialQuery(suggestion) },
                             label = { Text(suggestion, color = if (chipFocused) Color.White else Color.Unspecified) },
                             modifier = Modifier
+                                .tvFocusScale()
                                 .onFocusChanged { chipFocused = it.isFocused },
                             colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.surfaceVariant
+                                containerColor = if (chipFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.surfaceVariant
                             ),
                             border = SuggestionChipDefaults.suggestionChipBorder(
                                 borderColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline,
@@ -146,13 +154,14 @@ fun SearchRoute(
         // "Did you mean?" suggestion banner
         if (uiState.suggestedQuery != null && uiState.isFuzzyMatch) {
             var bannerFocused by remember { mutableStateOf(false) }
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .focusable()
-                    .onFocusChanged { bannerFocused = it.isFocused }
-                    .onPreviewKeyEvent { keyEvent ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .tvFocusScale()
+                        .focusable()
+                        .onFocusChanged { bannerFocused = it.isFocused }
+                        .onPreviewKeyEvent { keyEvent ->
                         if (keyEvent.type == KeyEventType.KeyDown &&
                             (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
                         ) {
@@ -186,32 +195,31 @@ fun SearchRoute(
                 onGoToDownloads = onDownloadsClick
             )
         } else if (uiState.error != null) {
-            val errorMessage = uiState.error ?: ""
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { viewModel.onQueryChange(uiState.query) }) {
-                        Text("Retry")
-                    }
-                }
-            }
+            AppErrorScreen(
+                title = "Search failed",
+                message = uiState.error ?: "Something went wrong.",
+                isTv = platform == Platform.TV,
+                primaryActionLabel = "Retry",
+                onPrimaryAction = { viewModel.onQueryChange(uiState.query) },
+                secondaryActionLabel = "Downloads",
+                onSecondaryAction = onDownloadsClick
+            )
         } else if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }
+            AppLoadingScreen(
+                title = "Searching",
+                message = "Finding the best matches for you...",
+                isTv = platform == Platform.TV
+            )
         } else if (uiState.results.isEmpty() && uiState.query.isNotBlank()) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Text(
-                    text = "No results found for \"${uiState.query}\"",
-                    modifier = Modifier.align(Alignment.Center),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
+            AppEmptyScreen(
+                title = "No results found",
+                message = "We couldn't find anything for \"${uiState.query}\". Try a different title, or clear the search and browse again.",
+                isTv = platform == Platform.TV,
+                primaryActionLabel = "Clear search",
+                onPrimaryAction = { viewModel.onQueryChange("") },
+                secondaryActionLabel = "Downloads",
+                onSecondaryAction = onDownloadsClick
+            )
         } else {
             if (platform == Platform.TV) {
                 SearchScreenTv(
@@ -281,14 +289,18 @@ fun SearchScreenMobile(
             onGoToDownloads = onGoToDownloads
         )
     } else {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(uiState.results, key = { it.id }) { movie ->
-                MovieTileMobile(movie = movie, onClick = { onMovieClick(movie) })
+        key(uiState.sortGeneration) {
+            val gridState = rememberLazyGridState()
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Fixed(3),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(uiState.results, key = { it.id }) { movie ->
+                    MovieTileMobile(movie = movie, onClick = { onMovieClick(movie) })
+                }
             }
         }
     }
@@ -309,14 +321,16 @@ fun SearchScreenTv(
             onGoToDownloads = onGoToDownloads
         )
     } else {
-        TvLazyVerticalGrid(
-            columns = TvGridCells.Fixed(4),
-            contentPadding = PaddingValues(48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            tvItems(uiState.results, key = { it.id }) { movie ->
-                MovieTileTv(movie = movie, onClick = { onMovieClick(movie) })
+        key(uiState.sortGeneration) {
+            TvLazyVerticalGrid(
+                columns = TvGridCells.Fixed(4),
+                contentPadding = PaddingValues(48.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                tvItems(uiState.results, key = { it.id }) { movie ->
+                    MovieTileTv(movie = movie, onClick = { onMovieClick(movie) })
+                }
             }
         }
     }

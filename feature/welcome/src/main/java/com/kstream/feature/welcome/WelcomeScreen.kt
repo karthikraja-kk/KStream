@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.kstream.core.ui.R
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
+import com.kstream.core.ui.components.tvFocusBorder
 
 @Composable
 fun WelcomeRoute(
@@ -270,6 +271,7 @@ fun WelcomeScreenTv(
                         else if (termsAccepted) Color(0xFFE50914)
                         else Color(0xFF444444)
                     )
+                    .tvFocusBorder(shape = RoundedCornerShape(24.dp))
                     .focusable()
                     .onFocusChanged { continueFocused = it.isFocused }
                     .onPreviewKeyEvent { keyEvent ->
@@ -303,6 +305,7 @@ fun WelcomeScreenTv(
                             if (checkboxFocused) Modifier.background(Color(0xFFE50914).copy(alpha = 0.3f))
                             else Modifier
                         )
+                        .tvFocusBorder(shape = RoundedCornerShape(4.dp))
                         .focusable()
                         .onFocusChanged { checkboxFocused = it.isFocused }
                         .onPreviewKeyEvent { keyEvent ->
@@ -337,6 +340,7 @@ fun WelcomeScreenTv(
                     ),
                     color = if (termsFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.primary,
                     modifier = Modifier
+                        .tvFocusBorder()
                         .focusable()
                         .onFocusChanged { termsFocused = it.isFocused }
                         .onPreviewKeyEvent { keyEvent ->
