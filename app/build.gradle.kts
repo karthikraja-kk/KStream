@@ -26,7 +26,7 @@ android {
 
     defaultConfig {
         applicationId = "com.kstream.app"
-        minSdk = 28
+        minSdk = 25
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
