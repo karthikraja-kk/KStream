@@ -19,6 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -66,7 +72,8 @@ fun SearchRoute(
             SearchBar(
                 query = uiState.query,
                 onQueryChange = viewModel::onQueryChange,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                isTv = platform == Platform.TV
             )
             SortButton(
                 currentSort = uiState.sortOption,
@@ -198,13 +205,29 @@ fun SearchRoute(
 fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTv: Boolean = false
 ) {
+    var isEditing by remember { mutableStateOf(false) }
     TextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = modifier.fillMaxWidth(),
-        placeholder = { Text("Search movies...") },
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (isTv) Modifier.onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown &&
+                        !isEditing &&
+                        (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                    ) {
+                        isEditing = true
+                        true
+                    } else false
+                }.onFocusChanged { if (!it.isFocused) isEditing = false }
+                else Modifier
+            ),
+        readOnly = isTv && !isEditing,
+        placeholder = { Text(if (isTv && !isEditing) "Search movies... (Press OK to type)" else "Search movies...") },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
         singleLine = true
     )

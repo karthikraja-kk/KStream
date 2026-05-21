@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -62,6 +65,14 @@ fun KStreamTvSideNav(
     content: @Composable () -> Unit
 ) {
     var sidebarExpanded by remember { mutableStateOf(false) }
+    val firstItemFocusRequester = remember { FocusRequester() }
+
+    // Request focus on the selected nav item when sidebar expands
+    LaunchedEffect(sidebarExpanded) {
+        if (sidebarExpanded) {
+            try { firstItemFocusRequester.requestFocus() } catch (_: Exception) {}
+        }
+    }
 
     Row(modifier = Modifier.fillMaxSize()) {
         if (currentRoute in topLevelRoutes) {
@@ -77,7 +88,12 @@ fun KStreamTvSideNav(
                         .background(TvMaterialTheme.colorScheme.surfaceVariant)
                         .padding(vertical = 16.dp, horizontal = 4.dp)
                         .selectableGroup()
-                        .onFocusChanged { if (!it.hasFocus) sidebarExpanded = false },
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
+                                sidebarExpanded = false
+                                true
+                            } else false
+                        },
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -99,25 +115,29 @@ fun KStreamTvSideNav(
                         icon = Icons.Default.Home,
                         label = "Home",
                         selected = currentRoute == "home",
-                        onClick = { onNavigate("home"); sidebarExpanded = false }
+                        onClick = { onNavigate("home"); sidebarExpanded = false },
+                        focusRequester = if (currentRoute == "home") firstItemFocusRequester else null
                     )
                     SideNavItem(
                         icon = Icons.Default.Search,
                         label = "Search",
                         selected = currentRoute == "search",
-                        onClick = { onNavigate("search"); sidebarExpanded = false }
+                        onClick = { onNavigate("search"); sidebarExpanded = false },
+                        focusRequester = if (currentRoute == "search") firstItemFocusRequester else null
                     )
                     SideNavItem(
                         icon = Icons.Default.Download,
                         label = "Downloads",
                         selected = currentRoute == "downloads",
-                        onClick = { onNavigate("downloads"); sidebarExpanded = false }
+                        onClick = { onNavigate("downloads"); sidebarExpanded = false },
+                        focusRequester = if (currentRoute == "downloads") firstItemFocusRequester else null
                     )
                     SideNavItem(
                         icon = Icons.Default.Settings,
                         label = "Settings",
                         selected = currentRoute == "settings",
-                        onClick = { onNavigate("settings"); sidebarExpanded = false }
+                        onClick = { onNavigate("settings"); sidebarExpanded = false },
+                        focusRequester = if (currentRoute == "settings") firstItemFocusRequester else null
                     )
                 }
             }
@@ -147,7 +167,8 @@ private fun SideNavItem(
     icon: ImageVector,
     label: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val bgColor = when {
@@ -165,6 +186,7 @@ private fun SideNavItem(
             .size(56.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .focusable()
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick)

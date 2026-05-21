@@ -94,6 +94,7 @@ fun PlayerRoute(
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
     
     var controlsVisible by remember { mutableStateOf(true) }
+    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
 
     fun enterFullscreen() {
         isFullscreen = true
@@ -184,7 +185,8 @@ fun PlayerRoute(
                         Key.DirectionUp, Key.DirectionDown,
                         Key.DirectionLeft, Key.DirectionRight -> {
                             controlsVisible = true
-                            false // let the event propagate to PlayerView controls
+                            playerViewRef?.showController()
+                            false
                         }
                         else -> false
                     }
@@ -200,6 +202,7 @@ fun PlayerRoute(
                     setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
                         controlsVisible = visibility == android.view.View.VISIBLE
                     })
+                    playerViewRef = this
                 }
             },
             modifier = Modifier.fillMaxSize()

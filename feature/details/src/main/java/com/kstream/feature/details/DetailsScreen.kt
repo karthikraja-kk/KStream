@@ -615,7 +615,9 @@ fun DetailsScreenTv(
                                     shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
                                 )
                             ) {
-                                TvText(text = "Resume", color = Color.White)
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    TvText(text = "Resume", color = Color.White)
+                                }
                             }
                             Spacer(modifier = Modifier.width(2.dp))
                             Box(
@@ -653,7 +655,9 @@ fun DetailsScreenTv(
                                 contentColor = Color.White
                             )
                         ) {
-                            TvText(text = "Watch Now", color = Color.White)
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                TvText(text = "Watch Now", color = Color.White)
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -678,7 +682,9 @@ fun DetailsScreenTv(
                             )
                         )
                     ) {
-                        TvText(text = downloadBtnText, color = Color(0xFFE50914))
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            TvText(text = downloadBtnText, color = Color(0xFFE50914))
+                        }
                     }
                 }
             }
