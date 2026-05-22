@@ -113,7 +113,7 @@ fun KStreamTvSideNav(
                     .onPreviewKeyEvent { keyEvent ->
                         if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
                             sidebarExpanded = false
-                            true
+                            false // Don't consume — let TV move focus right to content
                         } else if (keyEvent.type == KeyEventType.KeyDown &&
                             (keyEvent.key == Key.DirectionUp || keyEvent.key == Key.DirectionDown)
                         ) {

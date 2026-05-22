@@ -847,14 +847,14 @@ private fun WatchHistoryListItem(
                 if (item.completionPercent > 0f) {
                     Spacer(Modifier.height(8.dp))
                     LinearProgressIndicator(
-                        progress = item.completionPercent.coerceIn(0f, 1f),
+                        progress = (item.completionPercent / 100f).coerceIn(0f, 1f),
                         modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
                         color = BrandRed,
                         trackColor = BorderMid
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "${(item.completionPercent * 100).toInt()}% watched",
+                        "${item.completionPercent.toInt()}% watched",
                         style = TextStyle(color = TextDim, fontSize = 10.sp)
                     )
                 }

@@ -79,9 +79,6 @@ dependencies {
     implementation(project(":feature:search"))
     implementation(project(":feature:settings"))
     
-    // Lottie for splash animation
-    implementation("com.airbnb.android:lottie-compose:6.3.0")
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)

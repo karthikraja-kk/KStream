@@ -32,11 +32,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kstream.core.ui.components.KStreamTvSideNav
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
 import com.kstream.core.domain.repository.UserDataRepository
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import kotlinx.coroutines.delay
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.PlatformProvider
@@ -52,7 +56,7 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private var isLottieReady = false
+    private var isSplashReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -62,11 +66,11 @@ class MainActivity : ComponentActivity() {
         // backstack (it was popped inclusively), so onReady() would never be called.
         // Skip the splash hold to let the restored navigation state render immediately.
         if (savedInstanceState != null) {
-            isLottieReady = true
+            isSplashReady = true
         }
 
         splashScreen.setKeepOnScreenCondition {
-            !isLottieReady
+            !isSplashReady
         }
         
         setContent {
@@ -75,12 +79,12 @@ class MainActivity : ComponentActivity() {
                 if (platform == Platform.TV) {
                     KStreamTvTheme {
                         KStreamTheme {
-                            KStreamAppContent(onLottieReady = { isLottieReady = true })
+                            KStreamAppContent(onSplashReady = { isSplashReady = true })
                         }
                     }
                 } else {
                     KStreamTheme {
-                        KStreamAppContent(onLottieReady = { isLottieReady = true })
+                        KStreamAppContent(onSplashReady = { isSplashReady = true })
                     }
                 }
             }
@@ -89,7 +93,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun KStreamAppContent(onLottieReady: () -> Unit) {
+fun KStreamAppContent(onSplashReady: () -> Unit) {
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
     val isFirstLaunchCompleted by viewModel.isFirstLaunchCompleted.collectAsStateWithLifecycle(initialValue = null)
@@ -130,7 +134,7 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
                 composable("splash") {
                     SplashScreenWithNav(
                         isFirstLaunch = isFirstLaunchCompleted != true,
-                        onReady = onLottieReady,
+                        onReady = onSplashReady,
                         onNavigateToWelcome = {
                             navController.navigate("welcome") {
                                 popUpTo("splash") { inclusive = true }
@@ -262,7 +266,7 @@ fun KStreamAppContent(onLottieReady: () -> Unit) {
         composable("splash") {
             SplashScreenWithNav(
                 isFirstLaunch = isFirstLaunchCompleted != true,
-                onReady = onLottieReady,
+                onReady = onSplashReady,
                 onNavigateToWelcome = {
                     navController.navigate("welcome") {
                         popUpTo("splash") { inclusive = true }
@@ -411,43 +415,37 @@ fun SplashScreenWithNav(
     onNavigateToWelcome: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
-    val composition by rememberLottieComposition(
-        LottieCompositionSpec.Asset("kstream-lottie-animation.json")
+    var animationStarted by remember { mutableStateOf(false) }
+
+    val animatedAlpha by animateFloatAsState(
+        targetValue = if (animationStarted) 1f else 0f,
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "splashAlpha"
     )
-    
-    LaunchedEffect(composition) {
-        if (composition != null) {
-            onReady()
-        }
-    }
-    
-    val progress by animateLottieCompositionAsState(
-        composition = composition,
-        iterations = 1,
-        isPlaying = true,
-        restartOnPlay = false
+    val animatedScale by animateFloatAsState(
+        targetValue = if (animationStarted) 1f else 0.9f,
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "splashScale"
     )
-    
-    LaunchedEffect(progress) {
-        if (progress == 1f) {
-            if (isFirstLaunch) {
-                onNavigateToWelcome()
-            } else {
-                onNavigateToHome()
-            }
-        }
+
+    LaunchedEffect(Unit) {
+        onReady()          // dismiss OS splash immediately
+        animationStarted = true
+        delay(1500)        // 600ms animate-in + 900ms hold
+        if (isFirstLaunch) onNavigateToWelcome() else onNavigateToHome()
     }
-    
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        if (composition != null) {
-            LottieAnimation(
-                composition = composition,
-                progress = { progress },
-                modifier = Modifier.size(220.dp)
-            )
-        }
+        Image(
+            painter = painterResource(id = R.drawable.kstream_logo_with_name),
+            contentDescription = "KStream",
+            modifier = Modifier
+                .size(200.dp)
+                .alpha(animatedAlpha)
+                .scale(animatedScale)
+        )
     }
 }

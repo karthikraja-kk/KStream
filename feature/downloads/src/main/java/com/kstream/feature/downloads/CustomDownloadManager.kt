@@ -20,6 +20,7 @@ import okhttp3.Request
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,6 +38,7 @@ class CustomDownloadManager @Inject constructor(
 
     private val activeDownloads = ConcurrentHashMap<String, Job>()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val networkPauseJob = AtomicReference<Job?>(null)
 
     init {
         observeNetwork()
@@ -46,9 +48,16 @@ class CustomDownloadManager @Inject constructor(
         networkMonitor.isOnline
             .onEach { isOnline ->
                 if (isOnline) {
+                    // Cancel any pending pause — network came back in time
+                    networkPauseJob.getAndSet(null)?.cancel()
                     resumeAllPausedByNetwork()
                 } else {
-                    pauseAllActiveDueToNetwork()
+                    // Debounce: wait 2s before pausing to survive transient handoffs
+                    val job = scope.launch {
+                        delay(2000)
+                        pauseAllActiveDueToNetwork()
+                    }
+                    networkPauseJob.getAndSet(job)?.cancel()
                 }
             }
             .launchIn(scope)
@@ -61,6 +70,16 @@ class CustomDownloadManager @Inject constructor(
             scope.launch {
                 downloadRepository.updateDownloadStatusWithMessage(id, DownloadStatus.PAUSED, "Paused: No Internet")
             }
+        }
+        updateForegroundService()
+    }
+
+    private fun updateForegroundService() {
+        val count = activeDownloads.size
+        if (count > 0) {
+            try { DownloadForegroundService.start(context, count) } catch (_: Exception) {}
+        } else {
+            try { DownloadForegroundService.stop(context) } catch (_: Exception) {}
         }
     }
 
@@ -89,6 +108,7 @@ class CustomDownloadManager @Inject constructor(
         
         val job = scope.launch {
             try {
+                updateForegroundService()
                 performDownload(id, movieId, quality, url, movieName, posterUrl, fileSize, onProgress)
             } catch (e: Exception) {
                 if (e !is CancellationException) {
@@ -107,6 +127,7 @@ class CustomDownloadManager @Inject constructor(
                 }
             } finally {
                 activeDownloads.remove(id)
+                updateForegroundService()
             }
         }
         
@@ -236,6 +257,7 @@ class CustomDownloadManager @Inject constructor(
         scope.launch {
             downloadRepository.updateDownloadStatus(id, DownloadStatus.PAUSED)
         }
+        updateForegroundService()
     }
 
     suspend fun resumeDownload(id: String, onProgress: (Float) -> Unit) {

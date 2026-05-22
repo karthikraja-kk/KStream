@@ -291,7 +291,7 @@ fun PlayerRoute(
                         .background(if (fsBtnFocused) Color(0xFFFF1A1A) else Color.Black.copy(alpha = 0.5f))
                         .tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
                         .focusRequester(fullscreenFocusRequester)
-                        .focusable()
+                        .clickable { if (isFullscreen) exitFullscreen() else enterFullscreen() }
                         .onFocusChanged { fsBtnFocused = it.isFocused }
                         .onPreviewKeyEvent { keyEvent ->
                             if (keyEvent.type == KeyEventType.KeyDown &&
@@ -327,7 +327,7 @@ fun PlayerRoute(
                             .background(if (qualBtnFocused) Color(0xFFFF1A1A) else Color.Black.copy(alpha = 0.5f))
                             .tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
                             .focusRequester(qualityFocusRequester)
-                            .focusable()
+                            .clickable { showQualityMenu = true }
                             .onFocusChanged { qualBtnFocused = it.isFocused }
                             .onPreviewKeyEvent { keyEvent ->
                                 if (keyEvent.type == KeyEventType.KeyDown &&
