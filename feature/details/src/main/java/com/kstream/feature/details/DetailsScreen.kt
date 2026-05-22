@@ -624,6 +624,14 @@ fun DetailsScreenTv(
                                 focusedContentColor = Color.White,
                                 focusedSelectedContainerColor = Color(0xFFFF1A1A),
                                 focusedSelectedContentColor = Color.White
+                            ),
+                            border = androidx.tv.material3.FilterChipDefaults.border(
+                                focusedBorder = androidx.tv.material3.Border(
+                                    border = BorderStroke(2.dp, Color.White)
+                                ),
+                                focusedSelectedBorder = androidx.tv.material3.Border(
+                                    border = BorderStroke(2.dp, Color.White)
+                                )
                             )
                         )
                     }
@@ -664,6 +672,7 @@ fun DetailsScreenTv(
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
                                     .background(if (dropdownFocused) Color(0xFFFF1A1A) else Color(0xFFE50914))
+                                    .then(if (dropdownFocused) Modifier.border(2.dp, Color.White, RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) else Modifier)
                                     .tvFocusScale()
                                     .focusable()
                                     .onFocusChanged { dropdownFocused = it.isFocused }
@@ -739,7 +748,7 @@ fun DetailsScreenTv(
                                 border = BorderStroke(2.dp, Color(0xFFE50914))
                             ),
                             focusedBorder = androidx.tv.material3.Border(
-                                border = BorderStroke(2.dp, Color(0xFFFF1A1A))
+                                border = BorderStroke(2.dp, Color.White)
                             )
                         )
                     ) {

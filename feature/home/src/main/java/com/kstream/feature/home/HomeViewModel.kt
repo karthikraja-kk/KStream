@@ -169,13 +169,9 @@ class HomeViewModel @Inject constructor(
             rails.add(MovieRail("Continue Watching", continueWatchingMovies, totalContinueWatching, seeMoreQuery = "history:*"))
         }
 
-        // Liked Movies — preserves order from DB (most recently liked first)
-        if (likedIds.isNotEmpty()) {
-            val allLikedMovies = likedIds.mapNotNull { id -> movies.find { it.id == id } }
-            val likedMoviesPreview = allLikedMovies.take(10)
-            if (likedMoviesPreview.isNotEmpty()) {
-                rails.add(MovieRail("Liked Movies", likedMoviesPreview, allLikedMovies.size, seeMoreQuery = "liked:*"))
-            }
+        // New Releases — sorted by last_updated (latest first)
+        if (movies.isNotEmpty()) {
+            rails.add(MovieRail("New Releases", movies.sortedByLastUpdated().take(10), seeMoreQuery = "all:*"))
         }
 
         // Recommended for You — appears only when user has activity
@@ -188,9 +184,13 @@ class HomeViewModel @Inject constructor(
             ))
         }
 
-        // New Releases — sorted by last_updated (latest first)
-        if (movies.isNotEmpty()) {
-            rails.add(MovieRail("New Releases", movies.sortedByLastUpdated().take(10), seeMoreQuery = "all:*"))
+        // Liked Movies — preserves order from DB (most recently liked first)
+        if (likedIds.isNotEmpty()) {
+            val allLikedMovies = likedIds.mapNotNull { id -> movies.find { it.id == id } }
+            val likedMoviesPreview = allLikedMovies.take(10)
+            if (likedMoviesPreview.isNotEmpty()) {
+                rails.add(MovieRail("Liked Movies", likedMoviesPreview, allLikedMovies.size, seeMoreQuery = "liked:*"))
+            }
         }
         
         // Genre rails — sorted by last_updated

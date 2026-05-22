@@ -1,20 +1,27 @@
 package com.kstream.feature.search
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,9 +30,9 @@ import androidx.compose.runtime.key
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -33,10 +40,12 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
@@ -54,6 +63,11 @@ import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
 import androidx.tv.foundation.lazy.grid.items as tvItems
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text as TvText
+
+private val GenreList = listOf(
+    "Action", "Drama", "Comedy", "Thriller", "Horror",
+    "Romance", "Sci-Fi", "Animation", "Crime", "Adventure"
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,9 +88,21 @@ fun SearchRoute(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+        // "Discover" heading — mobile only (TV relies on sidebar for nav context)
+        if (platform != Platform.TV) {
+            Text(
+                text = "Discover",
+                style = TextStyle(color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 4.dp)
+            )
+        }
+
+        // Search bar + sort button row
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 16.dp, bottom = 0.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             SearchBar(
@@ -91,69 +117,62 @@ fun SearchRoute(
             )
         }
 
-        if (uiState.recentSearches.isNotEmpty() && uiState.query.isBlank()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                uiState.recentSearches.take(5).forEach { recent ->
-                    var chipFocused by remember { mutableStateOf(false) }
-                    SuggestionChip(
-                        onClick = { viewModel.setInitialQuery(recent) },
-                        label = { Text(recent, color = if (chipFocused) Color.White else Color.Unspecified) },
-                        modifier = Modifier
-                            .tvFocusScale()
-                            .onFocusChanged { chipFocused = it.isFocused },
-                        colors = SuggestionChipDefaults.suggestionChipColors(
-                            containerColor = if (chipFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        border = SuggestionChipDefaults.suggestionChipBorder(
-                            borderColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline,
-                            borderWidth = if (chipFocused) 2.dp else 1.dp
-                        )
-                    )
+        if (uiState.query.isBlank()) {
+            // Idle discovery state — replaces the blank screen
+            IdleDiscoveryState(
+                recentSearches = uiState.recentSearches,
+                onRecentClick = { viewModel.setInitialQuery(it) },
+                onClearRecents = { viewModel.clearRecentSearches() },
+                onGenreClick = { viewModel.setInitialQuery(it) },
+                isTv = platform == Platform.TV
+            )
+        } else {
+            // Type-ahead suggestions from search history
+            if (uiState.recentSearches.isNotEmpty()) {
+                val matchingSuggestions = uiState.recentSearches.filter {
+                    it.contains(uiState.query, ignoreCase = true) &&
+                        !it.equals(uiState.query, ignoreCase = true)
                 }
-            }
-        }
-
-        // Type-ahead suggestions from search history
-        if (uiState.recentSearches.isNotEmpty() && uiState.query.isNotBlank()) {
-            val matchingSuggestions = uiState.recentSearches.filter {
-                it.contains(uiState.query, ignoreCase = true) && !it.equals(uiState.query, ignoreCase = true)
-            }
-            if (matchingSuggestions.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    matchingSuggestions.take(3).forEach { suggestion ->
-                        var chipFocused by remember { mutableStateOf(false) }
-                        SuggestionChip(
-                            onClick = { viewModel.setInitialQuery(suggestion) },
-                            label = { Text(suggestion, color = if (chipFocused) Color.White else Color.Unspecified) },
-                            modifier = Modifier
-                                .tvFocusScale()
-                                .onFocusChanged { chipFocused = it.isFocused },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = if (chipFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.surfaceVariant
-                            ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                borderColor = if (chipFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline,
-                                borderWidth = if (chipFocused) 2.dp else 1.dp
-                            )
-                        )
+                if (matchingSuggestions.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        matchingSuggestions.take(3).forEach { suggestion ->
+                            key(suggestion) {
+                                var chipFocused by remember { mutableStateOf(false) }
+                                SuggestionChip(
+                                    onClick = { viewModel.setInitialQuery(suggestion) },
+                                    label = {
+                                        Text(
+                                            suggestion,
+                                            color = if (chipFocused) Color.White else Color.Unspecified
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .tvFocusScale()
+                                        .onFocusChanged { chipFocused = it.isFocused },
+                                    colors = SuggestionChipDefaults.suggestionChipColors(
+                                        containerColor = if (chipFocused) Color(0xFFFF1A1A)
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    ),
+                                    border = SuggestionChipDefaults.suggestionChipBorder(
+                                        borderColor = if (chipFocused) Color.White
+                                        else MaterialTheme.colorScheme.outline,
+                                        borderWidth = if (chipFocused) 2.dp else 1.dp
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
-        
-        // "Did you mean?" suggestion banner
-        if (uiState.suggestedQuery != null && uiState.isFuzzyMatch) {
-            var bannerFocused by remember { mutableStateOf(false) }
+
+            // "Did you mean?" fuzzy match banner
+            if (uiState.suggestedQuery != null && uiState.isFuzzyMatch) {
+                var bannerFocused by remember { mutableStateOf(false) }
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -161,88 +180,265 @@ fun SearchRoute(
                         .tvFocusScale()
                         .focusable()
                         .onFocusChanged { bannerFocused = it.isFocused }
+                        .then(
+                            if (bannerFocused) Modifier.border(2.dp, Color.White, MaterialTheme.shapes.small)
+                            else Modifier
+                        )
                         .onPreviewKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyDown &&
-                            (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
-                        ) {
-                            viewModel.setInitialQuery(uiState.suggestedQuery!!)
-                            true
-                        } else false
-                    },
-                color = if (bannerFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.small
-            ) {
-                Text(
-                    text = buildAnnotatedString {
-                        append("Did you mean: ")
-                        withStyle(SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )) {
-                            append(uiState.suggestedQuery!!)
-                        }
-                        append("?")
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                            if (keyEvent.type == KeyEventType.KeyDown &&
+                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                            ) {
+                                viewModel.setInitialQuery(uiState.suggestedQuery!!)
+                                true
+                            } else false
+                        },
+                    color = if (bannerFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = buildAnnotatedString {
+                            append("Did you mean: ")
+                            withStyle(SpanStyle(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )) {
+                                append(uiState.suggestedQuery!!)
+                            }
+                            append("?")
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
-        }
 
-        if (isOffline) {
-            OfflineScreen(
-                onRetry = { viewModel.onQueryChange(uiState.query) },
-                onGoToDownloads = onDownloadsClick
-            )
-        } else if (uiState.error != null) {
-            AppErrorScreen(
-                title = "Search failed",
-                message = uiState.error ?: "Something went wrong.",
-                isTv = platform == Platform.TV,
-                primaryActionLabel = "Retry",
-                onPrimaryAction = { viewModel.onQueryChange(uiState.query) },
-                secondaryActionLabel = "Downloads",
-                onSecondaryAction = onDownloadsClick
-            )
-        } else if (uiState.isLoading) {
-            AppLoadingScreen(
-                title = "Searching",
-                message = "Finding the best matches for you...",
-                isTv = platform == Platform.TV
-            )
-        } else if (uiState.results.isEmpty() && uiState.query.isNotBlank()) {
-            AppEmptyScreen(
-                title = "No results found",
-                message = "We couldn't find anything for \"${uiState.query}\". Try a different title, or clear the search and browse again.",
-                isTv = platform == Platform.TV,
-                primaryActionLabel = "Clear search",
-                onPrimaryAction = { viewModel.onQueryChange("") },
-                secondaryActionLabel = "Downloads",
-                onSecondaryAction = onDownloadsClick
-            )
-        } else {
-            if (platform == Platform.TV) {
-                SearchScreenTv(
-                    uiState = uiState,
-                    onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) },
+            // Results / error / loading / empty states
+            if (isOffline) {
+                OfflineScreen(
                     onRetry = { viewModel.onQueryChange(uiState.query) },
-                    isOffline = false,
                     onGoToDownloads = onDownloadsClick
+                )
+            } else if (uiState.error != null) {
+                AppErrorScreen(
+                    title = "Search failed",
+                    message = uiState.error ?: "Something went wrong.",
+                    isTv = platform == Platform.TV,
+                    primaryActionLabel = "Retry",
+                    onPrimaryAction = { viewModel.onQueryChange(uiState.query) },
+                    secondaryActionLabel = "Downloads",
+                    onSecondaryAction = onDownloadsClick
+                )
+            } else if (uiState.isLoading) {
+                AppLoadingScreen(
+                    title = "Searching",
+                    message = "Finding the best matches for you...",
+                    isTv = platform == Platform.TV
+                )
+            } else if (uiState.results.isEmpty()) {
+                AppEmptyScreen(
+                    title = "No results found",
+                    message = "We couldn't find anything for \"${uiState.query}\". Try a different title, or clear the search and browse again.",
+                    isTv = platform == Platform.TV,
+                    primaryActionLabel = "Clear search",
+                    onPrimaryAction = { viewModel.onQueryChange("") },
+                    secondaryActionLabel = "Downloads",
+                    onSecondaryAction = onDownloadsClick
                 )
             } else {
-                SearchScreenMobile(
-                    uiState = uiState,
-                    onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) },
-                    onRetry = { viewModel.onQueryChange(uiState.query) },
-                    isOffline = false,
-                    onGoToDownloads = onDownloadsClick
-                )
+                if (platform == Platform.TV) {
+                    SearchScreenTv(
+                        uiState = uiState,
+                        onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) },
+                        onRetry = { viewModel.onQueryChange(uiState.query) },
+                        isOffline = false,
+                        onGoToDownloads = onDownloadsClick
+                    )
+                } else {
+                    SearchScreenMobile(
+                        uiState = uiState,
+                        onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) },
+                        onRetry = { viewModel.onQueryChange(uiState.query) },
+                        isOffline = false,
+                        onGoToDownloads = onDownloadsClick
+                    )
+                }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IdleDiscoveryState(
+    recentSearches: List<String>,
+    onRecentClick: (String) -> Unit,
+    onClearRecents: () -> Unit,
+    onGenreClick: (String) -> Unit,
+    isTv: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        if (recentSearches.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Recent",
+                    style = TextStyle(
+                        color = Color(0xFFB3B3B3),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onClearRecents) {
+                    Text("Clear all", color = Color(0xFF777777), fontSize = 12.sp)
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                recentSearches.take(8).forEach { recent ->
+                    key(recent) {
+                        var chipFocused by remember { mutableStateOf(false) }
+                        SuggestionChip(
+                            onClick = { onRecentClick(recent) },
+                            label = {
+                                Text(
+                                    recent,
+                                    color = if (chipFocused) Color.White else Color(0xFFCCCCCC),
+                                    fontSize = 13.sp
+                                )
+                            },
+                            modifier = Modifier
+                                .tvFocusScale()
+                                .onFocusChanged { chipFocused = it.isFocused }
+                                .then(
+                                    if (chipFocused && isTv)
+                                        Modifier.border(2.dp, Color.White, RoundedCornerShape(50))
+                                    else Modifier
+                                ),
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = if (chipFocused) Color(0xFFE50914)
+                                else Color(0xFF1E1E1E)
+                            ),
+                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                borderColor = if (chipFocused) Color(0xFFE50914)
+                                else Color(0xFF333333),
+                                borderWidth = 1.dp
+                            )
+                        )
+                    }
+                }
+            }
+        } else {
+            // Central illustration when no recent searches exist
+            Spacer(Modifier.height(48.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(Color(0xFF1A1A1A), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color(0xFF444444),
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Start discovering",
+                    style = TextStyle(
+                        color = Color(0xFF888888),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Search for movies, series, and more",
+                    style = TextStyle(color = Color(0xFF555555), fontSize = 13.sp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // "Explore by genre" section with red accent bar
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(16.dp)
+                    .background(Color(0xFFE50914), RoundedCornerShape(2.dp))
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Explore by genre",
+                style = TextStyle(
+                    color = Color(0xFFB3B3B3),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GenreList.forEach { genre ->
+                key(genre) {
+                    var genreFocused by remember { mutableStateOf(false) }
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (genreFocused) Color(0xFFE50914) else Color(0xFF1E1E1E),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .border(
+                                1.dp,
+                                if (genreFocused) Color.White else Color(0xFF333333),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .tvFocusScale()
+                            .focusable()
+                            .onFocusChanged { genreFocused = it.isFocused }
+                            .clickable { onGenreClick(genre) }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = genre,
+                            style = TextStyle(
+                                color = if (genreFocused) Color.White else Color(0xFFCCCCCC),
+                                fontSize = 13.sp,
+                                fontWeight = if (genreFocused) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
 @Composable
 fun SearchBar(
     query: String,
@@ -250,12 +446,27 @@ fun SearchBar(
     modifier: Modifier = Modifier,
     isTv: Boolean = false
 ) {
+    var isFocused by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
-    TextField(
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isTv && isFocused -> Color.White
+            !isTv && isFocused -> Color(0xFFE50914)
+            else -> Color(0xFF333333)
+        },
+        animationSpec = tween(200),
+        label = "searchBorder"
+    )
+
+    BasicTextField(
         value = query,
         onValueChange = onQueryChange,
         modifier = modifier
             .fillMaxWidth()
+            .onFocusChanged {
+                isFocused = it.isFocused || it.hasFocus
+                if (!it.isFocused) isEditing = false
+            }
             .then(
                 if (isTv) Modifier.onPreviewKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown &&
@@ -265,13 +476,60 @@ fun SearchBar(
                         isEditing = true
                         true
                     } else false
-                }.onFocusChanged { if (!it.isFocused) isEditing = false }
+                }
                 else Modifier
             ),
         readOnly = isTv && !isEditing,
-        placeholder = { Text(if (isTv && !isEditing) "Search movies... (Press OK to type)" else "Search movies...") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-        singleLine = true
+        singleLine = true,
+        textStyle = TextStyle(
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Normal
+        ),
+        cursorBrush = SolidColor(Color(0xFFE50914)),
+        decorationBox = { innerTextField ->
+            Row(
+                modifier = Modifier
+                    .background(Color(0xFF1E1E1E), RoundedCornerShape(28.dp))
+                    .border(1.5.dp, borderColor, RoundedCornerShape(28.dp))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = if (isFocused) Color(0xFFE50914) else Color(0xFF777777),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) {
+                        Text(
+                            text = if (isTv && !isEditing) "Press OK to search" else "Search movies...",
+                            style = TextStyle(color = Color(0xFF666666), fontSize = 16.sp)
+                        )
+                    }
+                    innerTextField()
+                }
+                if (query.isNotEmpty()) {
+                    Spacer(Modifier.width(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .background(Color(0xFF3A3A3A), CircleShape)
+                            .clickable { onQueryChange("") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Clear search",
+                            tint = Color(0xFFAAAAAA),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+            }
+        }
     )
 }
 
@@ -342,28 +600,41 @@ private fun SortButton(
     onSortChange: (SortOption) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-
     var sortFocused by remember { mutableStateOf(false) }
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            sortFocused -> Color.White
+            currentSort != SortOption.NONE -> Color(0xFFE50914)
+            else -> Color(0xFF333333)
+        },
+        animationSpec = tween(200),
+        label = "sortBorder"
+    )
 
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .then(
-                if (sortFocused) Modifier.background(Color(0xFFE50914))
-                else Modifier
-            )
+            .padding(start = 8.dp)
+            .size(44.dp)
+            .background(Color(0xFF1E1E1E), CircleShape)
+            .border(1.5.dp, borderColor, CircleShape)
+            .tvFocusScale()
             .focusable()
-            .onFocusChanged { sortFocused = it.isFocused }
+            .onFocusChanged { sortFocused = it.isFocused },
+        contentAlignment = Alignment.Center
     ) {
-        IconButton(onClick = { expanded = true }) {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(44.dp)
+        ) {
             Icon(
                 painter = painterResource(android.R.drawable.ic_menu_sort_by_size),
                 contentDescription = "Sort",
                 tint = when {
                     sortFocused -> Color.White
-                    currentSort != SortOption.NONE -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                    currentSort != SortOption.NONE -> Color(0xFFE50914)
+                    else -> Color(0xFF777777)
+                },
+                modifier = Modifier.size(20.dp)
             )
         }
         DropdownMenu(

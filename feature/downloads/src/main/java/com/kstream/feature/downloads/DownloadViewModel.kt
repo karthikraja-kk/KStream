@@ -34,6 +34,11 @@ class DownloadViewModel @Inject constructor(
     private val _sortOption = MutableStateFlow(DownloadSortOption.DATE_DESC)
     val sortOption: StateFlow<DownloadSortOption> = _sortOption.asStateFlow()
 
+    private val _filterStatus = MutableStateFlow<DownloadStatus?>(null)
+    val filterStatus: StateFlow<DownloadStatus?> = _filterStatus.asStateFlow()
+
+    val allDownloadsRaw: Flow<List<Download>> = downloadRepository.getDownloads()
+
     private val _events = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val events: SharedFlow<String> = _events.asSharedFlow()
 
@@ -62,13 +67,13 @@ class DownloadViewModel @Inject constructor(
     val downloads: Flow<List<Download>> = combine(
         downloadRepository.getDownloads(),
         _searchQuery,
-        _sortOption
-    ) { allDownloads, query, sort ->
-        val filtered = if (query.isBlank()) {
-            allDownloads
-        } else {
-            allDownloads.filter { it.title.contains(query, ignoreCase = true) }
-        }
+        _sortOption,
+        _filterStatus
+    ) { allDownloads, query, sort, filter ->
+        val searched = if (query.isBlank()) allDownloads
+                       else allDownloads.filter { it.title.contains(query, ignoreCase = true) }
+        val filtered = if (filter == null) searched
+                       else searched.filter { it.status == filter }
         applySorting(filtered, sort)
     }
 
@@ -96,6 +101,10 @@ class DownloadViewModel @Inject constructor(
 
     fun onSortChange(option: DownloadSortOption) {
         _sortOption.value = option
+    }
+
+    fun onFilterChange(status: DownloadStatus?) {
+        _filterStatus.value = status
     }
 
     suspend fun checkFileExists(filePath: String): Boolean {

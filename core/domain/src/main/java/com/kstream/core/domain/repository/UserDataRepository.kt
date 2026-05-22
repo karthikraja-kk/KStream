@@ -17,5 +17,6 @@ interface UserDataRepository {
 
     suspend fun setWifiOnlyDownload(wifiOnly: Boolean)
     suspend fun addRecentSearch(query: String)
+    suspend fun clearRecentSearches()
     suspend fun clearAllData()
 }

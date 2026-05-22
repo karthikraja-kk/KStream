@@ -72,6 +72,10 @@ class KStreamDataStore @Inject constructor(
         context.dataStore.edit { it.clear() }
     }
 
+    suspend fun clearRecentSearches() {
+        context.dataStore.edit { it.remove(RECENT_SEARCHES) }
+    }
+
     suspend fun addRecentSearch(query: String) {
         val normalized = query.trim()
         if (normalized.isEmpty()) return

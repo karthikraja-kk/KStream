@@ -7,6 +7,8 @@ object OttConstants {
     // Brand colors
     val BrandRed = Color(0xFFE50914)
     val BrandRedFocused = Color(0xFFFF1A1A)
+    val BrandRedPressed = Color(0xFFCC0000)  // Darker — mobile press / TV active
+    val FocusBorderColor = Color.White       // White ring on focused TV components
     val DarkBackground = Color(0xFF141414)
     val SurfaceVariant = Color(0xFF2A2A2A)
     val TextSecondary = Color(0xFFB3B3B3)
@@ -19,7 +21,7 @@ object OttConstants {
     )
 
     // Tile sizes
-    val TileSizeTv = 240.dp
+    val TileSizeTv = 160.dp
     val TileSizeMobile = 140.dp
     val TileCornerRadius = 8.dp
 

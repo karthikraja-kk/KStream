@@ -1,15 +1,25 @@
 package com.kstream.feature.downloads
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,13 +28,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kstream.core.model.Download
@@ -33,6 +48,17 @@ import com.kstream.core.ui.components.AppEmptyScreen
 import com.kstream.core.ui.components.tvFocusBorder
 import com.kstream.core.ui.components.tvFocusScale
 import java.util.Locale
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+private val BgPage       = Color(0xFF0A0A0A)
+private val BgCard       = Color(0xFF141414)
+private val BgRow        = Color(0xFF1A1A1A)
+private val BorderSubtle = Color(0xFF222222)
+private val BorderMid    = Color(0xFF333333)
+private val BrandRed     = Color(0xFFE50914)
+private val TextPrimary  = Color(0xFFFFFFFF)
+private val TextSecond   = Color(0xFFAAAAAA)
+private val TextDim      = Color(0xFF666666)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -43,13 +69,14 @@ fun DownloadRoute(
     viewModel: DownloadViewModel = hiltViewModel()
 ) {
     val downloads by viewModel.downloads.collectAsStateWithLifecycle(initialValue = emptyList())
+    val allDownloads by viewModel.allDownloadsRaw.collectAsStateWithLifecycle(initialValue = emptyList())
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOption by viewModel.sortOption.collectAsStateWithLifecycle()
+    val filterStatus by viewModel.filterStatus.collectAsStateWithLifecycle()
     var isSearching by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
-    
-    var downloadToRemove by remember { mutableStateOf<Download?>(null) }
 
+    var downloadToRemove by remember { mutableStateOf<Download?>(null) }
     val selectedIds = remember { mutableStateListOf<String>() }
     var isSelecting by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -63,143 +90,75 @@ fun DownloadRoute(
     }
 
     LaunchedEffect(downloads.size) {
-        if (downloads.isEmpty()) {
-            isSelecting = false
-            selectedIds.clear()
-        }
+        if (downloads.isEmpty()) { isSelecting = false; selectedIds.clear() }
     }
 
     BackHandler {
-        if (isSelecting) {
-            isSelecting = false
-            selectedIds.clear()
-        } else if (isSearching) {
-            isSearching = false
-            viewModel.onSearchQueryChange("")
-        } else {
-            onBackClick()
+        when {
+            isSelecting -> { isSelecting = false; selectedIds.clear() }
+            isSearching -> { isSearching = false; viewModel.onSearchQueryChange("") }
+            else -> onBackClick()
         }
     }
 
+    // Storage summary
+    val totalFiles = allDownloads.count { it.status == DownloadStatus.COMPLETED }
+    val totalBytes = allDownloads.filter { it.status == DownloadStatus.COMPLETED }
+        .sumOf { it.totalBytes }
+    val storageSummary = if (totalFiles == 0) "No offline content"
+                         else "$totalFiles file${if (totalFiles != 1) "s" else ""} • ${formatBytes(totalBytes)} saved"
+
     Scaffold(
+        containerColor = BgPage,
         topBar = {
-            if (isSelecting) {
-                TopAppBar(
-                    title = {
-                        Text("${selectedIds.size} selected")
+            when {
+                isSelecting -> SelectionTopBar(
+                    count = selectedIds.size,
+                    total = downloads.size,
+                    onSelectAll = {
+                        if (selectedIds.size == downloads.size) selectedIds.clear()
+                        else { selectedIds.clear(); selectedIds.addAll(downloads.map { it.id }) }
                     },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            isSelecting = false
-                            selectedIds.clear()
-                        }) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancel")
-                        }
-                    },
-                    actions = {
-                        if (downloads.isNotEmpty()) {
-                            val allSelected = selectedIds.size == downloads.size
-                            TextButton(onClick = {
-                                if (allSelected) {
-                                    selectedIds.clear()
-                                } else {
-                                    selectedIds.clear()
-                                    selectedIds.addAll(downloads.map { it.id })
-                                }
-                            }) {
-                                Text(if (allSelected) "Deselect All" else "Select All")
-                            }
-                        }
-                    }
+                    onCancel = { isSelecting = false; selectedIds.clear() }
                 )
-            } else if (isSearching) {
-                TopAppBar(
-                    title = {
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = viewModel::onSearchQueryChange,
-                            placeholder = { Text("Search downloads...") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = TextFieldDefaults.textFieldColors(containerColor = Color.Transparent)
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { 
-                            isSearching = false
-                            viewModel.onSearchQueryChange("")
-                        }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    actions = {
-                        DownloadSortButton(
-                            currentSort = sortOption,
-                            expanded = showSortMenu,
-                            onToggle = { showSortMenu = !showSortMenu },
-                            onDismiss = { showSortMenu = false },
-                            onSortChange = {
-                                viewModel.onSortChange(it)
-                                showSortMenu = false
-                            }
-                        )
-                    }
+                isSearching -> SearchTopBar(
+                    query = searchQuery,
+                    onQueryChange = viewModel::onSearchQueryChange,
+                    onClose = { isSearching = false; viewModel.onSearchQueryChange("") },
+                    sortOption = sortOption,
+                    showSortMenu = showSortMenu,
+                    onSortToggle = { showSortMenu = !showSortMenu },
+                    onSortDismiss = { showSortMenu = false },
+                    onSortChange = { viewModel.onSortChange(it); showSortMenu = false }
                 )
-            } else {
-                TopAppBar(
-                    title = { Text("Downloads") },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    actions = {
-                        DownloadSortButton(
-                            currentSort = sortOption,
-                            expanded = showSortMenu,
-                            onToggle = { showSortMenu = !showSortMenu },
-                            onDismiss = { showSortMenu = false },
-                            onSortChange = {
-                                viewModel.onSortChange(it)
-                                showSortMenu = false
-                            }
-                        )
-                        IconButton(onClick = { isSearching = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
-                        }
-                        if (downloads.isNotEmpty()) {
-                            IconButton(onClick = { isSelecting = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Select items")
-                            }
-                        }
-                    }
+                else -> DefaultTopBar(
+                    title = "Downloads",
+                    subtitle = storageSummary,
+                    sortOption = sortOption,
+                    showSortMenu = showSortMenu,
+                    onSortToggle = { showSortMenu = !showSortMenu },
+                    onSortDismiss = { showSortMenu = false },
+                    onSortChange = { viewModel.onSortChange(it); showSortMenu = false },
+                    onSearchClick = { isSearching = true },
+                    onSelectClick = { isSelecting = true },
+                    hasItems = downloads.isNotEmpty(),
+                    onBackClick = onBackClick
                 )
             }
         },
         bottomBar = {
             if (isSelecting && selectedIds.isNotEmpty()) {
-                Surface(
-                    tonalElevation = 3.dp,
-                    shadowElevation = 8.dp
-                ) {
+                Surface(color = BgCard, shadowElevation = 8.dp, tonalElevation = 0.dp) {
                     Button(
-                        onClick = {
-                            pendingDeleteIds = selectedIds.toSet()
-                            showDeleteConfirm = true
-                        },
+                        onClick = { pendingDeleteIds = selectedIds.toSet(); showDeleteConfirm = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .tvFocusBorder(shape = RoundedCornerShape(8.dp)),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
                     ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text("Delete ${selectedIds.size} item${if (selectedIds.size > 1) "s" else ""}")
                     }
                 }
@@ -207,10 +166,21 @@ fun DownloadRoute(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            val mainContentModifier = Modifier.fillMaxSize()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BgPage)
+                .padding(padding)
+        ) {
+            // Status filter chips
+            StatusFilterRow(
+                allDownloads = allDownloads,
+                selected = filterStatus,
+                onSelect = viewModel::onFilterChange
+            )
 
-            if (downloads.isEmpty() && searchQuery.isEmpty()) {
+            val isEmpty = downloads.isEmpty()
+            if (isEmpty && searchQuery.isEmpty() && filterStatus == null) {
                 AppEmptyScreen(
                     title = "No Downloads Yet",
                     message = "Movies you download will appear here. Tap Download on any movie to save it for offline viewing.",
@@ -218,51 +188,47 @@ fun DownloadRoute(
                     icon = Icons.Default.Download,
                     primaryActionLabel = "Browse Content",
                     onPrimaryAction = onBackClick,
-                    modifier = mainContentModifier
+                    modifier = Modifier.fillMaxSize()
                 )
-            } else if (downloads.isEmpty() && searchQuery.isNotEmpty()) {
+            } else if (isEmpty) {
                 AppEmptyScreen(
-                    title = "No Results",
-                    message = "No downloads match \"$searchQuery\". Try a different title.",
+                    title = if (filterStatus != null) "No ${filterStatus!!.label()} Downloads"
+                            else "No Results",
+                    message = if (searchQuery.isNotEmpty()) "No downloads match \"$searchQuery\"."
+                              else "No downloads in this category.",
                     isTv = false,
                     icon = Icons.Default.Search,
-                    primaryActionLabel = "Clear Search",
-                    onPrimaryAction = { viewModel.onSearchQueryChange("") },
-                    modifier = mainContentModifier
+                    primaryActionLabel = if (filterStatus != null) "Show All" else "Clear Search",
+                    onPrimaryAction = {
+                        if (filterStatus != null) viewModel.onFilterChange(null)
+                        else viewModel.onSearchQueryChange("")
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
             } else {
                 LazyColumn(
-                    modifier = mainContentModifier,
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(downloads, key = { it.id }) { download ->
                         var fileExists by remember { mutableStateOf(true) }
-                        
                         LaunchedEffect(download.localFilePath, download.status) {
                             fileExists = viewModel.checkFileExists(download.localFilePath)
                         }
-
-                        val isSelected = download.id in selectedIds
-                        
                         DownloadItem(
                             download = download,
                             fileExists = fileExists,
-                            isSelected = isSelected,
+                            isSelected = download.id in selectedIds,
                             isSelecting = isSelecting,
                             onClick = {
                                 if (isSelecting) {
-                                    if (isSelected) selectedIds.remove(download.id)
+                                    if (download.id in selectedIds) selectedIds.remove(download.id)
                                     else selectedIds.add(download.id)
-                                } else {
-                                    onMovieClick(download.movieId)
-                                }
+                                } else onMovieClick(download.movieId)
                             },
                             onLongPress = {
-                                if (!isSelecting) {
-                                    isSelecting = true
-                                    selectedIds.add(download.id)
-                                }
+                                if (!isSelecting) { isSelecting = true; selectedIds.add(download.id) }
                             },
                             onWatch = { quality -> onWatchClick(download.movieId, quality) },
                             onRedownload = { viewModel.redownload(download.id) },
@@ -276,50 +242,48 @@ fun DownloadRoute(
         }
     }
 
+    // ── Single-item delete dialog ──────────────────────────────────────────────
     if (downloadToRemove != null) {
-        val movieTitle = downloadToRemove?.title ?: "this movie"
+        val title = downloadToRemove?.title ?: "this movie"
         AlertDialog(
             onDismissRequest = { downloadToRemove = null },
-            title = { Text("Delete Download?") },
+            containerColor = BgCard,
+            title = { Text("Delete Download?", color = TextPrimary) },
             text = {
                 Text(
-                    "\"$movieTitle\" will be permanently deleted from your device. " +
-                    "You will need to download it again to watch offline."
+                    "\"$title\" will be permanently deleted from your device. " +
+                    "You will need to download it again to watch offline.",
+                    color = TextSecond
                 )
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        downloadToRemove?.let { viewModel.removeDownload(it.id) }
-                        downloadToRemove = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Delete")
-                }
+                    onClick = { downloadToRemove?.let { viewModel.removeDownload(it.id) }; downloadToRemove = null },
+                    colors = ButtonDefaults.textButtonColors(contentColor = BrandRed)
+                ) { Text("Delete") }
             },
             dismissButton = {
-                TextButton(onClick = { downloadToRemove = null }) {
-                    Text("Keep")
-                }
+                TextButton(onClick = { downloadToRemove = null }) { Text("Keep", color = TextSecond) }
             }
         )
     }
 
+    // ── Multi-item delete dialog ───────────────────────────────────────────────
     if (showDeleteConfirm) {
         val count = pendingDeleteIds.size
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete ${if (count == 1) "Download" else "$count Downloads"}?") },
+            containerColor = BgCard,
+            title = { Text("Delete ${if (count == 1) "Download" else "$count Downloads"}?", color = BrandRed) },
             text = {
-                if (count == 1) {
-                    Text("This movie will be permanently deleted from your device. You will need to download it again to watch offline.")
-                } else {
-                    Text("$count movies will be permanently deleted from your device. You will need to re-download them to watch offline.")
-                }
+                Text(
+                    if (count == 1) "This movie will be permanently deleted from your device."
+                    else "$count movies will be permanently deleted from your device.",
+                    color = TextSecond
+                )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         viewModel.removeDownloads(pendingDeleteIds)
                         selectedIds.removeAll(pendingDeleteIds)
@@ -327,19 +291,286 @@ fun DownloadRoute(
                         pendingDeleteIds = emptySet()
                         showDeleteConfirm = false
                     },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Delete All")
-                }
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                ) { Text("Delete All") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Keep")
-                }
+                OutlinedButton(onClick = { showDeleteConfirm = false }) { Text("Keep", color = TextSecond) }
             }
         )
     }
 }
+
+// ─── Top bars ─────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DefaultTopBar(
+    title: String,
+    subtitle: String,
+    sortOption: DownloadSortOption,
+    showSortMenu: Boolean,
+    onSortToggle: () -> Unit,
+    onSortDismiss: () -> Unit,
+    onSortChange: (DownloadSortOption) -> Unit,
+    onSearchClick: () -> Unit,
+    onSelectClick: () -> Unit,
+    hasItems: Boolean,
+    onBackClick: () -> Unit
+) {
+    TopAppBar(
+        title = {
+            Column {
+                Text(
+                    title,
+                    style = TextStyle(color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                )
+                Text(subtitle, style = TextStyle(color = TextDim, fontSize = 11.sp))
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder()) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+            }
+        },
+        actions = {
+            SortChip(
+                currentSort = sortOption,
+                expanded = showSortMenu,
+                onToggle = onSortToggle,
+                onDismiss = onSortDismiss,
+                onSortChange = onSortChange
+            )
+            IconButton(onClick = onSearchClick, modifier = Modifier.tvFocusBorder()) {
+                Icon(Icons.Default.Search, contentDescription = "Search", tint = TextPrimary)
+            }
+            if (hasItems) {
+                IconButton(onClick = onSelectClick, modifier = Modifier.tvFocusBorder()) {
+                    Icon(Icons.Default.CheckBox, contentDescription = "Select", tint = TextPrimary)
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = BgPage)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectionTopBar(
+    count: Int,
+    total: Int,
+    onSelectAll: () -> Unit,
+    onCancel: () -> Unit
+) {
+    TopAppBar(
+        title = { Text("$count selected", style = TextStyle(color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)) },
+        navigationIcon = {
+            IconButton(onClick = onCancel, modifier = Modifier.tvFocusBorder()) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel", tint = TextPrimary)
+            }
+        },
+        actions = {
+            TextButton(onClick = onSelectAll, modifier = Modifier.tvFocusBorder()) {
+                Text(if (count == total) "Deselect All" else "Select All",
+                    style = TextStyle(color = BrandRed, fontSize = 14.sp))
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = BgPage)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchTopBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit,
+    sortOption: DownloadSortOption,
+    showSortMenu: Boolean,
+    onSortToggle: () -> Unit,
+    onSortDismiss: () -> Unit,
+    onSortChange: (DownloadSortOption) -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+    var barFocused by remember { mutableStateOf(false) }
+    val borderColor by animateColorAsState(
+        if (barFocused) BrandRed else BorderMid, tween(200), label = "searchBorder"
+    )
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    TopAppBar(
+        title = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .background(BgRow, RoundedCornerShape(20.dp))
+                    .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { barFocused = it.hasFocus },
+                    singleLine = true,
+                    cursorBrush = SolidColor(BrandRed),
+                    textStyle = TextStyle(color = TextPrimary, fontSize = 15.sp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { }),
+                    decorationBox = { inner ->
+                        if (query.isEmpty()) {
+                            Text("Search downloads…", style = TextStyle(color = TextDim, fontSize = 15.sp))
+                        }
+                        inner()
+                    }
+                )
+                if (query.isNotEmpty()) {
+                    Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                        IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Close, null, tint = TextDim, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = onClose, modifier = Modifier.tvFocusBorder()) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Close Search", tint = TextPrimary)
+            }
+        },
+        actions = {
+            SortChip(
+                currentSort = sortOption,
+                expanded = showSortMenu,
+                onToggle = onSortToggle,
+                onDismiss = onSortDismiss,
+                onSortChange = onSortChange
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = BgPage)
+    )
+}
+
+// ─── Sort chip ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SortChip(
+    currentSort: DownloadSortOption,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onDismiss: () -> Unit,
+    onSortChange: (DownloadSortOption) -> Unit
+) {
+    Box {
+        var focused by remember { mutableStateOf(false) }
+        val borderColor by animateColorAsState(
+            if (focused) Color.White else BorderMid, tween(200), label = "sortBorder"
+        )
+        Box(
+            modifier = Modifier
+                .height(32.dp)
+                .background(BgRow, RoundedCornerShape(16.dp))
+                .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                .clickable { onToggle() }
+                .onFocusChanged { focused = it.hasFocus }
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(Icons.Default.SwapVert, null, tint = TextSecond, modifier = Modifier.size(16.dp))
+                Text(currentSort.label, style = TextStyle(color = TextSecond, fontSize = 12.sp), maxLines = 1)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onDismiss,
+            modifier = Modifier.background(BgCard)
+        ) {
+            DownloadSortOption.entries.forEach { option ->
+                val isSelected = option == currentSort
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            option.label,
+                            color = if (isSelected) BrandRed else TextPrimary,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    },
+                    trailingIcon = {
+                        if (isSelected) Icon(Icons.Default.Check, null, tint = BrandRed, modifier = Modifier.size(16.dp))
+                    },
+                    onClick = { onSortChange(option) }
+                )
+            }
+        }
+    }
+}
+
+// ─── Status filter chips ──────────────────────────────────────────────────────
+
+@Composable
+private fun StatusFilterRow(
+    allDownloads: List<Download>,
+    selected: DownloadStatus?,
+    onSelect: (DownloadStatus?) -> Unit
+) {
+    val counts = remember(allDownloads) {
+        DownloadStatus.entries.associateWith { s -> allDownloads.count { it.status == s } }
+    }
+    val chips = listOf<Pair<String, DownloadStatus?>>(
+        "All" to null,
+        "Downloading" to DownloadStatus.DOWNLOADING,
+        "Paused" to DownloadStatus.PAUSED,
+        "Completed" to DownloadStatus.COMPLETED,
+        "Failed" to DownloadStatus.FAILED,
+        "Queued" to DownloadStatus.QUEUED
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        chips.forEach { (label, status) ->
+            val count = if (status == null) allDownloads.size else (counts[status] ?: 0)
+            if (status == null || count > 0) {
+                val isActive = selected == status
+                var focused by remember { mutableStateOf(false) }
+                val bg = if (isActive) BrandRed else BgRow
+                val border by animateColorAsState(
+                    when { isActive -> BrandRed; focused -> Color.White; else -> BorderMid },
+                    tween(150), label = "chip$label"
+                )
+                Box(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .background(bg, RoundedCornerShape(14.dp))
+                        .border(1.dp, border, RoundedCornerShape(14.dp))
+                        .clickable { onSelect(status) }
+                        .onFocusChanged { focused = it.hasFocus }
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (status == null) label else "$label ($count)",
+                        style = TextStyle(
+                            color = if (isActive) Color.White else TextSecond,
+                            fontSize = 12.sp,
+                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── Download item card ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -357,21 +588,23 @@ fun DownloadItem(
     onRemove: () -> Unit
 ) {
     var cardFocused by remember { mutableStateOf(false) }
+    val borderColor = when {
+        isSelected  -> BrandRed
+        cardFocused -> Color.White
+        else        -> BorderSubtle
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .focusable()
             .onFocusChanged { cardFocused = it.hasFocus }
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongPress
-            )
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .tvFocusScale(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) Color(0xFF1A0A0A) else BgCard
         ),
-        border = if (cardFocused) BorderStroke(2.dp, Color(0xFFE50914)) else null
+        border = BorderStroke(if (isSelected || cardFocused) 1.5.dp else 0.5.dp, borderColor),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
@@ -379,198 +612,227 @@ fun DownloadItem(
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── Poster with optional checkbox overlay ──────────────────────
             Box {
                 AsyncImage(
                     model = download.posterUrl,
                     contentDescription = null,
                     modifier = Modifier
-                        .width(80.dp)
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                        .width(72.dp)
+                        .height(108.dp)
+                        .clip(RoundedCornerShape(6.dp)),
                     contentScale = ContentScale.Crop
                 )
                 if (isSelecting) {
                     Checkbox(
                         checked = isSelected,
                         onCheckedChange = { onClick() },
-                        modifier = Modifier.align(Alignment.TopStart),
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .size(24.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape),
                         colors = CheckboxDefaults.colors(
-                            checkedColor = Color(0xFFE50914),
+                            checkedColor = BrandRed,
                             checkmarkColor = Color.White
                         )
                     )
                 }
             }
 
+            // ── Info column ────────────────────────────────────────────────
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = download.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${download.quality} • ${download.fileSize}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                val progressPercent = (download.progress * 100).toInt()
-                val isRefreshingLinks = download.statusMessage == "Refreshing expired links..."
-                val statusText = when {
-                    isRefreshingLinks -> "Refreshing expired links..."
-                    download.status == DownloadStatus.DOWNLOADING -> {
-                        val downloaded = formatBytes(download.downloadedBytes)
-                        val total = formatBytes(download.totalBytes)
-                        "Downloading... $downloaded / $total ($progressPercent%)"
+                // Status badge + quality
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val (badgeColor, badgeLabel) = download.status.badgeStyle(fileExists)
+                    Box(
+                        modifier = Modifier
+                            .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            badgeLabel,
+                            style = TextStyle(
+                                color = badgeColor, fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        )
                     }
-                    download.status == DownloadStatus.PAUSED -> {
-                        val downloaded = formatBytes(download.downloadedBytes)
-                        val total = formatBytes(download.totalBytes)
-                        "${download.statusMessage ?: "Paused"} $downloaded / $total ($progressPercent%)"
-                    }
-                    download.status == DownloadStatus.COMPLETED -> if (fileExists) "Completed" else "File moved or deleted"
-                    download.status == DownloadStatus.QUEUED -> "Queued"
-                    download.status == DownloadStatus.FAILED -> download.statusMessage ?: "Failed"
-                    download.status == DownloadStatus.DELETED -> "Deleted"
-                    else -> ""
+                    Text(
+                        download.quality,
+                        style = TextStyle(color = TextDim, fontSize = 11.sp)
+                    )
                 }
-                
+                Spacer(Modifier.height(4.dp))
+
+                // Title
                 Text(
-                    text = statusText, 
-                    style = MaterialTheme.typography.labelSmall,
-                    color = when {
-                        isRefreshingLinks -> MaterialTheme.colorScheme.primary
-                        !fileExists && download.status == DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    download.title,
+                    style = TextStyle(color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
-                
-                if (isRefreshingLinks) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    )
-                } else if (download.status != DownloadStatus.COMPLETED) {
-                    LinearProgressIndicator(
-                        progress = download.progress,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    )
-                } else if (fileExists) {
-                    Button(
-                        onClick = { onWatch(download.quality) },
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .tvFocusBorder(shape = RoundedCornerShape(20.dp)),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Watch Now")
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    download.fileSize,
+                    style = TextStyle(color = TextDim, fontSize = 11.sp)
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                val isRefreshing = download.statusMessage == "Refreshing expired links..."
+                when {
+                    // ── In-progress: progress bar + status text ─────────
+                    isRefreshing -> {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
+                            color = Color(0xFFFFC107), trackColor = BorderMid
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text("Refreshing expired links…", style = TextStyle(color = Color(0xFFFFC107), fontSize = 11.sp))
                     }
-                } else {
-                    Row(
-                        modifier = Modifier.padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    download.status == DownloadStatus.DOWNLOADING ||
+                    download.status == DownloadStatus.PAUSED ||
+                    download.status == DownloadStatus.QUEUED -> {
+                        val pct = (download.progress * 100).toInt()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            LinearProgressIndicator(
+                                progress = download.progress,
+                                modifier = Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)),
+                                color = when (download.status) {
+                                    DownloadStatus.PAUSED -> Color(0xFF5C9EE8)
+                                    else -> BrandRed
+                                },
+                                trackColor = BorderMid
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("$pct%", style = TextStyle(color = TextDim, fontSize = 10.sp))
+                        }
+                        Spacer(Modifier.height(3.dp))
+                        val downloaded = formatBytes(download.downloadedBytes)
+                        val total = formatBytes(download.totalBytes)
+                        Text(
+                            if (download.status == DownloadStatus.QUEUED) "Queued"
+                            else "$downloaded / $total",
+                            style = TextStyle(color = TextSecond, fontSize = 11.sp)
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        // Pause / Resume chip
+                        if (download.status == DownloadStatus.DOWNLOADING) {
+                            OutlinedButton(
+                                onClick = onPause,
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .tvFocusBorder(shape = RoundedCornerShape(14.dp)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, BorderMid)
+                            ) {
+                                Icon(Icons.Default.Pause, null, tint = TextSecond, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Pause", style = TextStyle(color = TextSecond, fontSize = 12.sp))
+                            }
+                        } else if (download.status == DownloadStatus.PAUSED || download.status == DownloadStatus.QUEUED) {
+                            OutlinedButton(
+                                onClick = onResume,
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .tvFocusBorder(shape = RoundedCornerShape(14.dp)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, BrandRed.copy(alpha = 0.5f))
+                            ) {
+                                Icon(Icons.Default.PlayArrow, null, tint = BrandRed, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Resume", style = TextStyle(color = BrandRed, fontSize = 12.sp))
+                            }
+                        }
+                    }
+                    // ── Completed + file exists: Watch Now ──────────────
+                    download.status == DownloadStatus.COMPLETED && fileExists -> {
                         Button(
-                            onClick = onRedownload,
-                            modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(20.dp)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            onClick = { onWatch(download.quality) },
+                            modifier = Modifier
+                                .height(32.dp)
+                                .tvFocusBorder(shape = RoundedCornerShape(16.dp)),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Redownload", style = MaterialTheme.typography.labelSmall)
+                            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Watch Now", style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
+                        }
+                    }
+                    // ── File missing / failed / deleted: Redownload ─────
+                    else -> {
+                        if (!fileExists || download.status == DownloadStatus.FAILED) {
+                            val warningColor = if (download.status == DownloadStatus.FAILED) BrandRed
+                                              else Color(0xFFFFC107)
+                            Text(
+                                if (download.status == DownloadStatus.FAILED) download.statusMessage ?: "Download failed"
+                                else "File moved or deleted",
+                                style = TextStyle(color = warningColor, fontSize = 11.sp)
+                            )
+                            Spacer(Modifier.height(6.dp))
+                        }
+                        OutlinedButton(
+                            onClick = onRedownload,
+                            modifier = Modifier
+                                .height(28.dp)
+                                .tvFocusBorder(shape = RoundedCornerShape(14.dp)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.dp, BorderMid)
+                        ) {
+                            Icon(Icons.Default.Refresh, null, tint = TextSecond, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Redownload", style = TextStyle(color = TextSecond, fontSize = 12.sp))
                         }
                     }
                 }
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (download.status == DownloadStatus.DOWNLOADING) {
-                    IconButton(
-                        onClick = onPause,
-                        modifier = Modifier.size(48.dp).tvFocusBorder(),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Icon(imageVector = Icons.Default.Pause, contentDescription = "Pause")
-                    }
-                } else if (download.status == DownloadStatus.PAUSED || download.status == DownloadStatus.QUEUED) {
-                    IconButton(
-                        onClick = onResume,
-                        modifier = Modifier.size(48.dp).tvFocusBorder(),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
-                    }
-                }
-                
-                IconButton(
-                    onClick = onRemove,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .tvFocusBorder(shape = RoundedCornerShape(50))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Remove",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
+            // ── Delete button ──────────────────────────────────────────────
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier
+                    .size(36.dp)
+                    .align(Alignment.Top)
+                    .tvFocusBorder(shape = RoundedCornerShape(50))
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = "Remove",
+                    tint = Color(0xFF993333), modifier = Modifier.size(18.dp))
             }
         }
     }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+private fun DownloadStatus.label() = when (this) {
+    DownloadStatus.DOWNLOADING -> "Downloading"
+    DownloadStatus.PAUSED      -> "Paused"
+    DownloadStatus.COMPLETED   -> "Completed"
+    DownloadStatus.FAILED      -> "Failed"
+    DownloadStatus.QUEUED      -> "Queued"
+    DownloadStatus.DELETED     -> "Deleted"
+}
+
+private fun DownloadStatus.badgeStyle(fileExists: Boolean): Pair<Color, String> = when (this) {
+    DownloadStatus.DOWNLOADING -> Color(0xFFFFC107) to "Downloading"
+    DownloadStatus.PAUSED      -> Color(0xFF5C9EE8) to "Paused"
+    DownloadStatus.COMPLETED   -> if (fileExists) Color(0xFF4CAF50) to "Ready"
+                                  else Color(0xFFFFC107) to "Missing"
+    DownloadStatus.FAILED      -> Color(0xFFE50914) to "Failed"
+    DownloadStatus.QUEUED      -> Color(0xFF888888) to "Queued"
+    DownloadStatus.DELETED     -> Color(0xFF555555) to "Deleted"
 }
 
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
     val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
-    return String.format(Locale.US, "%.2f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
-}
-
-@Composable
-private fun DownloadSortButton(
-    currentSort: DownloadSortOption,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onDismiss: () -> Unit,
-    onSortChange: (DownloadSortOption) -> Unit
-) {
-    Box {
-        IconButton(onClick = onToggle, modifier = Modifier.tvFocusBorder()) {
-            Icon(
-                painter = painterResource(android.R.drawable.ic_menu_sort_by_size),
-                contentDescription = "Sort",
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss
-        ) {
-            DownloadSortOption.entries.forEach { option ->
-                val isSelected = option == currentSort
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = option.label,
-                            color = if (isSelected)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurface
-                        )
-                    },
-                    onClick = { onSortChange(option) }
-                )
-            }
-        }
-    }
+    return String.format(Locale.US, "%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
 }

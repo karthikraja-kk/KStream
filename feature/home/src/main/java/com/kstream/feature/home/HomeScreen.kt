@@ -1,6 +1,8 @@
 package com.kstream.feature.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,7 +22,15 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -475,13 +485,18 @@ fun HomeScreenTv(
                                     colors = androidx.tv.material3.ButtonDefaults.colors(
                                         containerColor = Color(0xFFE50914),
                                         contentColor = Color.White,
-                        focusedContainerColor = Color(0xFFFF1A1A),
-                        focusedContentColor = Color.White
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
+                                        focusedContainerColor = Color(0xFFFF1A1A),
+                                        focusedContentColor = Color.White
+                                    ),
+                                    border = androidx.tv.material3.ButtonDefaults.border(
+                                        focusedBorder = androidx.tv.material3.Border(
+                                            border = BorderStroke(2.dp, Color.White)
+                                        )
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -534,21 +549,47 @@ fun HomeScreenTv(
                                         contentColor = Color.White,
                                         focusedContainerColor = Color(0xFFFF1A1A),
                                         focusedContentColor = Color.White
+                                    ),
+                                    border = androidx.tv.material3.ButtonDefaults.border(
+                                        focusedBorder = androidx.tv.material3.Border(
+                                            border = BorderStroke(2.dp, Color.White)
+                                        )
                                     )
                                 ) {
                                     TvText("See More")
                                 }
                             }
                         }
+                        val tilesFocusRequesters = remember(rail.movies.size) {
+                            Array(rail.movies.size) { FocusRequester() }
+                        }
+                        var focusedTileIndex by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
                         TvLazyRow(
+                            modifier = Modifier.onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown &&
+                                    event.key == Key.DirectionLeft &&
+                                    focusedTileIndex > 0
+                                ) {
+                                    try { tilesFocusRequesters[focusedTileIndex - 1].requestFocus() } catch (_: Exception) {}
+                                    true
+                                } else false
+                            },
                             contentPadding = PaddingValues(horizontal = 48.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            tvItems(rail.movies, key = { it.id }) { movie ->
+                            tvItems(
+                                items = rail.movies.mapIndexed { i, m -> Pair(i, m) },
+                                key = { (_, m) -> m.id }
+                            ) { (index, movie) ->
                                 MovieTileTv(
                                     movie = movie,
                                     onClick = onMovieClick,
-                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent?.div(100f)
+                                    watchProgress = uiState.watchProgressMap[movie.id]?.completionPercent?.div(100f),
+                                    modifier = Modifier
+                                        .focusRequester(tilesFocusRequesters[index])
+                                        .onFocusChanged { fs ->
+                                            if (fs.isFocused || fs.hasFocus) focusedTileIndex = index
+                                        }
                                 )
                             }
                         }

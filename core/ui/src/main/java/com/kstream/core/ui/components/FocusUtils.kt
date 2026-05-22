@@ -62,10 +62,11 @@ fun Modifier.tvFocusGlow(
 }
 
 /**
- * Applies a colored border on focus. Used for consistent focus indication.
+ * Applies a white border on focus — the Netflix/Disney+ standard focus ring.
+ * White is universally visible on dark backgrounds and red fills.
  */
 fun Modifier.tvFocusBorder(
-    color: Color = OttConstants.BrandRed,
+    color: Color = OttConstants.FocusBorderColor,
     width: Dp = OttConstants.FocusBorderWidth,
     shape: RoundedCornerShape = RoundedCornerShape(OttConstants.TileCornerRadius)
 ): Modifier = composed {

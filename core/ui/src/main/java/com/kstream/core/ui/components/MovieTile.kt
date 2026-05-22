@@ -207,7 +207,7 @@ fun MovieTileTv(
             .then(
                 if (isFocused) Modifier.border(
                     OttConstants.FocusBorderWidth,
-                    OttConstants.BrandRed,
+                    OttConstants.FocusBorderColor,
                     RoundedCornerShape(OttConstants.TileCornerRadius)
                 ) else Modifier
             ),

@@ -132,6 +132,12 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    fun clearRecentSearches() {
+        viewModelScope.launch {
+            try { userDataRepository.clearRecentSearches() } catch (_: Exception) { }
+        }
+    }
+
     private fun applySorting(movies: List<Movie>, option: SortOption): List<Movie> {
         return when (option) {
             SortOption.NONE -> movies

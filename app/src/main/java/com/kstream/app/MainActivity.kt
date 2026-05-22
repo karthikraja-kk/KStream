@@ -8,6 +8,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -444,7 +446,7 @@ fun SplashScreenWithNav(
             LottieAnimation(
                 composition = composition,
                 progress = { progress },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.size(220.dp)
             )
         }
     }

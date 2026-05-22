@@ -2,12 +2,16 @@ package com.kstream.feature.settings
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -21,18 +25,126 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.FavoriteBorder
 import coil.compose.AsyncImage
 import com.kstream.core.ui.components.AppEmptyScreen
 import com.kstream.core.ui.components.AppLoadingScreen
 import com.kstream.core.ui.components.tvFocusBorder
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+private val BgPage       = Color(0xFF0A0A0A)
+private val BgCard       = Color(0xFF141414)
+private val BgRow        = Color(0xFF1A1A1A)
+private val BorderSubtle = Color(0xFF222222)
+private val BorderMid    = Color(0xFF333333)
+private val BrandRed     = Color(0xFFE50914)
+private val TextPrimary  = Color(0xFFFFFFFF)
+private val TextSecond   = Color(0xFFB3B3B3)
+private val TextDim      = Color(0xFF666666)
+
+// ─── Reusable building blocks ─────────────────────────────────────────────────
+
+@Composable
+private fun SettingsSection(title: String, icon: ImageVector? = null) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 24.dp, bottom = 10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(16.dp)
+                .background(BrandRed, RoundedCornerShape(2.dp))
+        )
+        Spacer(Modifier.width(8.dp))
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = TextSecond, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            text = title,
+            style = TextStyle(color = TextSecond, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.8.sp)
+        )
+    }
+}
+
+@Composable
+private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BgCard, RoundedCornerShape(12.dp))
+            .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp)),
+        content = content
+    )
+}
+
+@Composable
+private fun SettingsRow(
+    icon: ImageVector,
+    iconTint: Color = TextSecond,
+    title: String,
+    subtitle: String? = null,
+    titleColor: Color = TextPrimary,
+    modifier: Modifier = Modifier,
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(BgRow, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(text = title, style = TextStyle(color = titleColor, fontSize = 15.sp, fontWeight = FontWeight.Medium))
+            if (subtitle != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(text = subtitle, style = TextStyle(color = TextSecond, fontSize = 12.sp))
+            }
+        }
+        trailing()
+    }
+}
+
+@Composable
+private fun RowDivider() {
+    Divider(
+        modifier = Modifier.padding(start = 66.dp),
+        color = BorderSubtle,
+        thickness = 0.5.dp
+    )
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,220 +172,244 @@ fun SettingsRoute(
         viewModel.clearSuccessMessage()
     }
 
-    BackHandler {
-        onBackClick()
-    }
+    BackHandler { onBackClick() }
 
     Scaffold(
+        containerColor = BgPage,
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Text(
+                        "Settings",
+                        style = TextStyle(color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder()) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgPage)
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState())) {
-            Text(text = "Profile", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (isEditingUsername) {
-                    OutlinedTextField(
-                        value = tempUsername,
-                        onValueChange = { tempUsername = it },
-                        label = { Text("Username") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    IconButton(onClick = {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BgPage)
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+
+            // ── Profile ──────────────────────────────────────────────────────
+            SettingsSection("PROFILE", Icons.Default.Person)
+            SettingsCard {
+                ProfileRow(
+                    username = uiState.username,
+                    isEditing = isEditingUsername,
+                    tempUsername = tempUsername,
+                    onTempChange = { tempUsername = it },
+                    onEditClick = { isEditingUsername = true },
+                    onSaveClick = {
                         viewModel.onUsernameChange(tempUsername)
                         viewModel.saveUsername()
                         isEditingUsername = false
-                    }, modifier = Modifier.tvFocusBorder()) {
-                        Icon(Icons.Default.Check, contentDescription = "Save")
+                    },
+                    onCancelClick = {
+                        tempUsername = uiState.username
+                        isEditingUsername = false
                     }
-                } else {
+                )
+            }
+
+            // ── Content ───────────────────────────────────────────────────────
+            SettingsSection("CONTENT", Icons.Default.Search)
+            SettingsCard {
+                // Scan Movies row
+                ScanMoviesRow(
+                    isEnabled = uiState.isScanButtonEnabled,
+                    scanState = uiState.scanState,
+                    scanDetailText = uiState.scanDetailText,
+                    lastRefreshText = uiState.lastRefreshText,
+                    onTriggerScan = { viewModel.triggerScan() }
+                )
+                RowDivider()
+                // Clear Liked Movies
+                var clearLikedFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (clearLikedFocused) Color(0xFF1F0000) else Color.Transparent)
+                        .onFocusChanged { clearLikedFocused = it.hasFocus }
+                        .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+                ) {
+                    SettingsRow(
+                        icon = Icons.Default.FavoriteBorder,
+                        iconTint = BrandRed,
+                        title = "Clear Liked Movies",
+                        subtitle = "Remove all movies from your liked list",
+                        modifier = Modifier.clickableRow { showClearLikedDialog = true }
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowRight, null, tint = TextDim, modifier = Modifier.size(20.dp))
+                    }
+                }
+                RowDivider()
+                // Manage Watch History
+                var watchHistFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (watchHistFocused) Color(0xFF1A1A1A) else Color.Transparent)
+                        .onFocusChanged { watchHistFocused = it.hasFocus }
+                        .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+                ) {
+                    SettingsRow(
+                        icon = Icons.Default.AccessTime,
+                        title = "Manage Watch History",
+                        subtitle = "${uiState.watchHistory.size} item${if (uiState.watchHistory.size != 1) "s" else ""} in history",
+                        modifier = Modifier.clickableRow { showWatchHistory = true }
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowRight, null, tint = TextDim, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
+            // ── Downloads ─────────────────────────────────────────────────────
+            SettingsSection("DOWNLOADS", Icons.Default.Download)
+            SettingsCard {
+                SettingsRow(
+                    icon = Icons.Default.Download,
+                    title = "Download Location",
+                    subtitle = "/Internal Storage/Movies/KStream"
+                ) {
+                    Text("Default", style = TextStyle(color = TextDim, fontSize = 12.sp))
+                }
+                RowDivider()
+                var cacheFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (cacheFocused) Color(0xFF1A1A1A) else Color.Transparent)
+                        .onFocusChanged { cacheFocused = it.hasFocus }
+                        .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+                ) {
+                    SettingsRow(
+                        icon = Icons.Default.Delete,
+                        title = if (uiState.cacheCleared) "Cache Cleared ✓" else "Clear Cache",
+                        subtitle = "Frees image and data cache",
+                        titleColor = if (uiState.cacheCleared) Color(0xFF4CAF50) else TextPrimary,
+                        modifier = Modifier.clickableRow(enabled = !uiState.cacheCleared) {
+                            viewModel.clearCache()
+                        }
+                    ) {
+                        if (uiState.cacheCleared) {
+                            Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+
+            // ── Danger Zone ───────────────────────────────────────────────────
+            SettingsSection("DANGER ZONE", Icons.Default.Warning)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF1A0000), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0xFF5C0000), RoundedCornerShape(12.dp))
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = BrandRed, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = uiState.username.ifBlank { "Guest" },
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f)
+                        "Irreversible actions",
+                        style = TextStyle(color = BrandRed, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp)
                     )
-                    IconButton(onClick = { isEditingUsername = true }, modifier = Modifier.tvFocusBorder()) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                }
+                Divider(color = Color(0xFF3A0000), thickness = 0.5.dp)
+                var resetFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (resetFocused) Color(0xFF2A0000) else Color.Transparent)
+                        .onFocusChanged { resetFocused = it.hasFocus }
+                        .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+                ) {
+                    SettingsRow(
+                        icon = Icons.Default.Delete,
+                        iconTint = BrandRed,
+                        title = "Reset All & Restart",
+                        titleColor = BrandRed,
+                        subtitle = "Permanently deletes all data and restarts",
+                        modifier = Modifier.clickableRow { showResetDialog = true }
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowRight, null, tint = Color(0xFF993333), modifier = Modifier.size(20.dp))
                     }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(text = "Content", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
 
-            ScanMoviesButton(
-                isEnabled = uiState.isScanButtonEnabled,
-                scanStatusText = uiState.scanStatusText,
-                lastRefreshText = uiState.lastRefreshText,
-                scanDetailText = uiState.scanDetailText,
-                onTriggerScan = { viewModel.triggerScan() }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            var clearLikedFocused by remember { mutableStateOf(false) }
-            OutlinedButton(
-                onClick = { showClearLikedDialog = true },
-                modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { clearLikedFocused = it.isFocused }
-                    .tvFocusBorder(),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                ),
-                border = BorderStroke(
-                    width = if (clearLikedFocused) 2.dp else 1.dp,
-                    color = if (clearLikedFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.error
-                )
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Clear Liked Movies")
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            var watchHistoryFocused by remember { mutableStateOf(false) }
-            OutlinedButton(
-                onClick = {
-                    showWatchHistory = true
-                },
-                modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { watchHistoryFocused = it.isFocused }
-                    .tvFocusBorder(),
-                border = BorderStroke(
-                    width = if (watchHistoryFocused) 2.dp else 1.dp,
-                    color = if (watchHistoryFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline
-                )
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Manage Watch History")
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(text = "Downloads", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            ListItem(
-                headlineContent = { Text("Download Location") },
-                supportingContent = { 
-                    Text("/Internal Storage/Movies/KStream")
-                }
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            var clearCacheFocused by remember { mutableStateOf(false) }
-            Button(
-                onClick = { viewModel.clearCache() },
-                modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { clearCacheFocused = it.isFocused }
-                    .tvFocusBorder(),
-                enabled = !uiState.cacheCleared,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (clearCacheFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.primary
-                )
-            ) {
-                if (uiState.cacheCleared) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Cache Cleared ✓")
-                } else {
-                    Text("Clear Cache")
+            // ── Footer ────────────────────────────────────────────────────────
+            Spacer(Modifier.height(24.dp))
+            SettingsCard {
+                var termsFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (termsFocused) BgRow else Color.Transparent)
+                        .onFocusChanged { termsFocused = it.hasFocus }
+                        .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+                ) {
+                    SettingsRow(
+                        icon = Icons.Default.Info,
+                        title = "Terms & Conditions",
+                        modifier = Modifier.clickableRow { onTermsClick() }
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowRight, null, tint = TextDim, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
-            Divider()
-            Spacer(modifier = Modifier.height(16.dp))
-
-            var resetFocused by remember { mutableStateOf(false) }
-            Button(
-                onClick = { showResetDialog = true },
-                modifier = Modifier.fillMaxWidth()
-                    .onFocusChanged { resetFocused = it.isFocused }
-                    .tvFocusBorder(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (resetFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.error
-                )
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Reset All & Restart")
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-            Divider()
-            Spacer(modifier = Modifier.height(16.dp))
-
-            TextButton(
-                onClick = onTermsClick,
-                modifier = Modifier.fillMaxWidth().tvFocusBorder()
-            ) {
-                Text(
-                    text = "Terms & Conditions",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             val context = androidx.compose.ui.platform.LocalContext.current
             val versionName = remember {
-                try {
-                    context.packageManager.getPackageInfo(context.packageName, 0).versionName
-                } catch (_: Exception) { "1.0.0" }
+                try { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+                catch (_: Exception) { "1.0.0" }
             }
             Text(
-                text = "App Version $versionName",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "KStream v$versionName",
+                style = TextStyle(color = TextDim, fontSize = 12.sp),
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
+            Spacer(Modifier.height(32.dp))
         }
 
+        // ── Dialogs ───────────────────────────────────────────────────────────
         if (showClearLikedDialog) {
             AlertDialog(
                 onDismissRequest = { showClearLikedDialog = false },
-                title = { Text("Clear Liked Movies?") },
+                containerColor = BgCard,
+                title = { Text("Clear Liked Movies?", color = TextPrimary) },
                 text = {
                     Text(
                         "This will permanently remove all movies from your Liked list.\n\n" +
-                        "You can re-like them later, but this cannot be undone."
+                        "You can re-like them later, but this cannot be undone.",
+                        color = TextSecond
                     )
                 },
                 confirmButton = {
                     TextButton(
-                        onClick = {
-                            viewModel.clearLikedMovies()
-                            showClearLikedDialog = false
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Clear All")
-                    }
+                        onClick = { viewModel.clearLikedMovies(); showClearLikedDialog = false },
+                        colors = ButtonDefaults.textButtonColors(contentColor = BrandRed)
+                    ) { Text("Clear All") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showClearLikedDialog = false }) {
-                        Text("Keep")
-                    }
+                    TextButton(onClick = { showClearLikedDialog = false }) { Text("Keep") }
                 }
             )
         }
@@ -283,9 +419,7 @@ fun SettingsRoute(
                 items = uiState.watchHistory,
                 isLoading = uiState.isLoadingHistory,
                 onMovieClick = onMovieClick,
-                onRemove = { ids: Set<String> ->
-                    viewModel.deleteWatchHistory(ids)
-                },
+                onRemove = { ids -> viewModel.deleteWatchHistory(ids) },
                 onDismiss = { showWatchHistory = false }
             )
         }
@@ -293,20 +427,12 @@ fun SettingsRoute(
         if (showResetDialog) {
             AlertDialog(
                 onDismissRequest = { showResetDialog = false },
+                containerColor = BgCard,
                 icon = {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(32.dp)
-                    )
+                    Icon(Icons.Default.Warning, contentDescription = null,
+                        tint = BrandRed, modifier = Modifier.size(32.dp))
                 },
-                title = {
-                    Text(
-                        "⚠️ Reset All Data",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                },
+                title = { Text("Reset All Data?", color = BrandRed) },
                 text = {
                     Text(
                         "This will permanently delete ALL app data including:\n\n" +
@@ -315,32 +441,198 @@ fun SettingsRoute(
                         "• Liked movies list\n" +
                         "• Cached data and preferences\n" +
                         "• Username and settings\n\n" +
-                        "The app will restart as if freshly installed. This action cannot be undone."
+                        "The app will restart as if freshly installed. This action cannot be undone.",
+                        color = TextSecond
                     )
                 },
                 confirmButton = {
                     Button(
-                        onClick = {
-                            showResetDialog = false
-                            viewModel.resetAllAndRestart()
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Yes, Reset Everything")
-                    }
+                        onClick = { showResetDialog = false; viewModel.resetAllAndRestart() },
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                    ) { Text("Yes, Reset Everything") }
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = { showResetDialog = false }) {
-                        Text("Cancel")
-                    }
+                    OutlinedButton(onClick = { showResetDialog = false }) { Text("Cancel") }
                 }
             )
         }
     }
 }
 
+// ─── Modifier helper for tappable rows ────────────────────────────────────────
+private fun Modifier.clickableRow(enabled: Boolean = true, onClick: () -> Unit): Modifier =
+    if (enabled) this.clickable(onClick = onClick) else this
+
+// ─── Profile row ──────────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileRow(
+    username: String,
+    isEditing: Boolean,
+    tempUsername: String,
+    onTempChange: (String) -> Unit,
+    onEditClick: () -> Unit,
+    onSaveClick: () -> Unit,
+    onCancelClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar circle with initial
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(BrandRed, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = (username.firstOrNull() ?: 'G').uppercaseChar().toString(),
+                style = TextStyle(color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            if (isEditing) {
+                OutlinedTextField(
+                    value = tempUsername,
+                    onValueChange = onTempChange,
+                    label = { Text("Username", style = TextStyle(color = TextSecond, fontSize = 12.sp)) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = BrandRed,
+                        unfocusedBorderColor = BorderMid,
+                        cursorColor = BrandRed
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                Text(
+                    text = username.ifBlank { "Guest" },
+                    style = TextStyle(color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                )
+                Spacer(Modifier.height(2.dp))
+                Text("Tap to edit", style = TextStyle(color = TextDim, fontSize = 12.sp))
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        if (isEditing) {
+            IconButton(onClick = onSaveClick, modifier = Modifier.tvFocusBorder()) {
+                Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50))
+            }
+            IconButton(onClick = onCancelClick, modifier = Modifier.tvFocusBorder()) {
+                Icon(Icons.Default.Close, null, tint = TextDim)
+            }
+        } else {
+            IconButton(onClick = onEditClick, modifier = Modifier.tvFocusBorder()) {
+                Icon(Icons.Default.Edit, null, tint = TextSecond, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+// ─── Scan Movies row ──────────────────────────────────────────────────────────
+@Composable
+private fun ScanMoviesRow(
+    isEnabled: Boolean,
+    scanState: ScanState,
+    scanDetailText: String,
+    lastRefreshText: String,
+    onTriggerScan: () -> Unit
+) {
+    var scanFocused by remember { mutableStateOf(false) }
+    val badgeColor = when (scanState) {
+        ScanState.COMPLETED -> Color(0xFF4CAF50)
+        ScanState.RUNNING, ScanState.TRIGGERING -> Color(0xFFFFC107)
+        ScanState.FAILED -> BrandRed
+        ScanState.COOLDOWN -> Color(0xFFFF9800)
+        ScanState.IDLE -> TextDim
+    }
+    val badgeLabel = when (scanState) {
+        ScanState.COMPLETED -> "Ready"
+        ScanState.RUNNING -> "Running"
+        ScanState.TRIGGERING -> "Starting…"
+        ScanState.FAILED -> "Failed"
+        ScanState.COOLDOWN -> "Cooldown"
+        ScanState.IDLE -> "Idle"
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (scanFocused) BgRow else Color.Transparent)
+            .onFocusChanged { scanFocused = it.hasFocus }
+            .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickableRow(enabled = isEnabled, onClick = onTriggerScan)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(BgRow, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (scanState == ScanState.RUNNING || scanState == ScanState.TRIGGERING) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color(0xFFFFC107),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Refresh, null, tint = if (isEnabled) BrandRed else TextDim,
+                            modifier = Modifier.size(18.dp))
+                    }
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Scan Latest Movies",
+                        style = TextStyle(
+                            color = if (isEnabled) TextPrimary else TextDim,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        scanDetailText,
+                        style = TextStyle(color = TextSecond, fontSize = 12.sp),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // Status badge
+                Box(
+                    modifier = Modifier
+                        .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        badgeLabel,
+                        style = TextStyle(color = badgeColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            }
+            // Last refresh line
+            Text(
+                lastRefreshText,
+                style = TextStyle(color = TextDim, fontSize = 11.sp),
+                modifier = Modifier.padding(start = 66.dp, bottom = 10.dp)
+            )
+        }
+    }
+}
+
+// ─── Watch History screen ─────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WatchHistoryScreen(
@@ -355,45 +647,33 @@ private fun WatchHistoryScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pendingDeleteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    // Exit selection mode when all items are gone
     LaunchedEffect(items.size) {
-        if (items.isEmpty()) {
-            isSelecting = false
-            selectedIds.clear()
-        }
+        if (items.isEmpty()) { isSelecting = false; selectedIds.clear() }
     }
 
     BackHandler {
-        if (isSelecting) {
-            isSelecting = false
-            selectedIds.clear()
-        } else {
-            onDismiss()
-        }
+        if (isSelecting) { isSelecting = false; selectedIds.clear() }
+        else onDismiss()
     }
 
     Scaffold(
+        containerColor = BgPage,
         topBar = {
             TopAppBar(
                 title = {
-                    if (isSelecting && selectedIds.isNotEmpty()) {
-                        Text("${selectedIds.size} selected")
-                    } else {
-                        Text("Watch History")
-                    }
+                    Text(
+                        if (isSelecting && selectedIds.isNotEmpty()) "${selectedIds.size} selected" else "Watch History",
+                        style = TextStyle(color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (isSelecting) {
-                            isSelecting = false
-                            selectedIds.clear()
-                        } else {
-                            onDismiss()
-                        }
+                        if (isSelecting) { isSelecting = false; selectedIds.clear() }
+                        else onDismiss()
                     }, modifier = Modifier.tvFocusBorder()) {
                         Icon(
                             if (isSelecting) Icons.Default.Close else Icons.Default.ArrowBack,
-                            contentDescription = if (isSelecting) "Cancel" else "Back"
+                            contentDescription = null, tint = TextPrimary
                         )
                     }
                 },
@@ -401,49 +681,30 @@ private fun WatchHistoryScreen(
                     if (isSelecting && items.isNotEmpty()) {
                         val allSelected = selectedIds.size == items.size
                         TextButton(onClick = {
-                            if (allSelected) {
-                                selectedIds.clear()
-                            } else {
-                                selectedIds.clear()
-                                selectedIds.addAll(items.map { it.movieId })
-                            }
+                            if (allSelected) selectedIds.clear()
+                            else { selectedIds.clear(); selectedIds.addAll(items.map { it.movieId }) }
                         }, modifier = Modifier.tvFocusBorder()) {
                             Text(if (allSelected) "Deselect All" else "Select All")
                         }
                     } else if (items.isNotEmpty()) {
-                        IconButton(onClick = {
-                            isSelecting = true
-                        }, modifier = Modifier.tvFocusBorder()) {
-                            Icon(Icons.Default.Edit, contentDescription = "Select items")
+                        IconButton(onClick = { isSelecting = true }, modifier = Modifier.tvFocusBorder()) {
+                            Icon(Icons.Default.Edit, null, tint = TextPrimary)
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgPage)
             )
         },
         bottomBar = {
             if (isSelecting && selectedIds.isNotEmpty()) {
-                Surface(
-                    tonalElevation = 3.dp,
-                    shadowElevation = 8.dp
-                ) {
+                Surface(color = BgCard, tonalElevation = 0.dp, shadowElevation = 8.dp) {
                     Button(
-                        onClick = {
-                            pendingDeleteIds = selectedIds.toSet()
-                            showDeleteConfirm = true
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
+                        onClick = { pendingDeleteIds = selectedIds.toSet(); showDeleteConfirm = true },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
                     ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text("Delete ${selectedIds.size} item${if (selectedIds.size > 1) "s" else ""}")
                     }
                 }
@@ -451,68 +712,54 @@ private fun WatchHistoryScreen(
         }
     ) { padding ->
         if (isLoading) {
-            AppLoadingScreen(
-                title = "Loading History",
-                message = "Fetching your watch history...",
-                isTv = false,
-                modifier = Modifier.padding(padding)
-            )
+            AppLoadingScreen(title = "Loading History", message = "Fetching your watch history...",
+                isTv = false, modifier = Modifier.padding(padding))
         } else if (items.isEmpty()) {
-            AppEmptyScreen(
-                title = "No Watch History",
+            AppEmptyScreen(title = "No Watch History",
                 message = "Movies you watch will appear here. Start browsing and enjoy!",
-                isTv = false,
-                icon = Icons.Default.Info,
-                primaryActionLabel = "Browse Content",
-                onPrimaryAction = onDismiss,
-                modifier = Modifier.padding(padding)
-            )
+                isTv = false, icon = Icons.Default.Info,
+                primaryActionLabel = "Browse Content", onPrimaryAction = onDismiss,
+                modifier = Modifier.padding(padding))
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier.fillMaxSize().padding(padding).background(BgPage),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(items, key = { it.movieId }) { item ->
-                    val isSelected = item.movieId in selectedIds
                     WatchHistoryListItem(
                         item = item,
-                        isSelected = isSelected,
+                        isSelected = item.movieId in selectedIds,
                         isSelecting = isSelecting,
                         onTap = {
                             if (isSelecting) {
-                                if (isSelected) selectedIds.remove(item.movieId)
+                                if (item.movieId in selectedIds) selectedIds.remove(item.movieId)
                                 else selectedIds.add(item.movieId)
-                            } else {
-                                onMovieClick(item.movieId)
-                            }
+                            } else onMovieClick(item.movieId)
                         },
                         onLongPress = {
-                            if (!isSelecting) {
-                                isSelecting = true
-                                selectedIds.add(item.movieId)
-                            }
+                            if (!isSelecting) { isSelecting = true; selectedIds.add(item.movieId) }
                         },
-                        onDelete = {
-                            pendingDeleteIds = setOf(item.movieId)
-                            showDeleteConfirm = true
-                        }
+                        onDelete = { pendingDeleteIds = setOf(item.movieId); showDeleteConfirm = true }
                     )
                 }
             }
         }
 
         if (showDeleteConfirm) {
+            val count = pendingDeleteIds.size
             AlertDialog(
                 onDismissRequest = { showDeleteConfirm = false },
-                title = { Text("Remove from Watch History?") },
+                containerColor = BgCard,
+                title = { Text("Remove from History?", color = TextPrimary) },
                 text = {
-                    val count = pendingDeleteIds.size
-                    if (count == 1) {
-                        Text("This will remove 1 item from your watch history. Your progress for this movie will be lost.")
-                    } else {
-                        Text("This will remove $count items from your watch history. Watch progress for these movies will be lost.")
-                    }
+                    Text(
+                        if (count == 1)
+                            "This will remove 1 item from your watch history. Your progress for this movie will be lost."
+                        else
+                            "This will remove $count items from your watch history. Watch progress for these movies will be lost.",
+                        color = TextSecond
+                    )
                 },
                 confirmButton = {
                     TextButton(
@@ -523,13 +770,9 @@ private fun WatchHistoryScreen(
                             pendingDeleteIds = emptySet()
                             showDeleteConfirm = false
                         },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        ),
+                        colors = ButtonDefaults.textButtonColors(contentColor = BrandRed),
                         modifier = Modifier.tvFocusBorder()
-                    ) {
-                        Text("Remove")
-                    }
+                    ) { Text("Remove") }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteConfirm = false }, modifier = Modifier.tvFocusBorder()) {
@@ -551,77 +794,75 @@ private fun WatchHistoryListItem(
     onLongPress: () -> Unit,
     onDelete: () -> Unit
 ) {
-    var historyCardFocused by remember { mutableStateOf(false) }
+    var cardFocused by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .onFocusChanged { historyCardFocused = it.hasFocus }
-            .combinedClickable(
-                onClick = onTap,
-                onLongClick = onLongPress
-            ),
+            .onFocusChanged { cardFocused = it.hasFocus }
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) Color(0xFF1A0A0A) else BgCard
         ),
-        border = if (historyCardFocused) BorderStroke(2.dp, Color(0xFFE50914)) else null
+        border = when {
+            isSelected -> BorderStroke(1.5.dp, BrandRed)
+            cardFocused -> BorderStroke(1.5.dp, Color.White)
+            else -> BorderStroke(0.5.dp, BorderSubtle)
+        },
+        shape = RoundedCornerShape(10.dp)
     ) {
         Row(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Checkbox overlay in selection mode
             if (isSelecting) {
                 Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onTap() },
-                    modifier = Modifier.size(20.dp)
+                    checked = isSelected, onCheckedChange = { onTap() },
+                    modifier = Modifier.size(20.dp),
+                    colors = CheckboxDefaults.colors(checkedColor = BrandRed)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(Modifier.width(4.dp))
             }
 
-            // Poster
             AsyncImage(
                 model = item.posterUrl.ifBlank { null },
                 contentDescription = item.movieName,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .width(72.dp)
-                    .height(100.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                modifier = Modifier.width(60.dp).height(84.dp).clip(RoundedCornerShape(6.dp))
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
 
-            // Title + last watched
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = item.movieName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    item.movieName,
+                    style = TextStyle(color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = formatTimestamp(item.lastWatched),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    formatTimestamp(item.lastWatched),
+                    style = TextStyle(color = TextSecond, fontSize = 11.sp)
                 )
+                // Progress bar
+                if (item.completionPercent > 0f) {
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        progress = item.completionPercent.coerceIn(0f, 1f),
+                        modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
+                        color = BrandRed,
+                        trackColor = BorderMid
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "${(item.completionPercent * 100).toInt()}% watched",
+                        style = TextStyle(color = TextDim, fontSize = 10.sp)
+                    )
+                }
             }
 
-            // Per-item delete button (hidden in multi-select mode to reduce clutter)
             if (!isSelecting) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(48.dp).tvFocusBorder()
-                    ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Remove",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                IconButton(onClick = onDelete, modifier = Modifier.size(40.dp).tvFocusBorder()) {
+                    Icon(Icons.Default.Delete, null, tint = Color(0xFF993333), modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -631,51 +872,4 @@ private fun WatchHistoryListItem(
 private fun formatTimestamp(millis: Long): String {
     val sdf = java.text.SimpleDateFormat("MMM dd, yyyy • hh:mm a", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(millis))
-}
-
-@Composable
-private fun ScanMoviesButton(
-    isEnabled: Boolean,
-    scanStatusText: String,
-    lastRefreshText: String,
-    scanDetailText: String,
-    onTriggerScan: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        var scanFocused by remember { mutableStateOf(false) }
-        OutlinedButton(
-            onClick = onTriggerScan,
-            enabled = isEnabled,
-            modifier = Modifier.fillMaxWidth()
-                .onFocusChanged { scanFocused = it.isFocused }
-                .tvFocusBorder(),
-            border = BorderStroke(
-                width = if (scanFocused) 2.dp else 1.dp,
-                color = if (scanFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.outline
-            )
-        ) {
-            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Scan Latest Movies")
-        }
-
-        Text(
-            text = scanStatusText,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-        )
-        Text(
-            text = lastRefreshText,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp, start = 4.dp)
-        )
-        Text(
-            text = scanDetailText,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp, start = 4.dp)
-        )
-    }
 }

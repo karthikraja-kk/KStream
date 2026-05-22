@@ -78,6 +78,11 @@ import android.content.pm.ActivityInfo
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.kstream.core.ui.LocalPlatform
+import com.kstream.core.ui.Platform
+import com.kstream.core.ui.components.tvFocusBorder
+import androidx.compose.ui.input.key.onKeyEvent
+import kotlinx.coroutines.delay
 
 @androidx.media3.common.util.UnstableApi
 @Composable
@@ -98,9 +103,22 @@ fun PlayerRoute(
     var lastBackPressTime by rememberSaveable { mutableLongStateOf(0L) }
     var showQualityMenu by remember { mutableStateOf(false) }
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
-    
+
+    // FocusRequesters declared here (outside controlsVisible block) so LaunchedEffect can use them
+    val fullscreenFocusRequester = remember { FocusRequester() }
+    val qualityFocusRequester = remember { FocusRequester() }
+    val isTV = LocalPlatform.current == Platform.TV
+
     var controlsVisible by remember { mutableStateOf(true) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+
+    // When controls appear on TV, move focus to the fullscreen button
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible && isTV) {
+            delay(150)
+            try { fullscreenFocusRequester.requestFocus() } catch (_: Exception) {}
+        }
+    }
 
     fun enterFullscreen() {
         isFullscreen = true
@@ -260,7 +278,6 @@ fun PlayerRoute(
         }
 
         if (controlsVisible) {
-            val fullscreenFocusRequester = remember { FocusRequester() }
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -271,7 +288,8 @@ fun PlayerRoute(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(if (fsBtnFocused) Color(0xFFE50914) else Color.Black.copy(alpha = 0.5f))
+                        .background(if (fsBtnFocused) Color(0xFFFF1A1A) else Color.Black.copy(alpha = 0.5f))
+                        .tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
                         .focusRequester(fullscreenFocusRequester)
                         .focusable()
                         .onFocusChanged { fsBtnFocused = it.isFocused }
@@ -280,6 +298,12 @@ fun PlayerRoute(
                                 (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
                             ) {
                                 if (isFullscreen) exitFullscreen() else enterFullscreen()
+                                true
+                            } else false
+                        }
+                        .onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
+                                try { qualityFocusRequester.requestFocus() } catch (_: Exception) {}
                                 true
                             } else false
                         },
@@ -300,7 +324,9 @@ fun PlayerRoute(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(androidx.compose.foundation.shape.CircleShape)
-                            .background(if (qualBtnFocused) Color(0xFFE50914) else Color.Black.copy(alpha = 0.5f))
+                            .background(if (qualBtnFocused) Color(0xFFFF1A1A) else Color.Black.copy(alpha = 0.5f))
+                            .tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
+                            .focusRequester(qualityFocusRequester)
                             .focusable()
                             .onFocusChanged { qualBtnFocused = it.isFocused }
                             .onPreviewKeyEvent { keyEvent ->
@@ -308,6 +334,12 @@ fun PlayerRoute(
                                     (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
                                 ) {
                                     showQualityMenu = true
+                                    true
+                                } else false
+                            }
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
+                                    try { fullscreenFocusRequester.requestFocus() } catch (_: Exception) {}
                                     true
                                 } else false
                             },
