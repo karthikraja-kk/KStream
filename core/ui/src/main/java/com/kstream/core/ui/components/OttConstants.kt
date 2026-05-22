@@ -27,7 +27,7 @@ object OttConstants {
 
     // Focus
     val FocusScaleFactor = 1.05f
-    val FocusBorderWidth = 2.dp
+    val FocusBorderWidth = 3.dp
 
     // Spacing
     val RailSpacingTv = 16.dp

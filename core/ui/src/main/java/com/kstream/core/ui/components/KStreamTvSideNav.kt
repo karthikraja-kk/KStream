@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +87,10 @@ fun KStreamTvSideNav(
 
     LaunchedEffect(sidebarExpanded) {
         if (sidebarExpanded) {
+            // Delay allows SideNavItem composables to finish their Box→Row layout update
+            // before we request focus — without this, requestFocus() silently fails because
+            // the FocusRequester is briefly detached during the composable type switch.
+            delay(100)
             val target = navFocusRequesters[currentRoute] ?: navFocusRequesters["home"]
             try { target?.requestFocus() } catch (_: Exception) {}
         }
@@ -277,47 +282,52 @@ private fun SideNavItem(
             } else false
         }
 
-    if (expanded) {
-        Row(
-            modifier = itemModifier.padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Box(
+    // Single stable root Box — FocusRequester stays attached regardless of expanded state.
+    // Previously this used if(expanded) Row else Box, which caused Compose to dispose/recreate
+    // the composable on each toggle, briefly detaching the FocusRequester and breaking focus.
+    Box(
+        modifier = itemModifier,
+        contentAlignment = Alignment.Center
+    ) {
+        if (expanded) {
+            Row(
                 modifier = Modifier
-                    .width(8.dp)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
             ) {
                 Box(
                     modifier = Modifier
-                        .width(indicatorWidth)
-                        .fillMaxHeight(0.6f)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE50914).copy(alpha = indicatorAlpha))
+                        .width(8.dp)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(indicatorWidth)
+                            .fillMaxHeight(0.6f)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE50914).copy(alpha = indicatorAlpha))
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(22.dp),
+                    tint = iconColor
+                )
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    text = label,
+                    fontSize = 15.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = textColor,
+                    maxLines = 1
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(22.dp),
-                tint = iconColor
-            )
-            Spacer(Modifier.width(16.dp))
-            Text(
-                text = label,
-                fontSize = 15.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = textColor,
-                maxLines = 1
-            )
-        }
-    } else {
-        Box(
-            modifier = itemModifier,
-            contentAlignment = Alignment.Center
-        ) {
+        } else {
             Icon(
                 imageVector = icon,
                 contentDescription = label,

@@ -24,12 +24,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -580,14 +583,43 @@ fun SearchScreenTv(
         )
     } else {
         key(uiState.sortGeneration) {
+            val numColumns = 4
+            val tileFocusRequesters = remember(uiState.results.size) {
+                Array(uiState.results.size) { FocusRequester() }
+            }
+            var focusedIndex by remember { mutableIntStateOf(-1) }
+
             TvLazyVerticalGrid(
-                columns = TvGridCells.Fixed(4),
+                columns = TvGridCells.Fixed(numColumns),
+                modifier = Modifier.onPreviewKeyEvent { event ->
+                    // Mirror the Home screen pattern: consume Left to move to the left tile when
+                    // not in the leftmost column; pass through when in column 0 so the sidebar opens.
+                    if (event.type == KeyEventType.KeyDown &&
+                        event.key == Key.DirectionLeft &&
+                        focusedIndex > 0 &&
+                        focusedIndex % numColumns != 0
+                    ) {
+                        try { tileFocusRequesters[focusedIndex - 1].requestFocus() } catch (_: Exception) {}
+                        true
+                    } else false
+                },
                 contentPadding = PaddingValues(48.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                tvItems(uiState.results, key = { it.id }) { movie ->
-                    MovieTileTv(movie = movie, onClick = { onMovieClick(movie) })
+                tvItems(
+                    items = uiState.results.mapIndexed { i, m -> i to m },
+                    key = { (_, m) -> m.id }
+                ) { (index, movie) ->
+                    MovieTileTv(
+                        movie = movie,
+                        onClick = { onMovieClick(movie) },
+                        modifier = Modifier
+                            .focusRequester(tileFocusRequesters[index])
+                            .onFocusChanged { fs ->
+                                if (fs.isFocused || fs.hasFocus) focusedIndex = index
+                            }
+                    )
                 }
             }
         }

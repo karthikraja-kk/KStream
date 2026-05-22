@@ -206,11 +206,15 @@ fun MovieTileTv(
             }
             .then(
                 if (isFocused) Modifier.border(
-                    OttConstants.FocusBorderWidth,
-                    OttConstants.FocusBorderColor,
-                    RoundedCornerShape(OttConstants.TileCornerRadius)
-                ) else Modifier
-            ),
+                        // Compensate for graphicsLayer scale so the visual border width and corner
+                        // radius stay constant at the intended values throughout the animation.
+                        // visual width  = (FocusBorderWidth / scale) × scale = FocusBorderWidth
+                        // visual radius = (TileCornerRadius  / scale) × scale = TileCornerRadius
+                        width = (OttConstants.FocusBorderWidth.value / scale).dp,
+                        color = OttConstants.FocusBorderColor,
+                        shape = RoundedCornerShape((OttConstants.TileCornerRadius.value / scale).dp)
+                    ) else Modifier
+                ),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(OttConstants.TileCornerRadius))
     ) {
         Box {

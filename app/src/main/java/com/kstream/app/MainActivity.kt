@@ -56,35 +56,23 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private var isSplashReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        
-        // On process death restoration, the splash composable is no longer in the
-        // backstack (it was popped inclusively), so onReady() would never be called.
-        // Skip the splash hold to let the restored navigation state render immediately.
-        if (savedInstanceState != null) {
-            isSplashReady = true
-        }
 
-        splashScreen.setKeepOnScreenCondition {
-            !isSplashReady
-        }
-        
         setContent {
             PlatformProvider {
                 val platform = LocalPlatform.current
                 if (platform == Platform.TV) {
                     KStreamTvTheme {
                         KStreamTheme {
-                            KStreamAppContent(onSplashReady = { isSplashReady = true })
+                            KStreamAppContent()
                         }
                     }
                 } else {
                     KStreamTheme {
-                        KStreamAppContent(onSplashReady = { isSplashReady = true })
+                        KStreamAppContent()
                     }
                 }
             }
@@ -93,7 +81,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun KStreamAppContent(onSplashReady: () -> Unit) {
+fun KStreamAppContent() {
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
     val isFirstLaunchCompleted by viewModel.isFirstLaunchCompleted.collectAsStateWithLifecycle(initialValue = null)
@@ -134,7 +122,6 @@ fun KStreamAppContent(onSplashReady: () -> Unit) {
                 composable("splash") {
                     SplashScreenWithNav(
                         isFirstLaunchCompleted = isFirstLaunchCompleted,
-                        onReady = onSplashReady,
                         onNavigateToWelcome = {
                             navController.navigate("welcome") {
                                 popUpTo("splash") { inclusive = true }
@@ -266,7 +253,6 @@ fun KStreamAppContent(onSplashReady: () -> Unit) {
         composable("splash") {
             SplashScreenWithNav(
                 isFirstLaunchCompleted = isFirstLaunchCompleted,
-                onReady = onSplashReady,
                 onNavigateToWelcome = {
                     navController.navigate("welcome") {
                         popUpTo("splash") { inclusive = true }
@@ -411,7 +397,6 @@ fun KStreamAppContent(onSplashReady: () -> Unit) {
 @Composable
 fun SplashScreenWithNav(
     isFirstLaunchCompleted: Boolean?,
-    onReady: () -> Unit,
     onNavigateToWelcome: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
@@ -430,7 +415,6 @@ fun SplashScreenWithNav(
     )
 
     LaunchedEffect(Unit) {
-        onReady()
         animationStarted = true
         delay(1500)
         animationDone = true

@@ -13,8 +13,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
+import com.kstream.core.ui.components.OttConstants
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -38,7 +42,6 @@ import com.kstream.core.ui.components.AppLoadingScreen
 import com.kstream.core.ui.components.MovieInitialsFallback
 import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
-import com.kstream.core.ui.components.tvFocusBorder
 import com.kstream.core.ui.components.tvFocusScale
 import androidx.tv.material3.Button as TvButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -648,7 +651,7 @@ fun DetailsScreenTv(
                         ) {
                             TvButton(
                                 onClick = { uiState.selectedQuality?.let { onWatchClick(movie.id, it, false) } },
-                                modifier = Modifier.weight(1f).fillMaxHeight().tvFocusBorder(shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)),
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
                                 enabled = uiState.selectedQuality != null,
                                 colors = androidx.tv.material3.ButtonDefaults.colors(
                                     containerColor = Color(0xFFE50914),
@@ -658,6 +661,12 @@ fun DetailsScreenTv(
                                 ),
                                 shape = androidx.tv.material3.ButtonDefaults.shape(
                                     shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+                                ),
+                                border = androidx.tv.material3.ButtonDefaults.border(
+                                    focusedBorder = androidx.tv.material3.Border(
+                                        border = BorderStroke(OttConstants.FocusBorderWidth, Color.White),
+                                        shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+                                    )
                                 )
                             ) {
                                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -666,16 +675,21 @@ fun DetailsScreenTv(
                             }
                             Spacer(modifier = Modifier.width(2.dp))
                             var dropdownFocused by remember { mutableStateOf(false) }
+                            val dropdownScale by animateFloatAsState(
+                                targetValue = if (dropdownFocused) OttConstants.FocusScaleFactor else 1f,
+                                animationSpec = tween(durationMillis = 200),
+                                label = "dropdownScale"
+                            )
                             Box(
                                 modifier = Modifier
                                     .width(48.dp)
                                     .fillMaxHeight()
-                                    .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
-                                    .background(if (dropdownFocused) Color(0xFFFF1A1A) else Color(0xFFE50914))
-                                    .then(if (dropdownFocused) Modifier.border(2.dp, Color.White, RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) else Modifier)
-                                    .tvFocusScale()
                                     .focusable()
                                     .onFocusChanged { dropdownFocused = it.isFocused }
+                                    .graphicsLayer { scaleX = dropdownScale; scaleY = dropdownScale }
+                                    .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
+                                    .background(if (dropdownFocused) Color(0xFFFF1A1A) else Color(0xFFE50914))
+                                    .then(if (dropdownFocused) Modifier.border(OttConstants.FocusBorderWidth, Color.White, RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) else Modifier)
                                     .onPreviewKeyEvent { keyEvent ->
                                         if (keyEvent.type == KeyEventType.KeyDown &&
                                             (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
@@ -707,13 +721,19 @@ fun DetailsScreenTv(
                     } else {
                         TvButton(
                             onClick = { uiState.selectedQuality?.let { onWatchClick(movie.id, it, false) } },
-                            modifier = Modifier.weight(1f).height(48.dp).tvFocusBorder(shape = RoundedCornerShape(24.dp)),
+                            modifier = Modifier.weight(1f).height(48.dp),
                             enabled = uiState.selectedQuality != null,
                             colors = androidx.tv.material3.ButtonDefaults.colors(
                                 containerColor = Color(0xFFE50914),
                                 contentColor = Color.White,
                                 focusedContainerColor = Color(0xFFFF1A1A),
                                 focusedContentColor = Color.White
+                            ),
+                            border = androidx.tv.material3.ButtonDefaults.border(
+                                focusedBorder = androidx.tv.material3.Border(
+                                    border = BorderStroke(OttConstants.FocusBorderWidth, Color.White),
+                                    shape = RoundedCornerShape(24.dp)
+                                )
                             )
                         ) {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -735,7 +755,7 @@ fun DetailsScreenTv(
 
                     androidx.tv.material3.OutlinedButton(
                         onClick = onDownloadClick,
-                        modifier = Modifier.weight(1f).height(48.dp).tvFocusBorder(shape = RoundedCornerShape(24.dp)),
+                        modifier = Modifier.weight(1f).height(48.dp),
                         enabled = uiState.selectedQuality != null,
                         colors = androidx.tv.material3.ButtonDefaults.colors(
                             containerColor = Color.Transparent,
