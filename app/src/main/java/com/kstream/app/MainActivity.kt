@@ -133,7 +133,7 @@ fun KStreamAppContent(onSplashReady: () -> Unit) {
             ) {
                 composable("splash") {
                     SplashScreenWithNav(
-                        isFirstLaunch = isFirstLaunchCompleted != true,
+                        isFirstLaunchCompleted = isFirstLaunchCompleted,
                         onReady = onSplashReady,
                         onNavigateToWelcome = {
                             navController.navigate("welcome") {
@@ -265,7 +265,7 @@ fun KStreamAppContent(onSplashReady: () -> Unit) {
     ) {
         composable("splash") {
             SplashScreenWithNav(
-                isFirstLaunch = isFirstLaunchCompleted != true,
+                isFirstLaunchCompleted = isFirstLaunchCompleted,
                 onReady = onSplashReady,
                 onNavigateToWelcome = {
                     navController.navigate("welcome") {
@@ -410,12 +410,13 @@ fun KStreamAppContent(onSplashReady: () -> Unit) {
 
 @Composable
 fun SplashScreenWithNav(
-    isFirstLaunch: Boolean,
+    isFirstLaunchCompleted: Boolean?,
     onReady: () -> Unit,
     onNavigateToWelcome: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
     var animationStarted by remember { mutableStateOf(false) }
+    var animationDone by remember { mutableStateOf(false) }
 
     val animatedAlpha by animateFloatAsState(
         targetValue = if (animationStarted) 1f else 0f,
@@ -429,10 +430,17 @@ fun SplashScreenWithNav(
     )
 
     LaunchedEffect(Unit) {
-        onReady()          // dismiss OS splash immediately
+        onReady()
         animationStarted = true
-        delay(1500)        // 600ms animate-in + 900ms hold
-        if (isFirstLaunch) onNavigateToWelcome() else onNavigateToHome()
+        delay(1500)
+        animationDone = true
+    }
+
+    // Navigate only after animation finishes AND DataStore has loaded
+    LaunchedEffect(animationDone, isFirstLaunchCompleted) {
+        if (animationDone && isFirstLaunchCompleted != null) {
+            if (isFirstLaunchCompleted) onNavigateToHome() else onNavigateToWelcome()
+        }
     }
 
     Box(
