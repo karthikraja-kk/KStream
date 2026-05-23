@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
@@ -87,7 +88,15 @@ fun SearchRoute(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(Color(0xFF0A0A0A))
+        .then(
+            if (platform == Platform.TV) Modifier.onKeyEvent { keyEvent ->
+                keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft
+            } else Modifier
+        )
+    ) {
         // "Discover" heading — mobile only (TV relies on sidebar for nav context)
         if (platform != Platform.TV) {
             Text(

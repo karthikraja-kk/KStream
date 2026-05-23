@@ -75,7 +75,7 @@ class DetailsViewModel @Inject constructor(
             try {
                 val progress = watchProgressRepository.getProgress(movieId)
                 _uiState.update { 
-                    it.copy(hasWatchProgress = progress != null && progress.completionPercent < 95f) 
+                    it.copy(hasWatchProgress = progress != null && progress.lastPosition > 0 && progress.completionPercent < 95f) 
                 }
             } catch (_: Exception) { }
         }
@@ -167,7 +167,10 @@ class DetailsViewModel @Inject constructor(
     fun onStartOver() {
         viewModelScope.launch {
             try {
-                watchProgressRepository.deleteProgress(movieId)
+                val existing = watchProgressRepository.getProgress(movieId)
+                if (existing != null) {
+                    watchProgressRepository.saveProgress(movieId, 0L, existing.duration, existing.quality)
+                }
                 _uiState.update { it.copy(hasWatchProgress = false) }
             } catch (_: Exception) { }
         }

@@ -3,22 +3,30 @@ package com.kstream.feature.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
@@ -27,10 +35,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.animation.AnimatedVisibility
@@ -45,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,15 +67,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.ui.PlayerView
@@ -84,6 +97,8 @@ import com.kstream.core.ui.components.tvFocusBorder
 import androidx.compose.ui.input.key.onKeyEvent
 import kotlinx.coroutines.delay
 
+private val BrandRed = Color(0xFFE50914)
+
 @androidx.media3.common.util.UnstableApi
 @Composable
 fun PlayerRoute(
@@ -94,7 +109,7 @@ fun PlayerRoute(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+
     LaunchedEffect(startOver) {
         if (startOver) {
             viewModel.clearWatchProgress()
@@ -104,21 +119,49 @@ fun PlayerRoute(
     var showQualityMenu by remember { mutableStateOf(false) }
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
 
-    // FocusRequesters declared here (outside controlsVisible block) so LaunchedEffect can use them
-    val fullscreenFocusRequester = remember { FocusRequester() }
-    val qualityFocusRequester = remember { FocusRequester() }
     val isTV = LocalPlatform.current == Platform.TV
-
     var controlsVisible by remember { mutableStateOf(true) }
-    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+    var hideTimerKey by remember { mutableLongStateOf(0L) }
 
-    // When controls appear on TV, move focus to the fullscreen button
+    // Playback state tracking
+    val player = viewModel.playerManager.getPlayer()
+    var isPlaying by remember { mutableStateOf(player.isPlaying) }
+    var currentPosition by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+    var bufferedPosition by remember { mutableLongStateOf(0L) }
+    var isSeeking by remember { mutableStateOf(false) }
+
+    // Poll player state
+    LaunchedEffect(Unit) {
+        while (true) {
+            if (!isSeeking) {
+                currentPosition = player.currentPosition.coerceAtLeast(0L)
+            }
+            duration = player.duration.coerceAtLeast(0L)
+            bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
+            isPlaying = player.isPlaying
+            delay(500)
+        }
+    }
+
+    // Auto-hide controls after 4 seconds
+    LaunchedEffect(controlsVisible, hideTimerKey) {
+        if (controlsVisible && !isSeeking) {
+            delay(4000)
+            controlsVisible = false
+        }
+    }
+
+    // Focus requester for TV
+    val playPauseFocusRequester = remember { FocusRequester() }
     LaunchedEffect(controlsVisible) {
         if (controlsVisible && isTV) {
             delay(150)
-            try { fullscreenFocusRequester.requestFocus() } catch (_: Exception) {}
+            try { playPauseFocusRequester.requestFocus() } catch (_: Exception) {}
         }
     }
+
+    fun resetHideTimer() { hideTimerKey = System.currentTimeMillis() }
 
     fun enterFullscreen() {
         isFullscreen = true
@@ -151,7 +194,7 @@ fun PlayerRoute(
             controller.show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
         }
     }
-    
+
     BackHandler {
         if (isFullscreen) {
             exitFullscreen()
@@ -185,11 +228,13 @@ fun PlayerRoute(
         }
     }
 
-    val player = viewModel.playerManager.getPlayer()
     DisposableEffect(player) {
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 viewModel.onBufferingStateChanged(playbackState == androidx.media3.common.Player.STATE_BUFFERING)
+            }
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
             }
         }
         player.addListener(listener)
@@ -198,41 +243,380 @@ fun PlayerRoute(
         }
     }
 
+    // ─── Main player area ─────────────────────────────────────────────────────
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable { controlsVisible = !controlsVisible }
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    controlsVisible = !controlsVisible
+                    if (controlsVisible) resetHideTimer()
+                }
+            }
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
-                        Key.DirectionCenter, Key.Enter,
-                        Key.DirectionUp, Key.DirectionDown,
-                        Key.DirectionLeft, Key.DirectionRight -> {
-                            controlsVisible = true
-                            playerViewRef?.showController()
-                            false
+                        Key.DirectionCenter, Key.Enter -> {
+                            if (!controlsVisible) {
+                                controlsVisible = true
+                                resetHideTimer()
+                                true
+                            } else false
+                        }
+                        Key.DirectionUp, Key.DirectionDown -> {
+                            if (!controlsVisible) {
+                                controlsVisible = true
+                                resetHideTimer()
+                                true
+                            } else false
+                        }
+                        Key.DirectionLeft -> {
+                            if (!controlsVisible) {
+                                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                                controlsVisible = true
+                                resetHideTimer()
+                                true
+                            } else false
+                        }
+                        Key.DirectionRight -> {
+                            if (!controlsVisible) {
+                                player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
+                                controlsVisible = true
+                                resetHideTimer()
+                                true
+                            } else false
                         }
                         else -> false
                     }
                 } else false
             }
     ) {
+        // Video surface
         AndroidView(
             factory = {
                 PlayerView(context).apply {
                     setPlayer(viewModel.playerManager.getPlayer())
-                    useController = true
+                    useController = false
                     keepScreenOn = true
-                    setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-                        controlsVisible = visibility == android.view.View.VISIBLE
-                    })
-                    playerViewRef = this
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Initial loading overlay
+        // ─── Custom controls overlay ──────────────────────────────────────────
+        AnimatedVisibility(
+            visible = controlsVisible && !uiState.isLoading && uiState.loadError == null &&
+                    uiState.refreshError == null && !uiState.localFileMissing &&
+                    !(uiState.isOffline && !uiState.isPlayingLocal),
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(300))
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Top gradient + controls
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)
+                            )
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Back button
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .clickable { onBackClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        // Movie title
+                        Text(
+                            text = uiState.movieTitle,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        // Quality badge
+                        if (uiState.currentQuality.isNotBlank()) {
+                            Surface(
+                                color = Color.White.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = uiState.currentQuality,
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Center controls (skip back, play/pause, skip forward)
+                Row(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Skip back 10s
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clickable {
+                                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                                resetHideTimer()
+                            }
+                            .then(
+                                if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Replay10,
+                            contentDescription = "Skip back 10s",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Play/Pause (large)
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .then(
+                                if (isTV) Modifier
+                                    .focusRequester(playPauseFocusRequester)
+                                    .tvFocusBorder(shape = RoundedCornerShape(50))
+                                    .onPreviewKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown &&
+                                            (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                                        ) {
+                                            if (player.isPlaying) player.pause() else player.play()
+                                            resetHideTimer()
+                                            true
+                                        } else false
+                                    }
+                                    .focusable()
+                                else Modifier
+                            )
+                            .clickable {
+                                if (player.isPlaying) player.pause() else player.play()
+                                resetHideTimer()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+
+                    // Skip forward 10s
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clickable {
+                                player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
+                                resetHideTimer()
+                            }
+                            .then(
+                                if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Forward10,
+                            contentDescription = "Skip forward 10s",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
+                // Bottom gradient + seek bar + buttons
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                            )
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    // Seek bar
+                    if (duration > 0) {
+                        val progress = currentPosition.toFloat() / duration.toFloat()
+                        val buffered = bufferedPosition.toFloat() / duration.toFloat()
+
+                        Box(modifier = Modifier.fillMaxWidth().height(32.dp)) {
+                            // Buffered track
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(buffered.coerceIn(0f, 1f))
+                                    .height(4.dp)
+                                    .align(Alignment.CenterStart)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color.White.copy(alpha = 0.3f))
+                            )
+                            // Slider
+                            Slider(
+                                value = progress.coerceIn(0f, 1f),
+                                onValueChange = { value ->
+                                    isSeeking = true
+                                    currentPosition = (value * duration).toLong()
+                                    resetHideTimer()
+                                },
+                                onValueChangeFinished = {
+                                    player.seekTo(currentPosition)
+                                    isSeeking = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = BrandRed,
+                                    activeTrackColor = BrandRed,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                )
+                            )
+                        }
+                    }
+
+                    // Time + controls row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Elapsed / Duration
+                        Text(
+                            text = "${formatTime(currentPosition)} / ${formatTime(duration)}",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 12.sp
+                        )
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Quality selector
+                        Box {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.1f))
+                                    .clickable { showQualityMenu = true }
+                                    .then(
+                                        if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                        else Modifier
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = "Quality",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showQualityMenu,
+                                onDismissRequest = { showQualityMenu = false },
+                                modifier = Modifier.background(Color(0xFF2A2A2A))
+                            ) {
+                                uiState.availableQualities.forEach { quality ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = quality,
+                                                fontWeight = if (quality == uiState.currentQuality) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (quality == uiState.currentQuality) BrandRed else Color.White
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.switchQuality(quality)
+                                            showQualityMenu = false
+                                        },
+                                        modifier = Modifier.background(Color.Transparent)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Fullscreen toggle
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .clickable { if (isFullscreen) exitFullscreen() else enterFullscreen() }
+                                .then(
+                                    if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                    else Modifier
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                contentDescription = "Fullscreen",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ─── Mid-playback buffering spinner ───────────────────────────────────
+        if (uiState.isBuffering && !uiState.isLoading && !uiState.isOffline) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(52.dp),
+                    color = BrandRed,
+                    strokeWidth = 3.dp
+                )
+            }
+        }
+
+        // ─── Initial loading overlay ──────────────────────────────────────────
         if (uiState.isLoading) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -245,7 +629,7 @@ fun PlayerRoute(
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(56.dp),
-                        color = Color(0xFFE50914)
+                        color = BrandRed
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     Text(
@@ -263,141 +647,7 @@ fun PlayerRoute(
             }
         }
 
-        // Mid-playback buffering spinner (seek / slow network — not the initial load)
-        if (uiState.isBuffering && !uiState.isLoading && !uiState.isOffline) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(52.dp),
-                    color = Color(0xFFE50914),
-                    strokeWidth = 3.dp
-                )
-            }
-        }
-
-        if (controlsVisible) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = 96.dp, end = 16.dp)
-            ) {
-                var fsBtnFocused by remember { mutableStateOf(false) }
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(if (fsBtnFocused) Color(0xFFFF1A1A) else Color.Black.copy(alpha = 0.5f))
-                        .tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
-                        .focusRequester(fullscreenFocusRequester)
-                        .clickable { if (isFullscreen) exitFullscreen() else enterFullscreen() }
-                        .onFocusChanged { fsBtnFocused = it.isFocused }
-                        .onPreviewKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown &&
-                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
-                            ) {
-                                if (isFullscreen) exitFullscreen() else enterFullscreen()
-                                true
-                            } else false
-                        }
-                        .onKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
-                                try { qualityFocusRequester.requestFocus() } catch (_: Exception) {}
-                                true
-                            } else false
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                        contentDescription = "Fullscreen",
-                        tint = Color.White
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                var qualBtnFocused by remember { mutableStateOf(false) }
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(androidx.compose.foundation.shape.CircleShape)
-                            .background(if (qualBtnFocused) Color(0xFFFF1A1A) else Color.Black.copy(alpha = 0.5f))
-                            .tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
-                            .focusRequester(qualityFocusRequester)
-                            .clickable { showQualityMenu = true }
-                            .onFocusChanged { qualBtnFocused = it.isFocused }
-                            .onPreviewKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown &&
-                                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
-                                ) {
-                                    showQualityMenu = true
-                                    true
-                                } else false
-                            }
-                            .onKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
-                                    try { fullscreenFocusRequester.requestFocus() } catch (_: Exception) {}
-                                    true
-                                } else false
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Movie, contentDescription = "Quality", tint = Color.White)
-                    }
-
-                    DropdownMenu(
-                        expanded = showQualityMenu,
-                        onDismissRequest = { showQualityMenu = false },
-                        modifier = Modifier.background(Color(0xFF2A2A2A))
-                    ) {
-                        uiState.availableQualities.forEach { quality: String ->
-                            DropdownMenuItem(
-                                text = { 
-                                    Text(
-                                        text = quality,
-                                        fontWeight = if (quality == uiState.currentQuality) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (quality == uiState.currentQuality) Color(0xFFE50914) else Color.White
-                                    ) 
-                                },
-                                onClick = {
-                                    viewModel.switchQuality(quality)
-                                    showQualityMenu = false
-                                },
-                                modifier = Modifier.background(Color.Transparent)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        var showStatus by remember { mutableStateOf(false) }
-        LaunchedEffect(uiState.currentQuality) {
-            showStatus = true
-            kotlinx.coroutines.delay(2000)
-            showStatus = false
-        }
-        
-        if (showStatus) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp),
-                color = Color.Black.copy(alpha = 0.7f),
-                shape = CircleShape
-            ) {
-                Text(
-                    text = "Quality: ${uiState.currentQuality}",
-                    color = Color.White,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-        }
-
+        // ─── Offline overlay ──────────────────────────────────────────────────
         if (uiState.isOffline && !uiState.isPlayingLocal) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -406,7 +656,7 @@ fun PlayerRoute(
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.WifiOff,
@@ -439,7 +689,7 @@ fun PlayerRoute(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(onClick = { viewModel.retryConnection() },
-                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
+                            modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -447,7 +697,7 @@ fun PlayerRoute(
                         }
                         OutlinedButton(
                             onClick = onGoToDownloads,
-                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50)),
+                            modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
                         ) {
@@ -458,7 +708,7 @@ fun PlayerRoute(
             }
         }
 
-        // Refreshing links overlay — shows funny messages after 2s delay
+        // ─── Refreshing links overlay ─────────────────────────────────────────
         AnimatedVisibility(
             visible = uiState.showRefreshOverlay,
             enter = fadeIn(),
@@ -507,7 +757,7 @@ fun PlayerRoute(
             }
         }
 
-        // Refresh error overlay
+        // ─── Refresh error overlay ────────────────────────────────────────────
         if (uiState.refreshError != null && !uiState.isRefreshingLinks) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -543,7 +793,7 @@ fun PlayerRoute(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
                             onClick = onBackClick,
-                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50)),
+                            modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
                         ) {
@@ -551,8 +801,8 @@ fun PlayerRoute(
                         }
                         Button(
                             onClick = { viewModel.retryRefresh() },
-                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50)),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
+                            modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50)),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -563,7 +813,7 @@ fun PlayerRoute(
             }
         }
 
-        // Load error overlay
+        // ─── Load error overlay ───────────────────────────────────────────────
         if (uiState.loadError != null && uiState.refreshError == null) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -589,7 +839,7 @@ fun PlayerRoute(
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = onBackClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
                     ) {
                         Text("Go Back", color = Color.White)
                     }
@@ -597,7 +847,7 @@ fun PlayerRoute(
             }
         }
 
-        // Downloaded file missing overlay
+        // ─── Downloaded file missing overlay ──────────────────────────────────
         if (uiState.localFileMissing) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -630,9 +880,10 @@ fun PlayerRoute(
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
                         onClick = onGoToDownloads,
-                        modifier = Modifier.width(220.dp)
+                        modifier = Modifier.width(220.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
                     ) {
-                        Text("Re-download")
+                        Text("Re-download", color = Color.White)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedButton(
@@ -655,5 +906,18 @@ fun PlayerRoute(
                 }
             }
         }
+    }
+}
+
+private fun formatTime(millis: Long): String {
+    if (millis <= 0) return "0:00"
+    val totalSeconds = millis / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        String.format("%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%d:%02d", minutes, seconds)
     }
 }

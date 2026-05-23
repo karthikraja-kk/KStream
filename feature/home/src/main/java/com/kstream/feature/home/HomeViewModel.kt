@@ -90,13 +90,15 @@ class HomeViewModel @Inject constructor(
             likedMovieRepository.getAllLikedMovieIds().catch { emit(emptyList()) },
             getRecommendationsUseCase().catch { emit(emptyList()) }
         ) { movies, progress, username, likedIds, recommendations ->
-            _uiState.update { 
+            val rails = groupMoviesIntoRails(movies, progress, likedIds, recommendations)
+            _uiState.update {
                 it.copy(
-                    isLoading = false, 
+                    isLoading = false,
                     userName = username,
-                    rails = groupMoviesIntoRails(movies, progress, likedIds, recommendations),
-                    watchProgressMap = progress.associateBy { p -> p.movieId }
-                ) 
+                    rails = rails,
+                    watchProgressMap = progress.associateBy { p -> p.movieId },
+                    error = if (rails.isNotEmpty()) null else it.error
+                )
             }
         }.launchIn(viewModelScope)
     }
@@ -107,12 +109,16 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = true, error = null) }
                 lastSyncTime = System.currentTimeMillis()
                 syncMoviesUseCase()
-                getRecommendationsUseCase.refreshRecommendations()
+                try {
+                    getRecommendationsUseCase.refreshRecommendations()
+                } catch (_: Exception) {
+                    // Recommendations refresh is non-critical
+                }
             } catch (e: Exception) {
-                if (isOnline.value) {
+                if (isOnline.value && _uiState.value.rails.isEmpty()) {
                     _uiState.update { it.copy(error = e.toUserMessage(), isLoading = false) }
                 } else {
-                    // Offline sync failure is expected — don't show error
+                    // Cached data available or offline — don't show error screen
                     _uiState.update { it.copy(isLoading = false) }
                 }
             }

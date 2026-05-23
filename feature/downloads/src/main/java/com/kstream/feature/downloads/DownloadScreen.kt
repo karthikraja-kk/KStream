@@ -48,6 +48,13 @@ import com.kstream.core.model.DownloadStatus
 import com.kstream.core.ui.components.AppEmptyScreen
 import com.kstream.core.ui.components.tvFocusBorder
 import com.kstream.core.ui.components.tvFocusScale
+import com.kstream.core.ui.LocalPlatform
+import com.kstream.core.ui.Platform
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import java.util.Locale
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -102,6 +109,8 @@ fun DownloadRoute(
         }
     }
 
+    val platform = LocalPlatform.current
+
     // Storage summary
     val totalFiles = allDownloads.count { it.status == DownloadStatus.COMPLETED }
     val totalBytes = allDownloads.filter { it.status == DownloadStatus.COMPLETED }
@@ -110,6 +119,9 @@ fun DownloadRoute(
                          else "$totalFiles file${if (totalFiles != 1) "s" else ""} • ${formatBytes(totalBytes)} saved"
 
     Scaffold(
+        modifier = if (platform == Platform.TV) Modifier.onKeyEvent { keyEvent ->
+            keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft
+        } else Modifier,
         containerColor = BgPage,
         topBar = {
             when {
@@ -185,7 +197,7 @@ fun DownloadRoute(
                 AppEmptyScreen(
                     title = "No Downloads Yet",
                     message = "Movies you download will appear here. Tap Download on any movie to save it for offline viewing.",
-                    isTv = false,
+                    isTv = platform == Platform.TV,
                     icon = Icons.Default.Download,
                     primaryActionLabel = "Browse Content",
                     onPrimaryAction = onBackClick,
@@ -197,7 +209,7 @@ fun DownloadRoute(
                             else "No Results",
                     message = if (searchQuery.isNotEmpty()) "No downloads match \"$searchQuery\"."
                               else "No downloads in this category.",
-                    isTv = false,
+                    isTv = platform == Platform.TV,
                     icon = Icons.Default.Search,
                     primaryActionLabel = if (filterStatus != null) "Show All" else "Clear Search",
                     onPrimaryAction = {
@@ -567,7 +579,7 @@ private fun StatusFilterRow(
                     modifier = Modifier
                         .height(28.dp)
                         .background(bg, RoundedCornerShape(14.dp))
-                        .border(1.dp, border, RoundedCornerShape(14.dp))
+                        .border(3.dp, border, RoundedCornerShape(14.dp))
                         .onFocusChanged { focused = it.hasFocus }
                         .clickable { onSelect(status) }
                         .padding(horizontal = 12.dp),

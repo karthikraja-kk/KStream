@@ -378,7 +378,10 @@ class PlayerViewModel @Inject constructor(
         if (startOver) {
             viewModelScope.launch {
                 try {
-                    watchProgressRepository.deleteProgress(movieId)
+                    val existing = watchProgressRepository.getProgress(movieId)
+                    val duration = existing?.duration ?: 1L
+                    val quality = existing?.quality ?: _uiState.value.currentQuality
+                    watchProgressRepository.saveProgress(movieId, 0L, duration, quality)
                     loadMediaAndPlay()
                 } catch (e: Exception) {
                     android.util.Log.e("PlayerViewModel", "Error starting over", e)
