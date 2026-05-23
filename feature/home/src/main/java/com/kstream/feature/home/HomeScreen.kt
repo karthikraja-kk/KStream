@@ -47,6 +47,7 @@ import com.kstream.core.ui.components.AppErrorScreen
 import com.kstream.core.ui.components.AppLoadingScreen
 import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
+import com.kstream.core.ui.components.tvFocusBorder
 import com.kstream.core.ui.components.tvFocusScale
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.TvLazyRow
@@ -55,6 +56,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.Text as TvText
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import java.util.Calendar
@@ -180,20 +182,32 @@ fun HomeRoute(
     }
 
     if (showExitDialog) {
+        val dismissFocusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            try { dismissFocusRequester.requestFocus() } catch (_: Exception) {}
+        }
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
             title = { Text("Exit App") },
             text = { Text("Are you sure you want to exit?") },
             confirmButton = {
-                TextButton(onClick = { 
-                    showExitDialog = false
-                    activity?.finishAffinity()
-                }) {
+                TextButton(
+                    onClick = { 
+                        showExitDialog = false
+                        activity?.finishAffinity()
+                    },
+                    modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                ) {
                     Text("Exit")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) {
+                TextButton(
+                    onClick = { showExitDialog = false },
+                    modifier = Modifier
+                        .focusRequester(dismissFocusRequester)
+                        .tvFocusBorder(shape = RoundedCornerShape(50))
+                ) {
                     Text("Cancel")
                 }
             }
@@ -485,7 +499,7 @@ fun HomeScreenTv(
                                     colors = androidx.tv.material3.ButtonDefaults.colors(
                                         containerColor = Color(0xFFE50914),
                                         contentColor = Color.White,
-                                        focusedContainerColor = Color(0xFFFF1A1A),
+                                        focusedContainerColor = Color(0xFFE50914),
                                         focusedContentColor = Color.White
                                     ),
                                     border = androidx.tv.material3.ButtonDefaults.border(
@@ -497,7 +511,7 @@ fun HomeScreenTv(
                                     Icon(
                                         imageVector = Icons.Default.Refresh,
                                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     TvText("Refresh")
@@ -547,7 +561,7 @@ fun HomeScreenTv(
                                     colors = androidx.tv.material3.ButtonDefaults.colors(
                                         containerColor = Color(0xFFE50914),
                                         contentColor = Color.White,
-                                        focusedContainerColor = Color(0xFFFF1A1A),
+                                        focusedContainerColor = Color(0xFFE50914),
                                         focusedContentColor = Color.White
                                     ),
                                     border = androidx.tv.material3.ButtonDefaults.border(

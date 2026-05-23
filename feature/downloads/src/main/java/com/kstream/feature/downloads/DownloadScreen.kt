@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -264,13 +265,13 @@ fun DownloadRoute(
                 TextButton(
                     onClick = { downloadToRemove?.let { viewModel.removeDownload(it.id) }; downloadToRemove = null },
                     colors = ButtonDefaults.textButtonColors(contentColor = BrandRed),
-                    modifier = Modifier.tvFocusBorder()
+                    modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                 ) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(
                     onClick = { downloadToRemove = null },
-                    modifier = Modifier.focusRequester(singleDeleteDismissFocus).tvFocusBorder()
+                    modifier = Modifier.focusRequester(singleDeleteDismissFocus).tvFocusBorder(shape = RoundedCornerShape(50))
                 ) { Text("Keep", color = TextSecond) }
             }
         )
@@ -304,13 +305,13 @@ fun DownloadRoute(
                         showDeleteConfirm = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BrandRed),
-                    modifier = Modifier.tvFocusBorder()
+                    modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                 ) { Text("Delete All") }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = { showDeleteConfirm = false },
-                    modifier = Modifier.focusRequester(multiDeleteDismissFocus).tvFocusBorder()
+                    modifier = Modifier.focusRequester(multiDeleteDismissFocus).tvFocusBorder(shape = RoundedCornerShape(50))
                 ) { Text("Keep", color = TextSecond) }
             }
         )
@@ -345,7 +346,7 @@ private fun DefaultTopBar(
             }
         },
         navigationIcon = {
-            IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder()) {
+            IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
             }
         },
@@ -357,11 +358,11 @@ private fun DefaultTopBar(
                 onDismiss = onSortDismiss,
                 onSortChange = onSortChange
             )
-            IconButton(onClick = onSearchClick, modifier = Modifier.tvFocusBorder()) {
+            IconButton(onClick = onSearchClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = TextPrimary)
             }
             if (hasItems) {
-                IconButton(onClick = onSelectClick, modifier = Modifier.tvFocusBorder()) {
+                IconButton(onClick = onSelectClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                     Icon(Icons.Default.CheckBox, contentDescription = "Select", tint = TextPrimary)
                 }
             }
@@ -381,12 +382,12 @@ private fun SelectionTopBar(
     TopAppBar(
         title = { Text("$count selected", style = TextStyle(color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)) },
         navigationIcon = {
-            IconButton(onClick = onCancel, modifier = Modifier.tvFocusBorder()) {
+            IconButton(onClick = onCancel, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel", tint = TextPrimary)
             }
         },
         actions = {
-            TextButton(onClick = onSelectAll, modifier = Modifier.tvFocusBorder()) {
+            TextButton(onClick = onSelectAll, modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))) {
                 Text(if (count == total) "Deselect All" else "Select All",
                     style = TextStyle(color = BrandRed, fontSize = 14.sp))
             }
@@ -446,7 +447,7 @@ private fun SearchTopBar(
                 )
                 if (query.isNotEmpty()) {
                     Box(modifier = Modifier.align(Alignment.CenterEnd)) {
-                        IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(28.dp)) {
+                        IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(28.dp).tvFocusBorder(shape = CircleShape)) {
                             Icon(Icons.Default.Close, null, tint = TextDim, modifier = Modifier.size(16.dp))
                         }
                     }
@@ -454,7 +455,7 @@ private fun SearchTopBar(
             }
         },
         navigationIcon = {
-            IconButton(onClick = onClose, modifier = Modifier.tvFocusBorder()) {
+            IconButton(onClick = onClose, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Close Search", tint = TextPrimary)
             }
         },
@@ -613,7 +614,7 @@ fun DownloadItem(
         modifier = Modifier
             .fillMaxWidth()
             .onFocusChanged { cardFocused = it.hasFocus }
-            .focusable()
+            .focusProperties { canFocus = false }
             .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .tvFocusScale(),
         colors = CardDefaults.cardColors(
@@ -629,7 +630,11 @@ fun DownloadItem(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ── Poster with optional checkbox overlay ──────────────────────
-            Box {
+            Box(
+                modifier = Modifier
+                    .clickable { onClick() }
+                    .tvFocusBorder(shape = RoundedCornerShape(6.dp))
+            ) {
                 AsyncImage(
                     model = download.posterUrl,
                     contentDescription = null,

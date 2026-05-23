@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import com.kstream.core.ui.components.tvFocusBorder
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -461,6 +462,7 @@ fun SearchBar(
                         modifier = Modifier
                             .size(20.dp)
                             .background(Color(0xFF3A3A3A), CircleShape)
+                            .tvFocusBorder(shape = CircleShape)
                             .clickable { onQueryChange("") },
                         contentAlignment = Alignment.Center
                     ) {

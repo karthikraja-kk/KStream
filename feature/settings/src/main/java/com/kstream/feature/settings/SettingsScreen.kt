@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -194,7 +195,7 @@ fun SettingsRoute(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder()) {
+                    IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
@@ -419,13 +420,13 @@ fun SettingsRoute(
                     TextButton(
                         onClick = { viewModel.clearLikedMovies(); showClearLikedDialog = false },
                         colors = ButtonDefaults.textButtonColors(contentColor = BrandRed),
-                        modifier = Modifier.tvFocusBorder()
+                        modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                     ) { Text("Clear All") }
                 },
                 dismissButton = {
                     TextButton(
                         onClick = { showClearLikedDialog = false },
-                        modifier = Modifier.focusRequester(clearDismissFocus).tvFocusBorder()
+                        modifier = Modifier.focusRequester(clearDismissFocus).tvFocusBorder(shape = RoundedCornerShape(50))
                     ) { Text("Keep") }
                 }
             )
@@ -475,13 +476,13 @@ fun SettingsRoute(
                     Button(
                         onClick = { showResetDialog = false; viewModel.resetAllAndRestart() },
                         colors = ButtonDefaults.buttonColors(containerColor = BrandRed),
-                        modifier = Modifier.tvFocusBorder()
+                        modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                     ) { Text("Yes, Reset Everything") }
                 },
                 dismissButton = {
                     OutlinedButton(
                         onClick = { showResetDialog = false },
-                        modifier = Modifier.focusRequester(resetDismissFocus).tvFocusBorder()
+                        modifier = Modifier.focusRequester(resetDismissFocus).tvFocusBorder(shape = RoundedCornerShape(50))
                     ) { Text("Cancel") }
                 }
             )
@@ -748,7 +749,7 @@ private fun WatchHistoryScreen(
                     IconButton(onClick = {
                         if (isSelecting) { isSelecting = false; selectedIds.clear() }
                         else onDismiss()
-                    }, modifier = Modifier.tvFocusBorder()) {
+                    }, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                         Icon(
                             if (isSelecting) Icons.Default.Close else Icons.Default.ArrowBack,
                             contentDescription = null, tint = TextPrimary
@@ -761,11 +762,11 @@ private fun WatchHistoryScreen(
                         TextButton(onClick = {
                             if (allSelected) selectedIds.clear()
                             else { selectedIds.clear(); selectedIds.addAll(items.map { it.movieId }) }
-                        }, modifier = Modifier.tvFocusBorder()) {
+                        }, modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))) {
                             Text(if (allSelected) "Deselect All" else "Select All")
                         }
                     } else if (items.isNotEmpty()) {
-                        IconButton(onClick = { isSelecting = true }, modifier = Modifier.tvFocusBorder()) {
+                        IconButton(onClick = { isSelecting = true }, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                             Icon(Icons.Default.Edit, null, tint = TextPrimary)
                         }
                     }
@@ -853,13 +854,13 @@ private fun WatchHistoryScreen(
                             showDeleteConfirm = false
                         },
                         colors = ButtonDefaults.textButtonColors(contentColor = BrandRed),
-                        modifier = Modifier.tvFocusBorder()
+                        modifier = Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                     ) { Text("Remove") }
                 },
                 dismissButton = {
                     TextButton(
                         onClick = { showDeleteConfirm = false },
-                        modifier = Modifier.focusRequester(histDeleteDismissFocus).tvFocusBorder()
+                        modifier = Modifier.focusRequester(histDeleteDismissFocus).tvFocusBorder(shape = RoundedCornerShape(50))
                     ) { Text("Keep") }
                 }
             )
@@ -882,6 +883,7 @@ private fun WatchHistoryListItem(
         modifier = Modifier
             .fillMaxWidth()
             .onFocusChanged { cardFocused = it.hasFocus }
+            .focusProperties { canFocus = false }
             .combinedClickable(onClick = onTap, onLongClick = onLongPress),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) Color(0xFF1A0A0A) else BgCard
@@ -910,7 +912,12 @@ private fun WatchHistoryListItem(
                 model = item.posterUrl.ifBlank { null },
                 contentDescription = item.movieName,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.width(60.dp).height(84.dp).clip(RoundedCornerShape(6.dp))
+                modifier = Modifier
+                    .width(60.dp)
+                    .height(84.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onTap() }
+                    .tvFocusBorder(shape = RoundedCornerShape(6.dp))
             )
 
             Spacer(Modifier.width(12.dp))
@@ -944,7 +951,7 @@ private fun WatchHistoryListItem(
             }
 
             if (!isSelecting) {
-                IconButton(onClick = onDelete, modifier = Modifier.size(40.dp).tvFocusBorder()) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(40.dp).tvFocusBorder(shape = CircleShape)) {
                     Icon(Icons.Default.Delete, null, tint = Color(0xFF993333), modifier = Modifier.size(18.dp))
                 }
             }

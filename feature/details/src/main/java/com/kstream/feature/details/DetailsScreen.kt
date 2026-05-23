@@ -42,6 +42,7 @@ import com.kstream.core.ui.components.AppLoadingScreen
 import com.kstream.core.ui.components.MovieInitialsFallback
 import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
+import com.kstream.core.ui.components.tvFocusBorder
 import com.kstream.core.ui.components.tvFocusScale
 import androidx.tv.material3.Button as TvButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -548,21 +549,16 @@ fun DetailsScreenTv(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TvText(text = movie.movieName, style = TvMaterialTheme.typography.displayMedium, color = TvMaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                    var heartFocused by remember { mutableStateOf(false) }
                     IconButton(
                         onClick = onLikeClick,
                         modifier = Modifier
                             .tvFocusScale()
-                            .onFocusChanged { heartFocused = it.isFocused }
-                            .then(
-                                if (heartFocused) Modifier.border(2.dp, Color(0xFFE50914), RoundedCornerShape(50))
-                                else Modifier
-                            )
+                            .tvFocusBorder(shape = CircleShape)
                     ) {
                         Icon(
                             imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = if (uiState.isLiked) "Unlike" else "Like",
-                            tint = if (uiState.isLiked) Color(0xFFE50914) else if (heartFocused) Color(0xFFE50914) else MaterialTheme.colorScheme.onSurface,
+                            tint = if (uiState.isLiked) Color(0xFFE50914) else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(32.dp)
                         )
                     }

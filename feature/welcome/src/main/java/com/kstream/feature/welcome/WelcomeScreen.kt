@@ -293,8 +293,6 @@ fun WelcomeScreenTv(
                         else if (termsAccepted) Color(0xFFE50914)
                         else Color(0xFF444444)
                     )
-                    .tvFocusBorder(shape = RoundedCornerShape(24.dp))
-                    .focusable()
                     .onFocusChanged { continueFocused = it.isFocused }
                     .onPreviewKeyEvent { keyEvent ->
                         if (keyEvent.type == KeyEventType.KeyDown &&
@@ -305,7 +303,9 @@ fun WelcomeScreenTv(
                             onContinueClick()
                             true
                         } else false
-                    },
+                    }
+                    .tvFocusBorder(shape = RoundedCornerShape(24.dp))
+                    .focusable(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -327,8 +327,6 @@ fun WelcomeScreenTv(
                             if (checkboxFocused) Modifier.background(Color(0xFFE50914).copy(alpha = 0.3f))
                             else Modifier
                         )
-                        .tvFocusBorder(shape = RoundedCornerShape(4.dp))
-                        .focusable()
                         .onFocusChanged { checkboxFocused = it.isFocused }
                         .onPreviewKeyEvent { keyEvent ->
                             if (keyEvent.type == KeyEventType.KeyDown &&
@@ -338,6 +336,8 @@ fun WelcomeScreenTv(
                                 true
                             } else false
                         }
+                        .tvFocusBorder(shape = RoundedCornerShape(4.dp))
+                        .focusable()
                 ) {
                     Checkbox(
                         checked = termsAccepted,
@@ -362,8 +362,6 @@ fun WelcomeScreenTv(
                     ),
                     color = if (termsFocused) Color(0xFFFF1A1A) else MaterialTheme.colorScheme.primary,
                     modifier = Modifier
-                        .tvFocusBorder()
-                        .focusable()
                         .onFocusChanged { termsFocused = it.isFocused }
                         .onPreviewKeyEvent { keyEvent ->
                             if (keyEvent.type == KeyEventType.KeyDown &&
@@ -373,6 +371,8 @@ fun WelcomeScreenTv(
                                 true
                             } else false
                         }
+                        .tvFocusBorder()
+                        .focusable()
                 )
             }
         }

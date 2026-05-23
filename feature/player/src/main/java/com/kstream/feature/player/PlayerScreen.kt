@@ -438,13 +438,16 @@ fun PlayerRoute(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(onClick = { viewModel.retryConnection() }) {
+                        Button(onClick = { viewModel.retryConnection() },
+                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
+                        ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Retry")
                         }
                         OutlinedButton(
                             onClick = onGoToDownloads,
+                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
                         ) {
@@ -540,6 +543,7 @@ fun PlayerRoute(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
                             onClick = onBackClick,
+                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
                         ) {
@@ -547,6 +551,7 @@ fun PlayerRoute(
                         }
                         Button(
                             onClick = { viewModel.retryRefresh() },
+                            modifier = Modifier.tvFocusBorder(shape = androidx.compose.foundation.shape.RoundedCornerShape(50)),
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
