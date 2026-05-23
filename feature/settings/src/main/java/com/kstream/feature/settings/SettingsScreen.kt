@@ -23,7 +23,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import com.kstream.core.ui.LocalPlatform
+import com.kstream.core.ui.Platform
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -33,6 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.filled.Edit
@@ -391,6 +400,10 @@ fun SettingsRoute(
 
         // ── Dialogs ───────────────────────────────────────────────────────────
         if (showClearLikedDialog) {
+            val clearDismissFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                try { clearDismissFocus.requestFocus() } catch (_: Exception) {}
+            }
             AlertDialog(
                 onDismissRequest = { showClearLikedDialog = false },
                 containerColor = BgCard,
@@ -405,26 +418,39 @@ fun SettingsRoute(
                 confirmButton = {
                     TextButton(
                         onClick = { viewModel.clearLikedMovies(); showClearLikedDialog = false },
-                        colors = ButtonDefaults.textButtonColors(contentColor = BrandRed)
+                        colors = ButtonDefaults.textButtonColors(contentColor = BrandRed),
+                        modifier = Modifier.tvFocusBorder()
                     ) { Text("Clear All") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showClearLikedDialog = false }) { Text("Keep") }
+                    TextButton(
+                        onClick = { showClearLikedDialog = false },
+                        modifier = Modifier.focusRequester(clearDismissFocus).tvFocusBorder()
+                    ) { Text("Keep") }
                 }
             )
         }
 
         if (showWatchHistory) {
-            WatchHistoryScreen(
-                items = uiState.watchHistory,
-                isLoading = uiState.isLoadingHistory,
-                onMovieClick = onMovieClick,
-                onRemove = { ids -> viewModel.deleteWatchHistory(ids) },
-                onDismiss = { showWatchHistory = false }
-            )
+            Dialog(
+                onDismissRequest = { showWatchHistory = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                WatchHistoryScreen(
+                    items = uiState.watchHistory,
+                    isLoading = uiState.isLoadingHistory,
+                    onMovieClick = onMovieClick,
+                    onRemove = { ids -> viewModel.deleteWatchHistory(ids) },
+                    onDismiss = { showWatchHistory = false }
+                )
+            }
         }
 
         if (showResetDialog) {
+            val resetDismissFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                try { resetDismissFocus.requestFocus() } catch (_: Exception) {}
+            }
             AlertDialog(
                 onDismissRequest = { showResetDialog = false },
                 containerColor = BgCard,
@@ -448,11 +474,15 @@ fun SettingsRoute(
                 confirmButton = {
                     Button(
                         onClick = { showResetDialog = false; viewModel.resetAllAndRestart() },
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandRed),
+                        modifier = Modifier.tvFocusBorder()
                     ) { Text("Yes, Reset Everything") }
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                    OutlinedButton(
+                        onClick = { showResetDialog = false },
+                        modifier = Modifier.focusRequester(resetDismissFocus).tvFocusBorder()
+                    ) { Text("Cancel") }
                 }
             )
         }
@@ -475,6 +505,19 @@ private fun ProfileRow(
     onSaveClick: () -> Unit,
     onCancelClick: () -> Unit
 ) {
+    val platform = LocalPlatform.current
+    val isTv = platform == Platform.TV
+    val textFieldFocusRequester = remember { FocusRequester() }
+    var textFieldActive by remember { mutableStateOf(false) }
+
+    // When editing starts on TV, focus the text field area
+    LaunchedEffect(isEditing) {
+        if (isEditing && isTv) {
+            textFieldActive = false
+            try { textFieldFocusRequester.requestFocus() } catch (_: Exception) {}
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -496,20 +539,55 @@ private fun ProfileRow(
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             if (isEditing) {
-                OutlinedTextField(
-                    value = tempUsername,
-                    onValueChange = onTempChange,
-                    label = { Text("Username", style = TextStyle(color = TextSecond, fontSize = 12.sp)) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = BrandRed,
-                        unfocusedBorderColor = BorderMid,
-                        cursorColor = BrandRed
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (isTv) {
+                    // On TV: show as a focusable box with white border highlight.
+                    // Only open keyboard (make editable) when user presses Enter/click.
+                    OutlinedTextField(
+                        value = tempUsername,
+                        onValueChange = onTempChange,
+                        label = { Text("Username", style = TextStyle(color = TextSecond, fontSize = 12.sp)) },
+                        singleLine = true,
+                        readOnly = !textFieldActive,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = if (textFieldActive) BrandRed else Color.White,
+                            unfocusedBorderColor = BorderMid,
+                            cursorColor = BrandRed
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(textFieldFocusRequester)
+                            .onPreviewKeyEvent { event ->
+                                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+                                    when (event.key) {
+                                        androidx.compose.ui.input.key.Key.DirectionLeft -> true // consume left
+                                        androidx.compose.ui.input.key.Key.Enter,
+                                        androidx.compose.ui.input.key.Key.NumPadEnter -> {
+                                            if (!textFieldActive) { textFieldActive = true; true }
+                                            else false
+                                        }
+                                        else -> false
+                                    }
+                                } else false
+                            }
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = tempUsername,
+                        onValueChange = onTempChange,
+                        label = { Text("Username", style = TextStyle(color = TextSecond, fontSize = 12.sp)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = BrandRed,
+                            unfocusedBorderColor = BorderMid,
+                            cursorColor = BrandRed
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             } else {
                 Text(
                     text = username.ifBlank { "Guest" },
@@ -521,14 +599,14 @@ private fun ProfileRow(
         }
         Spacer(Modifier.width(8.dp))
         if (isEditing) {
-            IconButton(onClick = onSaveClick, modifier = Modifier.tvFocusBorder()) {
+            IconButton(onClick = onSaveClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                 Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50))
             }
-            IconButton(onClick = onCancelClick, modifier = Modifier.tvFocusBorder()) {
+            IconButton(onClick = onCancelClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                 Icon(Icons.Default.Close, null, tint = TextDim)
             }
         } else {
-            IconButton(onClick = onEditClick, modifier = Modifier.tvFocusBorder()) {
+            IconButton(onClick = onEditClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
                 Icon(Icons.Default.Edit, null, tint = TextSecond, modifier = Modifier.size(18.dp))
             }
         }
@@ -748,6 +826,10 @@ private fun WatchHistoryScreen(
 
         if (showDeleteConfirm) {
             val count = pendingDeleteIds.size
+            val histDeleteDismissFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                try { histDeleteDismissFocus.requestFocus() } catch (_: Exception) {}
+            }
             AlertDialog(
                 onDismissRequest = { showDeleteConfirm = false },
                 containerColor = BgCard,
@@ -775,9 +857,10 @@ private fun WatchHistoryScreen(
                     ) { Text("Remove") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteConfirm = false }, modifier = Modifier.tvFocusBorder()) {
-                        Text("Keep")
-                    }
+                    TextButton(
+                        onClick = { showDeleteConfirm = false },
+                        modifier = Modifier.focusRequester(histDeleteDismissFocus).tvFocusBorder()
+                    ) { Text("Keep") }
                 }
             )
         }

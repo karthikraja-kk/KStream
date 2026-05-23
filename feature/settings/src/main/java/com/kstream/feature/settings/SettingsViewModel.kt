@@ -340,19 +340,28 @@ class SettingsViewModel @Inject constructor(
 
     private fun parseIsoMillis(value: String?): Long? {
         if (value.isNullOrBlank()) return null
+        // Normalize: replace space between date and time with 'T'
+        var normalized = value.trim().replace(' ', 'T')
+        // Truncate microseconds to milliseconds (keep only 3 fractional digits)
+        normalized = normalized.replace(Regex("(\\d{2}:\\d{2}:\\d{2})\\.?(\\d{0,3})\\d*"), "$1.$2")
+        // If fractional part is empty after dot, remove the dot
+        normalized = normalized.replace(Regex("\\.$"), "")
+        // Normalize timezone: +00 → +00:00, handle Z
+        normalized = normalized.replace(Regex("([+-])(\\d{2})$"), "$1$2:00")
+
         val formats = arrayOf(
-            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
             "yyyy-MM-dd'T'HH:mm:ssXXX",
-            "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-            "yyyy-MM-dd'T'HH:mm:ss'Z'"
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS",
+            "yyyy-MM-dd'T'HH:mm:ss"
         )
         for (pattern in formats) {
             try {
                 val sdf = SimpleDateFormat(pattern, Locale.getDefault())
                 sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
-                return sdf.parse(value)?.time
+                return sdf.parse(normalized)?.time
             } catch (_: Exception) { }
         }
         return null

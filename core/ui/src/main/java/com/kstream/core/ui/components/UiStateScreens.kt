@@ -351,11 +351,42 @@ private fun TvStatusScreen(
         )
         Spacer(modifier = Modifier.height(36.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            androidx.tv.material3.Button(onClick = onPrimaryAction) {
+            androidx.tv.material3.Button(
+                onClick = onPrimaryAction,
+                colors = androidx.tv.material3.ButtonDefaults.colors(
+                    containerColor = Color(0xFFE50914),
+                    contentColor = Color.White,
+                    focusedContainerColor = Color(0xFFE50914),
+                    focusedContentColor = Color.White
+                ),
+                border = androidx.tv.material3.ButtonDefaults.border(
+                    focusedBorder = androidx.tv.material3.Border(
+                        border = androidx.compose.foundation.BorderStroke(OttConstants.FocusBorderWidth, Color.White),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                )
+            ) {
                 TvText(primaryActionLabel)
             }
             if (secondaryActionLabel != null && onSecondaryAction != null) {
-                androidx.tv.material3.OutlinedButton(onClick = onSecondaryAction) {
+                androidx.tv.material3.OutlinedButton(
+                    onClick = onSecondaryAction,
+                    colors = androidx.tv.material3.ButtonDefaults.colors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White,
+                        focusedContainerColor = Color.Transparent,
+                        focusedContentColor = Color.White
+                    ),
+                    border = androidx.tv.material3.ButtonDefaults.border(
+                        border = androidx.tv.material3.Border(
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF555555))
+                        ),
+                        focusedBorder = androidx.tv.material3.Border(
+                            border = androidx.compose.foundation.BorderStroke(OttConstants.FocusBorderWidth, Color.White),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                    )
+                ) {
                     TvText(secondaryActionLabel)
                 }
             }

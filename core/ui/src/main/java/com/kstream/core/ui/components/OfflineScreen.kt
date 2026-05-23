@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -130,7 +131,19 @@ fun TvOfflineScreen(
         )
         Spacer(modifier = Modifier.height(48.dp))
         androidx.tv.material3.Button(
-            onClick = onRetry
+            onClick = onRetry,
+            colors = androidx.tv.material3.ButtonDefaults.colors(
+                containerColor = Color(0xFFE50914),
+                contentColor = Color.White,
+                focusedContainerColor = Color(0xFFE50914),
+                focusedContentColor = Color.White
+            ),
+            border = androidx.tv.material3.ButtonDefaults.border(
+                focusedBorder = androidx.tv.material3.Border(
+                    border = androidx.compose.foundation.BorderStroke(OttConstants.FocusBorderWidth, Color.White),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+                )
+            )
         ) {
             Icon(
                 imageVector = Icons.Default.Refresh,
@@ -144,7 +157,22 @@ fun TvOfflineScreen(
         }
         Spacer(modifier = Modifier.height(24.dp))
         androidx.tv.material3.OutlinedButton(
-            onClick = onGoToDownloads
+            onClick = onGoToDownloads,
+            colors = androidx.tv.material3.ButtonDefaults.colors(
+                containerColor = Color.Transparent,
+                contentColor = Color.White,
+                focusedContainerColor = Color.Transparent,
+                focusedContentColor = Color.White
+            ),
+            border = androidx.tv.material3.ButtonDefaults.border(
+                border = androidx.tv.material3.Border(
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF555555))
+                ),
+                focusedBorder = androidx.tv.material3.Border(
+                    border = androidx.compose.foundation.BorderStroke(OttConstants.FocusBorderWidth, Color.White),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+                )
+            )
         ) {
             androidx.tv.material3.Text(
                 text = "Go to Downloads",

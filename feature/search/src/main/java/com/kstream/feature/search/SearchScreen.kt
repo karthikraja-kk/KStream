@@ -67,11 +67,6 @@ import androidx.tv.foundation.lazy.grid.items as tvItems
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text as TvText
 
-private val GenreList = listOf(
-    "Action", "Drama", "Comedy", "Thriller", "Horror",
-    "Romance", "Sci-Fi", "Animation", "Crime", "Adventure"
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchRoute(
@@ -101,6 +96,14 @@ fun SearchRoute(
             )
         }
 
+        // Request initial focus on the search bar for TV so D-pad highlights it immediately
+        val searchBarFocusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            if (platform == Platform.TV) {
+                try { searchBarFocusRequester.requestFocus() } catch (_: Exception) {}
+            }
+        }
+
         // Search bar + sort button row
         Row(
             modifier = Modifier
@@ -111,7 +114,7 @@ fun SearchRoute(
             SearchBar(
                 query = uiState.query,
                 onQueryChange = viewModel::onQueryChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).focusRequester(searchBarFocusRequester),
                 isTv = platform == Platform.TV
             )
             SortButton(
@@ -126,7 +129,6 @@ fun SearchRoute(
                 recentSearches = uiState.recentSearches,
                 onRecentClick = { viewModel.setInitialQuery(it) },
                 onClearRecents = { viewModel.clearRecentSearches() },
-                onGenreClick = { viewModel.setInitialQuery(it) },
                 isTv = platform == Platform.TV
             )
         } else {
@@ -275,7 +277,6 @@ private fun IdleDiscoveryState(
     recentSearches: List<String>,
     onRecentClick: (String) -> Unit,
     onClearRecents: () -> Unit,
-    onGenreClick: (String) -> Unit,
     isTv: Boolean
 ) {
     Column(
@@ -378,66 +379,6 @@ private fun IdleDiscoveryState(
             }
         }
 
-        Spacer(Modifier.height(24.dp))
-
-        // "Explore by genre" section with red accent bar
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(16.dp)
-                    .background(Color(0xFFE50914), RoundedCornerShape(2.dp))
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "Explore by genre",
-                style = TextStyle(
-                    color = Color(0xFFB3B3B3),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GenreList.forEach { genre ->
-                key(genre) {
-                    var genreFocused by remember { mutableStateOf(false) }
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                if (genreFocused) Color(0xFFE50914) else Color(0xFF1E1E1E),
-                                RoundedCornerShape(20.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (genreFocused) Color.White else Color(0xFF333333),
-                                RoundedCornerShape(20.dp)
-                            )
-                            .tvFocusScale()
-                            .focusable()
-                            .onFocusChanged { genreFocused = it.isFocused }
-                            .clickable { onGenreClick(genre) }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = genre,
-                            style = TextStyle(
-                                color = if (genreFocused) Color.White else Color(0xFFCCCCCC),
-                                fontSize = 13.sp,
-                                fontWeight = if (genreFocused) FontWeight.SemiBold else FontWeight.Normal
-                            )
-                        )
-                    }
-                }
-            }
-        }
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -650,8 +591,8 @@ private fun SortButton(
             .background(Color(0xFF1E1E1E), CircleShape)
             .border(1.5.dp, borderColor, CircleShape)
             .tvFocusScale()
-            .focusable()
-            .onFocusChanged { sortFocused = it.isFocused },
+            .onFocusChanged { sortFocused = it.isFocused }
+            .focusable(),
         contentAlignment = Alignment.Center
     ) {
         IconButton(

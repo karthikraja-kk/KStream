@@ -245,6 +245,10 @@ fun DownloadRoute(
     // ── Single-item delete dialog ──────────────────────────────────────────────
     if (downloadToRemove != null) {
         val title = downloadToRemove?.title ?: "this movie"
+        val singleDeleteDismissFocus = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            try { singleDeleteDismissFocus.requestFocus() } catch (_: Exception) {}
+        }
         AlertDialog(
             onDismissRequest = { downloadToRemove = null },
             containerColor = BgCard,
@@ -259,11 +263,15 @@ fun DownloadRoute(
             confirmButton = {
                 TextButton(
                     onClick = { downloadToRemove?.let { viewModel.removeDownload(it.id) }; downloadToRemove = null },
-                    colors = ButtonDefaults.textButtonColors(contentColor = BrandRed)
+                    colors = ButtonDefaults.textButtonColors(contentColor = BrandRed),
+                    modifier = Modifier.tvFocusBorder()
                 ) { Text("Delete") }
             },
             dismissButton = {
-                TextButton(onClick = { downloadToRemove = null }) { Text("Keep", color = TextSecond) }
+                TextButton(
+                    onClick = { downloadToRemove = null },
+                    modifier = Modifier.focusRequester(singleDeleteDismissFocus).tvFocusBorder()
+                ) { Text("Keep", color = TextSecond) }
             }
         )
     }
@@ -271,6 +279,10 @@ fun DownloadRoute(
     // ── Multi-item delete dialog ───────────────────────────────────────────────
     if (showDeleteConfirm) {
         val count = pendingDeleteIds.size
+        val multiDeleteDismissFocus = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            try { multiDeleteDismissFocus.requestFocus() } catch (_: Exception) {}
+        }
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             containerColor = BgCard,
@@ -291,11 +303,15 @@ fun DownloadRoute(
                         pendingDeleteIds = emptySet()
                         showDeleteConfirm = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed),
+                    modifier = Modifier.tvFocusBorder()
                 ) { Text("Delete All") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showDeleteConfirm = false }) { Text("Keep", color = TextSecond) }
+                OutlinedButton(
+                    onClick = { showDeleteConfirm = false },
+                    modifier = Modifier.focusRequester(multiDeleteDismissFocus).tvFocusBorder()
+                ) { Text("Keep", color = TextSecond) }
             }
         )
     }
@@ -475,8 +491,8 @@ private fun SortChip(
                 .height(32.dp)
                 .background(BgRow, RoundedCornerShape(16.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-                .clickable { onToggle() }
                 .onFocusChanged { focused = it.hasFocus }
+                .clickable { onToggle() }
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -551,8 +567,8 @@ private fun StatusFilterRow(
                         .height(28.dp)
                         .background(bg, RoundedCornerShape(14.dp))
                         .border(1.dp, border, RoundedCornerShape(14.dp))
-                        .clickable { onSelect(status) }
                         .onFocusChanged { focused = it.hasFocus }
+                        .clickable { onSelect(status) }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -596,8 +612,8 @@ fun DownloadItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .focusable()
             .onFocusChanged { cardFocused = it.hasFocus }
+            .focusable()
             .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .tvFocusScale(),
         colors = CardDefaults.cardColors(

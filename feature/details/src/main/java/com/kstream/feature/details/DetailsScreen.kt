@@ -623,9 +623,9 @@ fun DetailsScreenTv(
                             colors = androidx.tv.material3.FilterChipDefaults.colors(
                                 selectedContainerColor = Color(0xFFE50914),
                                 selectedContentColor = Color.White,
-                                focusedContainerColor = Color(0xFFFF1A1A),
+                                focusedContainerColor = Color.Transparent,
                                 focusedContentColor = Color.White,
-                                focusedSelectedContainerColor = Color(0xFFFF1A1A),
+                                focusedSelectedContainerColor = Color(0xFFE50914),
                                 focusedSelectedContentColor = Color.White
                             ),
                             border = androidx.tv.material3.FilterChipDefaults.border(
@@ -656,7 +656,7 @@ fun DetailsScreenTv(
                                 colors = androidx.tv.material3.ButtonDefaults.colors(
                                     containerColor = Color(0xFFE50914),
                                     contentColor = Color.White,
-                                    focusedContainerColor = Color(0xFFFF1A1A),
+                                    focusedContainerColor = Color(0xFFE50914),
                                     focusedContentColor = Color.White
                                 ),
                                 shape = androidx.tv.material3.ButtonDefaults.shape(
@@ -726,7 +726,7 @@ fun DetailsScreenTv(
                             colors = androidx.tv.material3.ButtonDefaults.colors(
                                 containerColor = Color(0xFFE50914),
                                 contentColor = Color.White,
-                                focusedContainerColor = Color(0xFFFF1A1A),
+                                focusedContainerColor = Color(0xFFE50914),
                                 focusedContentColor = Color.White
                             ),
                             border = androidx.tv.material3.ButtonDefaults.border(
@@ -760,8 +760,8 @@ fun DetailsScreenTv(
                         colors = androidx.tv.material3.ButtonDefaults.colors(
                             containerColor = Color.Transparent,
                             contentColor = Color(0xFFE50914),
-                            focusedContainerColor = Color(0xFFE50914),
-                            focusedContentColor = Color.White
+                            focusedContainerColor = Color.Transparent,
+                            focusedContentColor = Color(0xFFE50914)
                         ),
                         border = androidx.tv.material3.ButtonDefaults.border(
                             border = androidx.tv.material3.Border(
