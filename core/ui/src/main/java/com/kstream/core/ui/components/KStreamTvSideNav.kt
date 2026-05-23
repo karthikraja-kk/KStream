@@ -268,7 +268,6 @@ private fun SideNavItem(
         .background(bgColor)
         .then(if (isFocused) Modifier.border(2.dp, Color.White, RoundedCornerShape(12.dp)) else Modifier)
         .focusRequester(focusRequester)
-        .focusable()
         .onFocusChanged {
             isFocused = it.isFocused
             onFocusedChange(it.isFocused)
@@ -281,6 +280,7 @@ private fun SideNavItem(
                 true
             } else false
         }
+        .focusable()
 
     // Single stable root Box — FocusRequester stays attached regardless of expanded state.
     // Previously this used if(expanded) Row else Box, which caused Compose to dispose/recreate
