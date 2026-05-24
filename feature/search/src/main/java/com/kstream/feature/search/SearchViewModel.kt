@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 import javax.inject.Inject
 
 enum class SortOption(val label: String) {
@@ -153,6 +155,14 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    private val dateFormatter = SimpleDateFormat("dd MMMM yyyy", Locale.ENGLISH)
+
+    private fun parseLastUpdated(dateStr: String): Long {
+        return try {
+            if (dateStr.isNotBlank()) dateFormatter.parse(dateStr)?.time ?: 0L else 0L
+        } catch (_: Exception) { 0L }
+    }
+
     private fun applySorting(movies: List<Movie>, option: SortOption): List<Movie> {
         return when (option) {
             SortOption.NONE -> movies
@@ -162,11 +172,11 @@ class SearchViewModel @Inject constructor(
             SortOption.RATING_LOW -> movies.sortedBy { it.rating }
             SortOption.LATEST_FIRST -> movies.sortedWith(
                 compareByDescending<Movie> { it.lastUpdated.isNotBlank() }
-                    .thenByDescending { it.lastUpdated }
+                    .thenByDescending { parseLastUpdated(it.lastUpdated) }
             )
             SortOption.OLDEST_FIRST -> movies.sortedWith(
                 compareBy<Movie> { it.lastUpdated.isBlank() }
-                    .thenBy { it.lastUpdated }
+                    .thenBy { parseLastUpdated(it.lastUpdated) }
             )
         }
     }
