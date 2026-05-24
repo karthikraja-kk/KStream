@@ -344,6 +344,10 @@ private fun DefaultTopBar(
     hasItems: Boolean,
     onBackClick: () -> Unit
 ) {
+    val backFocusRequester = remember { FocusRequester() }
+    val sortFocusRequester = remember { FocusRequester() }
+    val searchFocusRequester = remember { FocusRequester() }
+
     TopAppBar(
         title = {
             Column {
@@ -355,7 +359,16 @@ private fun DefaultTopBar(
             }
         },
         navigationIcon = {
-            IconButton(onClick = onBackClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .focusRequester(backFocusRequester)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) true
+                        else false
+                    }
+                    .tvFocusBorder(shape = CircleShape)
+            ) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
             }
         },
@@ -365,13 +378,42 @@ private fun DefaultTopBar(
                 expanded = showSortMenu,
                 onToggle = onSortToggle,
                 onDismiss = onSortDismiss,
-                onSortChange = onSortChange
+                onSortChange = onSortChange,
+                modifier = Modifier
+                    .focusRequester(sortFocusRequester)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                            try { backFocusRequester.requestFocus() } catch (_: Exception) {}
+                            true
+                        } else false
+                    }
             )
-            IconButton(onClick = onSearchClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
+            IconButton(
+                onClick = onSearchClick,
+                modifier = Modifier
+                    .focusRequester(searchFocusRequester)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                            try { sortFocusRequester.requestFocus() } catch (_: Exception) {}
+                            true
+                        } else false
+                    }
+                    .tvFocusBorder(shape = CircleShape)
+            ) {
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = TextPrimary)
             }
             if (hasItems) {
-                IconButton(onClick = onSelectClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
+                IconButton(
+                    onClick = onSelectClick,
+                    modifier = Modifier
+                        .onPreviewKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                                try { searchFocusRequester.requestFocus() } catch (_: Exception) {}
+                                true
+                            } else false
+                        }
+                        .tvFocusBorder(shape = CircleShape)
+                ) {
                     Icon(Icons.Default.CheckBox, contentDescription = "Select", tint = TextPrimary)
                 }
             }
@@ -489,9 +531,10 @@ private fun SortChip(
     expanded: Boolean,
     onToggle: () -> Unit,
     onDismiss: () -> Unit,
-    onSortChange: (DownloadSortOption) -> Unit
+    onSortChange: (DownloadSortOption) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Box {
+    Box(modifier = modifier) {
         var focused by remember { mutableStateOf(false) }
         val borderColor by animateColorAsState(
             if (focused) Color.White else BorderMid, tween(200), label = "sortBorder"

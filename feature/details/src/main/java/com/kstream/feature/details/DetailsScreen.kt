@@ -58,6 +58,10 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 
 import androidx.compose.material.icons.Icons
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @Composable
 fun DetailsRoute(
@@ -69,6 +73,31 @@ fun DetailsRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val platform = LocalPlatform.current
     val isOffline = !uiState.isOnline
+    val context = LocalContext.current
+
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.downloadMovie()
+        } else {
+            Toast.makeText(context, "Storage permission required for downloads", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val onDownloadAction: () -> Unit = {
+        if (uiState.isInDownloads) {
+            onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "")
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            storagePermissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            viewModel.downloadMovie()
+        }
+    }
 
     if (platform == Platform.TV) {
         DetailsScreenTv(
@@ -76,13 +105,7 @@ fun DetailsRoute(
             onBackClick = onBackClick,
             onWatchClick = onWatchClick,
             onQualitySelected = viewModel::onQualitySelected,
-            onDownloadClick = {
-                if (uiState.isInDownloads) {
-                    onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "")
-                } else {
-                    viewModel.downloadMovie()
-                }
-            },
+            onDownloadClick = onDownloadAction,
             isOffline = isOffline,
             onGoToDownloads = { onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "") },
             onRetry = { viewModel.refreshMovieDetails() },
@@ -95,13 +118,7 @@ fun DetailsRoute(
             onBackClick = onBackClick,
             onWatchClick = onWatchClick,
             onQualitySelected = viewModel::onQualitySelected,
-            onDownloadClick = {
-                if (uiState.isInDownloads) {
-                    onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "")
-                } else {
-                    viewModel.downloadMovie()
-                }
-            },
+            onDownloadClick = onDownloadAction,
             isOffline = isOffline,
             onGoToDownloads = { onGoToDownloads(uiState.movieWithMedia?.movie?.id ?: "", uiState.selectedQuality ?: "") },
             onRetry = { viewModel.refreshMovieDetails() },

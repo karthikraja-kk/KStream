@@ -2,11 +2,13 @@ package com.kstream.feature.downloads
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.ContextCompat
 import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.model.Download
 import com.kstream.core.model.DownloadStatus
@@ -166,8 +168,11 @@ class CustomDownloadManager @Inject constructor(
             } else {
                 val moviesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
                 val kStreamDir = File(moviesDir, "KStream")
-                if (!kStreamDir.exists()) kStreamDir.mkdirs()
+                if (!kStreamDir.exists() && !kStreamDir.mkdirs()) {
+                    throw Exception("Failed to create download directory: ${kStreamDir.absolutePath}")
+                }
                 val file = File(kStreamDir, pendingFileName)
+                if (!file.exists()) file.createNewFile()
                 videoUri = Uri.fromFile(file)
             }
 
@@ -208,8 +213,12 @@ class CustomDownloadManager @Inject constructor(
             val body = response.body ?: throw Exception("Empty response body")
             val totalBytes = (body.contentLength() + currentBytes).takeIf { it > currentBytes } ?: 0L
             
-            val outputStream = contentResolver.openOutputStream(videoUri!!, if (currentBytes > 0) "wa" else "wt")
-                ?: throw Exception("Failed to open output stream")
+            val outputStream = if (videoUri!!.scheme == "file") {
+                val file = File(videoUri.path!!)
+                java.io.FileOutputStream(file, currentBytes > 0)
+            } else {
+                contentResolver.openOutputStream(videoUri, if (currentBytes > 0) "wa" else "wt")
+            } ?: throw Exception("Failed to open output stream")
 
             outputStream.use { out ->
                 body.byteStream().use { input ->
@@ -319,7 +328,15 @@ class CustomDownloadManager @Inject constructor(
         return true
     }
 
-    suspend fun hasStorageAccess(): Boolean = true
+    suspend fun hasStorageAccess(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            true
+        } else {
+            ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
     suspend fun getFolderUri(): String? = "/Movies/KStream"
     fun getDownloadDirectoryDisplay(): String = "/Movies/KStream"
 }

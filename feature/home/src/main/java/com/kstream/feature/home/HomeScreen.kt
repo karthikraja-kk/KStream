@@ -568,9 +568,18 @@ fun HomeScreenTv(
                         enabled = !uiState.isLoading,
                         modifier = Modifier
                             .onPreviewKeyEvent { event ->
-                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                                    try { contentFocusRequester.requestFocus() } catch (_: Exception) {}
-                                    true
+                                if (event.type == KeyEventType.KeyDown) {
+                                    when (event.key) {
+                                        Key.DirectionDown -> {
+                                            try { contentFocusRequester.requestFocus() } catch (_: Exception) {}
+                                            true
+                                        }
+                                        Key.DirectionLeft -> {
+                                            try { hdButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+                                            true
+                                        }
+                                        else -> false
+                                    }
                                 } else false
                             }
                             .tvFocusScale(),

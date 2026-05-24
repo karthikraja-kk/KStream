@@ -32,6 +32,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import androidx.compose.ui.graphics.Color
@@ -512,12 +513,21 @@ private fun ProfileRow(
     val isTv = platform == Platform.TV
     val textFieldFocusRequester = remember { FocusRequester() }
     var textFieldActive by remember { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     // When editing starts on TV, focus the text field area
     LaunchedEffect(isEditing) {
         if (isEditing && isTv) {
             textFieldActive = false
             try { textFieldFocusRequester.requestFocus() } catch (_: Exception) {}
+        }
+    }
+
+    // When textFieldActive becomes true, show keyboard
+    LaunchedEffect(textFieldActive) {
+        if (textFieldActive && isTv) {
+            try { textFieldFocusRequester.requestFocus() } catch (_: Exception) {}
+            keyboardController?.show()
         }
     }
 
