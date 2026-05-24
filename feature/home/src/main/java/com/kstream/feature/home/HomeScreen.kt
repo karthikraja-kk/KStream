@@ -509,6 +509,9 @@ fun HomeScreenTv(
             )
         }
     } else {
+        val hdButtonFocusRequester = remember { FocusRequester() }
+        val contentFocusRequester = remember { FocusRequester() }
+
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
@@ -529,7 +532,15 @@ fun HomeScreenTv(
                 ) {
                     androidx.tv.material3.Button(
                         onClick = onToggleHdOnly,
-                        modifier = Modifier.tvFocusScale(),
+                        modifier = Modifier
+                            .focusRequester(hdButtonFocusRequester)
+                            .onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                                    try { contentFocusRequester.requestFocus() } catch (_: Exception) {}
+                                    true
+                                } else false
+                            }
+                            .tvFocusScale(),
                         colors = androidx.tv.material3.ButtonDefaults.colors(
                             containerColor = if (uiState.hdOnly) Color(0xFFE50914) else Color(0xFF2A2A2A),
                             contentColor = Color.White,
@@ -555,7 +566,14 @@ fun HomeScreenTv(
                     androidx.tv.material3.Button(
                         onClick = onRefresh,
                         enabled = !uiState.isLoading,
-                        modifier = Modifier.tvFocusScale(),
+                        modifier = Modifier
+                            .onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                                    try { contentFocusRequester.requestFocus() } catch (_: Exception) {}
+                                    true
+                                } else false
+                            }
+                            .tvFocusScale(),
                         colors = androidx.tv.material3.ButtonDefaults.colors(
                             containerColor = Color(0xFFE50914),
                             contentColor = Color.White,
@@ -581,7 +599,18 @@ fun HomeScreenTv(
             val tvListState = androidx.tv.foundation.lazy.list.rememberTvLazyListState()
             TvLazyColumn(
                 state = tvListState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .focusRequester(contentFocusRequester)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                            if (tvListState.firstVisibleItemIndex == 0 && tvListState.firstVisibleItemScrollOffset == 0) {
+                                try { hdButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+                                true
+                            } else false
+                        } else false
+                    },
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
                 if (uiState.heroMovies.isNotEmpty()) {

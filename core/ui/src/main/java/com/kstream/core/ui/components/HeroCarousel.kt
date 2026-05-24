@@ -10,18 +10,14 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -41,9 +37,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val AUTO_SCROLL_DELAY = 5000L
-private val HERO_HEIGHT_TV = 400.dp
+private val HERO_HEIGHT_TV = 280.dp
 private val HERO_HEIGHT_MOBILE = 340.dp
-private val POSTER_HEIGHT_TV = 300.dp
+private val POSTER_HEIGHT_TV = 200.dp
 private val POSTER_HEIGHT_MOBILE = 250.dp
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.tv.material3.ExperimentalTvMaterial3Api::class)
@@ -51,7 +47,6 @@ private val POSTER_HEIGHT_MOBILE = 250.dp
 fun HeroCarousel(
     movies: List<Movie>,
     onMovieClick: (String) -> Unit,
-    onWatchClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (movies.isEmpty()) return
@@ -118,7 +113,6 @@ fun HeroCarousel(
                 movie = movie,
                 isTv = isTv,
                 onMovieClick = { onMovieClick(movie.id) },
-                onWatchClick = onWatchClick?.let { { it(movie.id) } },
                 onFocusChanged = { isFocused = it }
             )
         }
@@ -155,7 +149,6 @@ private fun HeroSlide(
     movie: Movie,
     isTv: Boolean,
     onMovieClick: () -> Unit,
-    onWatchClick: (() -> Unit)?,
     onFocusChanged: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
@@ -165,7 +158,13 @@ private fun HeroSlide(
         modifier = Modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(if (isTv) 16.dp else 12.dp))
-            .then(if (isTv) Modifier else Modifier.clickable { onMovieClick() })
+            .then(
+                if (isTv) Modifier
+                    .onFocusChanged { onFocusChanged(it.isFocused || it.hasFocus) }
+                    .tvFocusBorder(shape = RoundedCornerShape(16.dp))
+                    .clickable { onMovieClick() }
+                else Modifier.clickable { onMovieClick() }
+            )
     ) {
         // Blurred backdrop
         SubcomposeAsyncImage(
@@ -273,58 +272,6 @@ private fun HeroSlide(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Watch Now button
-            if (isTv) {
-                val focusRequester = remember { FocusRequester() }
-                androidx.tv.material3.Button(
-                    onClick = { (onWatchClick ?: onMovieClick).invoke() },
-                    modifier = Modifier
-                        .onFocusChanged { onFocusChanged(it.isFocused || it.hasFocus) }
-                        .focusRequester(focusRequester)
-                        .tvFocusScale(),
-                    colors = androidx.tv.material3.ButtonDefaults.colors(
-                        containerColor = OttConstants.BrandRed,
-                        contentColor = Color.White,
-                        focusedContainerColor = OttConstants.BrandRed,
-                        focusedContentColor = Color.White
-                    ),
-                    border = androidx.tv.material3.ButtonDefaults.border(
-                        focusedBorder = androidx.tv.material3.Border(
-                            border = androidx.compose.foundation.BorderStroke(
-                                OttConstants.FocusBorderWidth, OttConstants.FocusBorderColor
-                            )
-                        )
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    androidx.tv.material3.Text("Watch Now")
-                }
-            } else {
-                androidx.compose.material3.Button(
-                    onClick = { (onWatchClick ?: onMovieClick).invoke() },
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = OttConstants.BrandRed,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("Watch Now", fontWeight = FontWeight.SemiBold)
                 }
             }
         }

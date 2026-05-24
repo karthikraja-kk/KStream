@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -149,10 +150,15 @@ fun PlayerRoute(
 
     // Focus requester for TV
     val playPauseFocusRequester = remember { FocusRequester() }
+    val playerBoxFocusRequester = remember { FocusRequester() }
     LaunchedEffect(controlsVisible) {
-        if (controlsVisible && isTV) {
+        if (isTV) {
             delay(150)
-            try { playPauseFocusRequester.requestFocus() } catch (_: Exception) {}
+            if (controlsVisible) {
+                try { playPauseFocusRequester.requestFocus() } catch (_: Exception) {}
+            } else {
+                try { playerBoxFocusRequester.requestFocus() } catch (_: Exception) {}
+            }
         }
     }
 
@@ -243,6 +249,7 @@ fun PlayerRoute(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusRequester(playerBoxFocusRequester)
             .pointerInput(Unit) {
                 detectTapGestures {
                     controlsVisible = !controlsVisible
@@ -264,7 +271,10 @@ fun PlayerRoute(
                                 controlsVisible = true
                                 resetHideTimer()
                                 true
-                            } else false
+                            } else {
+                                resetHideTimer()
+                                false
+                            }
                         }
                         Key.DirectionLeft -> {
                             if (!controlsVisible) {
@@ -272,7 +282,10 @@ fun PlayerRoute(
                                 controlsVisible = true
                                 resetHideTimer()
                                 true
-                            } else false
+                            } else {
+                                resetHideTimer()
+                                false
+                            }
                         }
                         Key.DirectionRight -> {
                             if (!controlsVisible) {
@@ -280,12 +293,16 @@ fun PlayerRoute(
                                 controlsVisible = true
                                 resetHideTimer()
                                 true
-                            } else false
+                            } else {
+                                resetHideTimer()
+                                false
+                            }
                         }
                         else -> false
                     }
                 } else false
             }
+            .focusable()
     ) {
         // Video surface
         AndroidView(
@@ -294,6 +311,8 @@ fun PlayerRoute(
                     setPlayer(viewModel.playerManager.getPlayer())
                     useController = false
                     keepScreenOn = true
+                    isFocusable = false
+                    isFocusableInTouchMode = false
                 }
             },
             modifier = Modifier.fillMaxSize()

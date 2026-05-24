@@ -1,5 +1,7 @@
 package com.kstream.feature.settings
 
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,10 +9,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,12 +42,36 @@ fun TermsAndConditionsScreen(
             )
         }
     ) { padding ->
+        val scrollState = rememberScrollState()
+        val focusRequester = remember { FocusRequester() }
+        val coroutineScope = rememberCoroutineScope()
+        val scrollAmount = 150f
+
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState())
+                .focusRequester(focusRequester)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown) {
+                        when (event.key) {
+                            Key.DirectionDown -> {
+                                coroutineScope.launch { scrollState.animateScrollBy(scrollAmount) }
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                coroutineScope.launch { scrollState.animateScrollBy(-scrollAmount) }
+                                true
+                            }
+                            else -> false
+                        }
+                    } else false
+                }
+                .focusable()
+                .verticalScroll(scrollState)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 

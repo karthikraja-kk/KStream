@@ -34,6 +34,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -550,6 +555,12 @@ private fun StatusFilterRow(
         "Failed" to DownloadStatus.FAILED,
         "Queued" to DownloadStatus.QUEUED
     )
+    val visibleChips = remember(allDownloads) {
+        chips.filter { (_, status) -> status == null || (counts[status] ?: 0) > 0 }
+    }
+    val chipFocusRequesters = remember(visibleChips.size) {
+        List(visibleChips.size) { FocusRequester() }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -557,35 +568,42 @@ private fun StatusFilterRow(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        chips.forEach { (label, status) ->
+        visibleChips.forEachIndexed { index, (label, status) ->
             val count = if (status == null) allDownloads.size else (counts[status] ?: 0)
-            if (status == null || count > 0) {
-                val isActive = selected == status
-                var focused by remember { mutableStateOf(false) }
-                val bg = if (isActive) BrandRed else BgRow
-                val border by animateColorAsState(
-                    when { isActive -> BrandRed; focused -> Color.White; else -> BorderMid },
-                    tween(150), label = "chip$label"
-                )
-                Box(
-                    modifier = Modifier
-                        .height(28.dp)
-                        .background(bg, RoundedCornerShape(14.dp))
-                        .border(3.dp, border, RoundedCornerShape(14.dp))
-                        .onFocusChanged { focused = it.hasFocus }
-                        .clickable { onSelect(status) }
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        if (status == null) label else "$label ($count)",
-                        style = TextStyle(
-                            color = if (isActive) Color.White else TextSecond,
-                            fontSize = 12.sp,
-                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
-                        )
+            val isActive = selected == status
+            var focused by remember { mutableStateOf(false) }
+            val bg = if (isActive) BrandRed else BgRow
+            val border by animateColorAsState(
+                when { focused -> Color.White; isActive -> BrandRed; else -> BorderMid },
+                tween(150), label = "chip$label"
+            )
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .background(bg, RoundedCornerShape(14.dp))
+                    .border(3.dp, border, RoundedCornerShape(14.dp))
+                    .focusRequester(chipFocusRequesters[index])
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                            if (index > 0) {
+                                try { chipFocusRequesters[index - 1].requestFocus() } catch (_: Exception) {}
+                            }
+                            true // always consume Left — leftmost chip stays, others route left
+                        } else false
+                    }
+                    .onFocusChanged { focused = it.hasFocus }
+                    .clickable { onSelect(status) }
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (status == null) label else "$label ($count)",
+                    style = TextStyle(
+                        color = if (isActive) Color.White else TextSecond,
+                        fontSize = 12.sp,
+                        fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
                     )
-                }
+                )
             }
         }
     }

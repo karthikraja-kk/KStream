@@ -123,7 +123,8 @@ fun SearchRoute(
             )
             SortButton(
                 currentSort = uiState.sortOption,
-                onSortChange = viewModel::onSortChange
+                onSortChange = viewModel::onSortChange,
+                searchBarFocusRequester = searchBarFocusRequester
             )
         }
 
@@ -575,7 +576,8 @@ fun SearchScreenTv(
 @Composable
 private fun SortButton(
     currentSort: SortOption,
-    onSortChange: (SortOption) -> Unit
+    onSortChange: (SortOption) -> Unit,
+    searchBarFocusRequester: FocusRequester = FocusRequester()
 ) {
     var expanded by remember { mutableStateOf(false) }
     var sortFocused by remember { mutableStateOf(false) }
@@ -596,6 +598,12 @@ private fun SortButton(
             .background(Color(0xFF1E1E1E), CircleShape)
             .border(1.5.dp, borderColor, CircleShape)
             .tvFocusScale()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                    try { searchBarFocusRequester.requestFocus() } catch (_: Exception) {}
+                    true
+                } else false
+            }
             .onFocusChanged { sortFocused = it.isFocused }
             .focusable(),
         contentAlignment = Alignment.Center

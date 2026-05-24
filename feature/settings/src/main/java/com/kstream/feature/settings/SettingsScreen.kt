@@ -602,10 +602,36 @@ private fun ProfileRow(
         }
         Spacer(Modifier.width(8.dp))
         if (isEditing) {
-            IconButton(onClick = onSaveClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
+            val saveFocusRequester = remember { FocusRequester() }
+            val cancelFocusRequester = remember { FocusRequester() }
+            IconButton(
+                onClick = onSaveClick,
+                modifier = Modifier
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                            event.key == androidx.compose.ui.input.key.Key.DirectionLeft) {
+                            try { textFieldFocusRequester.requestFocus() } catch (_: Exception) {}
+                            true
+                        } else false
+                    }
+                    .focusRequester(saveFocusRequester)
+                    .tvFocusBorder(shape = CircleShape)
+            ) {
                 Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50))
             }
-            IconButton(onClick = onCancelClick, modifier = Modifier.tvFocusBorder(shape = CircleShape)) {
+            IconButton(
+                onClick = onCancelClick,
+                modifier = Modifier
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                            event.key == androidx.compose.ui.input.key.Key.DirectionLeft) {
+                            try { saveFocusRequester.requestFocus() } catch (_: Exception) {}
+                            true
+                        } else false
+                    }
+                    .focusRequester(cancelFocusRequester)
+                    .tvFocusBorder(shape = CircleShape)
+            ) {
                 Icon(Icons.Default.Close, null, tint = TextDim)
             }
         } else {
