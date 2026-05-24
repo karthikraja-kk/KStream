@@ -277,9 +277,9 @@ fun PlayerRoute(
                             }
                         }
                         Key.DirectionLeft -> {
-                            if (!controlsVisible) {
+                            if (isTV || !controlsVisible) {
                                 player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-                                controlsVisible = true
+                                if (!controlsVisible) controlsVisible = true
                                 resetHideTimer()
                                 true
                             } else {
@@ -288,9 +288,9 @@ fun PlayerRoute(
                             }
                         }
                         Key.DirectionRight -> {
-                            if (!controlsVisible) {
+                            if (isTV || !controlsVisible) {
                                 player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
-                                controlsVisible = true
+                                if (!controlsVisible) controlsVisible = true
                                 resetHideTimer()
                                 true
                             } else {
