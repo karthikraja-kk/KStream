@@ -9,6 +9,7 @@ interface UserDataRepository {
     val downloadLocation: Flow<String>
     val downloadLocationUri: Flow<String>
     val recentSearches: Flow<List<String>>
+    val isHdOnlyFilter: Flow<Boolean>
 
     suspend fun setUsername(name: String)
     suspend fun setDownloadLocation(location: String)
@@ -16,6 +17,7 @@ interface UserDataRepository {
     suspend fun setFirstLaunchCompleted(completed: Boolean)
 
     suspend fun setWifiOnlyDownload(wifiOnly: Boolean)
+    suspend fun setHdOnlyFilter(hdOnly: Boolean)
     suspend fun addRecentSearch(query: String)
     suspend fun clearRecentSearches()
     suspend fun clearAllData()

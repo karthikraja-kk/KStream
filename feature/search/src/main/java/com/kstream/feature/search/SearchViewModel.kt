@@ -30,6 +30,7 @@ enum class SortOption(val label: String) {
 
 data class SearchUiState(
     val query: String = "",
+    val activeQuery: String = "",
     val results: List<Movie> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -68,6 +69,8 @@ class SearchViewModel @Inject constructor(
         private const val DEBOUNCE_MS = 300L
     }
 
+    private var hdOnly: Boolean = false
+
     init {
         userDataRepository.recentSearches
             .catch { emit(emptyList()) }
@@ -79,13 +82,25 @@ class SearchViewModel @Inject constructor(
         networkMonitor.isOnline
             .onEach { online -> _isOnline.value = online }
             .launchIn(viewModelScope)
+
+        userDataRepository.isHdOnlyFilter
+            .catch { emit(false) }
+            .onEach { enabled ->
+                hdOnly = enabled
+                // Re-filter current results if we have any
+                val current = _uiState.value
+                if (current.results.isNotEmpty()) {
+                    executeSearch(current.activeQuery)
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     fun setInitialQuery(query: String) {
-        if (_uiState.value.query == query) return
-        _uiState.update { it.copy(query = query) }
+        if (_uiState.value.activeQuery == query) return
+        val displayQuery = if (isReservedQuery(query)) "" else query
+        _uiState.update { it.copy(query = displayQuery, activeQuery = query) }
         if (query.isNotEmpty()) {
-            // No debounce for programmatic queries (See More, recent searches)
             searchJob?.cancel()
             searchJob = viewModelScope.launch {
                 executeSearch(query)
@@ -94,7 +109,7 @@ class SearchViewModel @Inject constructor(
     }
 
     fun onQueryChange(newQuery: String) {
-        _uiState.update { it.copy(query = newQuery) }
+        _uiState.update { it.copy(query = newQuery, activeQuery = newQuery) }
 
         // Cancel previous search
         searchJob?.cancel()
@@ -156,6 +171,10 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    private fun applyHdFilter(movies: List<Movie>): List<Movie> {
+        return if (hdOnly) movies.filter { it.type.equals("Original HD", ignoreCase = true) } else movies
+    }
+
     private suspend fun executeSearch(query: String) {
         _uiState.update { it.copy(isLoading = true, error = null, suggestedQuery = null, isFuzzyMatch = false) }
         try {
@@ -184,12 +203,12 @@ class SearchViewModel @Inject constructor(
             }
 
             if (results != null) {
-                _uiState.update { it.copy(results = applySorting(results, it.sortOption), isLoading = false) }
+                _uiState.update { it.copy(results = applySorting(applyHdFilter(results), it.sortOption), isLoading = false) }
             } else {
                 val searchResult = movieRepository.searchMoviesWithSuggestion(query)
                 _uiState.update {
                     it.copy(
-                        results = applySorting(searchResult.movies, it.sortOption),
+                        results = applySorting(applyHdFilter(searchResult.movies), it.sortOption),
                         suggestedQuery = searchResult.suggestedQuery,
                         isFuzzyMatch = searchResult.isFuzzyMatch,
                         isLoading = false

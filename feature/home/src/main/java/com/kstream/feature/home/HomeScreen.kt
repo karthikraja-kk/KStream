@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.FileDownload
@@ -35,6 +36,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import com.kstream.core.ui.R
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,6 +44,7 @@ import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.MovieTileMobile
 import com.kstream.core.ui.components.MovieTileTv
+import com.kstream.core.ui.components.HeroCarousel
 import com.kstream.core.ui.components.AppEmptyScreen
 import com.kstream.core.ui.components.AppErrorScreen
 import com.kstream.core.ui.components.AppLoadingScreen
@@ -226,7 +229,8 @@ fun HomeRoute(
             onRetry = viewModel::refreshContent,
             onRefresh = viewModel::refreshContent,
             isOffline = isOffline,
-            onGoToDownloads = onDownloadsClick
+            onGoToDownloads = onDownloadsClick,
+            onToggleHdOnly = viewModel::toggleHdOnlyFilter
         )
     } else {
         HomeScreenMobile(
@@ -239,7 +243,8 @@ fun HomeRoute(
             onRetry = viewModel::refreshContent,
             onRefresh = viewModel::refreshContent,
             isOffline = isOffline,
-            onGoToDownloads = onDownloadsClick
+            onGoToDownloads = onDownloadsClick,
+            onToggleHdOnly = viewModel::toggleHdOnlyFilter
         )
     }
 }
@@ -256,7 +261,8 @@ fun HomeScreenMobile(
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     isOffline: Boolean = false,
-    onGoToDownloads: () -> Unit = {}
+    onGoToDownloads: () -> Unit = {},
+    onToggleHdOnly: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -277,6 +283,21 @@ fun HomeScreenMobile(
                         contentDescription = "KStream",
                         modifier = Modifier.height(52.dp).widthIn(max = 240.dp),
                         contentScale = ContentScale.Fit
+                    )
+                    Spacer(Modifier.weight(1f))
+                    FilterChip(
+                        selected = uiState.hdOnly,
+                        onClick = onToggleHdOnly,
+                        label = { Text("HD", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                        leadingIcon = if (uiState.hdOnly) {
+                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else null,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        modifier = Modifier.height(32.dp)
                     )
                     IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -374,6 +395,15 @@ fun HomeScreenMobile(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
+                if (uiState.heroMovies.isNotEmpty()) {
+                    item {
+                        HeroCarousel(
+                            movies = uiState.heroMovies,
+                            onMovieClick = onMovieClick,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
                 item {
                     val greeting = remember { getTimeBasedGreeting(uiState.userName) }
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -439,7 +469,8 @@ fun HomeScreenTv(
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     isOffline: Boolean = false,
-    onGoToDownloads: () -> Unit = {}
+    onGoToDownloads: () -> Unit = {},
+    onToggleHdOnly: () -> Unit = {}
 ) {
     if (uiState.isLoading) {
         AppLoadingScreen(
@@ -492,29 +523,59 @@ fun HomeScreenTv(
                     modifier = Modifier.height(56.dp).widthIn(max = 240.dp),
                     contentScale = ContentScale.Fit
                 )
-                                androidx.tv.material3.Button(
-                                    onClick = onRefresh,
-                                    enabled = !uiState.isLoading,
-                                    modifier = Modifier.tvFocusScale(),
-                                    colors = androidx.tv.material3.ButtonDefaults.colors(
-                                        containerColor = Color(0xFFE50914),
-                                        contentColor = Color.White,
-                                        focusedContainerColor = Color(0xFFE50914),
-                                        focusedContentColor = Color.White
-                                    ),
-                                    border = androidx.tv.material3.ButtonDefaults.border(
-                                        focusedBorder = androidx.tv.material3.Border(
-                                            border = BorderStroke(2.dp, Color.White)
-                                        )
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TvText("Refresh")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    androidx.tv.material3.Button(
+                        onClick = onToggleHdOnly,
+                        modifier = Modifier.tvFocusScale(),
+                        colors = androidx.tv.material3.ButtonDefaults.colors(
+                            containerColor = if (uiState.hdOnly) Color(0xFFE50914) else Color(0xFF2A2A2A),
+                            contentColor = Color.White,
+                            focusedContainerColor = if (uiState.hdOnly) Color(0xFFE50914) else Color(0xFF2A2A2A),
+                            focusedContentColor = Color.White
+                        ),
+                        border = androidx.tv.material3.ButtonDefaults.border(
+                            focusedBorder = androidx.tv.material3.Border(
+                                border = BorderStroke(2.dp, Color.White)
+                            )
+                        )
+                    ) {
+                        if (uiState.hdOnly) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        TvText("HD", style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+                    }
+                    androidx.tv.material3.Button(
+                        onClick = onRefresh,
+                        enabled = !uiState.isLoading,
+                        modifier = Modifier.tvFocusScale(),
+                        colors = androidx.tv.material3.ButtonDefaults.colors(
+                            containerColor = Color(0xFFE50914),
+                            contentColor = Color.White,
+                            focusedContainerColor = Color(0xFFE50914),
+                            focusedContentColor = Color.White
+                        ),
+                        border = androidx.tv.material3.ButtonDefaults.border(
+                            focusedBorder = androidx.tv.material3.Border(
+                                border = BorderStroke(2.dp, Color.White)
+                            )
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TvText("Refresh")
+                    }
                 }
             }
             val tvListState = androidx.tv.foundation.lazy.list.rememberTvLazyListState()
@@ -523,6 +584,15 @@ fun HomeScreenTv(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
+                if (uiState.heroMovies.isNotEmpty()) {
+                    item {
+                        HeroCarousel(
+                            movies = uiState.heroMovies,
+                            onMovieClick = onMovieClick,
+                            modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp)
+                        )
+                    }
+                }
                 item {
                     val greeting = remember { getTimeBasedGreeting(uiState.userName) }
                     Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 24.dp)) {

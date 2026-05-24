@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
@@ -80,7 +79,7 @@ fun SearchRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val platform = LocalPlatform.current
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle(initialValue = true)
-    val isOffline = !isOnline && uiState.query.isNotBlank()
+    val isOffline = !isOnline && uiState.activeQuery.isNotBlank()
 
     LaunchedEffect(initialQuery) {
         if (!initialQuery.isNullOrBlank()) {
@@ -91,11 +90,6 @@ fun SearchRoute(
     Column(modifier = Modifier
         .fillMaxSize()
         .background(Color(0xFF0A0A0A))
-        .then(
-            if (platform == Platform.TV) Modifier.onKeyEvent { keyEvent ->
-                keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft
-            } else Modifier
-        )
     ) {
         // "Discover" heading — mobile only (TV relies on sidebar for nav context)
         if (platform != Platform.TV) {
@@ -133,7 +127,7 @@ fun SearchRoute(
             )
         }
 
-        if (uiState.query.isBlank()) {
+        if (uiState.activeQuery.isBlank()) {
             // Idle discovery state — replaces the blank screen
             IdleDiscoveryState(
                 recentSearches = uiState.recentSearches,
@@ -230,7 +224,7 @@ fun SearchRoute(
             // Results / error / loading / empty states
             if (isOffline) {
                 OfflineScreen(
-                    onRetry = { viewModel.onQueryChange(uiState.query) },
+                    onRetry = { viewModel.setInitialQuery(uiState.activeQuery) },
                     onGoToDownloads = onDownloadsClick
                 )
             } else if (uiState.error != null) {
@@ -239,7 +233,7 @@ fun SearchRoute(
                     message = uiState.error ?: "Something went wrong.",
                     isTv = platform == Platform.TV,
                     primaryActionLabel = "Retry",
-                    onPrimaryAction = { viewModel.onQueryChange(uiState.query) },
+                    onPrimaryAction = { viewModel.setInitialQuery(uiState.activeQuery) },
                     secondaryActionLabel = "Downloads",
                     onSecondaryAction = onDownloadsClick
                 )
@@ -252,7 +246,7 @@ fun SearchRoute(
             } else if (uiState.results.isEmpty()) {
                 AppEmptyScreen(
                     title = "No results found",
-                    message = "We couldn't find anything for \"${uiState.query}\". Try a different title, or clear the search and browse again.",
+                    message = "We couldn't find anything for \"${uiState.activeQuery}\". Try a different title, or clear the search and browse again.",
                     isTv = platform == Platform.TV,
                     primaryActionLabel = "Clear search",
                     onPrimaryAction = { viewModel.onQueryChange("") },
@@ -264,7 +258,7 @@ fun SearchRoute(
                     SearchScreenTv(
                         uiState = uiState,
                         onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) },
-                        onRetry = { viewModel.onQueryChange(uiState.query) },
+                        onRetry = { viewModel.setInitialQuery(uiState.activeQuery) },
                         isOffline = false,
                         onGoToDownloads = onDownloadsClick
                     )
@@ -272,7 +266,7 @@ fun SearchRoute(
                     SearchScreenMobile(
                         uiState = uiState,
                         onMovieClick = { movie -> viewModel.onMovieClick(movie, onMovieClick) },
-                        onRetry = { viewModel.onQueryChange(uiState.query) },
+                        onRetry = { viewModel.setInitialQuery(uiState.activeQuery) },
                         isOffline = false,
                         onGoToDownloads = onDownloadsClick
                     )

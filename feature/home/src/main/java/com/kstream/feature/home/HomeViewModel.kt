@@ -22,8 +22,10 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val userName: String = "",
     val rails: List<MovieRail> = emptyList(),
+    val heroMovies: List<Movie> = emptyList(),
     val watchProgressMap: Map<String, WatchProgress> = emptyMap(),
-    val error: String? = null
+    val error: String? = null,
+    val hdOnly: Boolean = false
 )
 
 data class MovieRail(
@@ -90,14 +92,24 @@ class HomeViewModel @Inject constructor(
             likedMovieRepository.getAllLikedMovieIds().catch { emit(emptyList()) },
             getRecommendationsUseCase().catch { emit(emptyList()) }
         ) { movies, progress, username, likedIds, recommendations ->
-            val rails = groupMoviesIntoRails(movies, progress, likedIds, recommendations)
+            data class CombinedData(val movies: List<Movie>, val progress: List<WatchProgress>, val username: String, val likedIds: List<String>, val recommendations: List<Movie>)
+            CombinedData(movies, progress, username, likedIds, recommendations)
+        }.combine(
+            userDataRepository.isHdOnlyFilter.catch { emit(false) }
+        ) { data, hdOnly ->
+            val filteredMovies = if (hdOnly) data.movies.filter { it.type.equals("Original HD", ignoreCase = true) } else data.movies
+            val filteredRecs = if (hdOnly) data.recommendations.filter { it.type.equals("Original HD", ignoreCase = true) } else data.recommendations
+            val rails = groupMoviesIntoRails(filteredMovies, data.progress, data.likedIds, filteredRecs)
+            val heroMovies = buildHeroMovies(filteredMovies, filteredRecs)
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    userName = username,
+                    userName = data.username,
                     rails = rails,
-                    watchProgressMap = progress.associateBy { p -> p.movieId },
-                    error = if (rails.isNotEmpty()) null else it.error
+                    heroMovies = heroMovies,
+                    watchProgressMap = data.progress.associateBy { p -> p.movieId },
+                    error = if (rails.isNotEmpty()) null else it.error,
+                    hdOnly = hdOnly
                 )
             }
         }.launchIn(viewModelScope)
@@ -122,6 +134,12 @@ class HomeViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false) }
                 }
             }
+        }
+    }
+
+    fun toggleHdOnlyFilter() {
+        viewModelScope.launch {
+            userDataRepository.setHdOnlyFilter(!_uiState.value.hdOnly)
         }
     }
 
@@ -152,6 +170,30 @@ class HomeViewModel @Inject constructor(
                 getRecommendationsUseCase.refreshRecommendations()
             } catch (_: Exception) {}
         }
+    }
+
+    private fun buildHeroMovies(movies: List<Movie>, recommendations: List<Movie>): List<Movie> {
+        val seen = mutableSetOf<String>()
+        val hero = mutableListOf<Movie>()
+
+        // Top 5 from new releases
+        movies.sortedByLastUpdated().take(5).forEach { m ->
+            if (seen.add(m.id)) hero.add(m)
+        }
+
+        // Top 3 highest-rated new releases
+        movies
+            .filter { it.rating.isNotBlank() }
+            .sortedWith(compareByDescending<Movie> { it.rating.toDoubleOrNull() ?: 0.0 }.thenByDescending { it.lastUpdated })
+            .take(3)
+            .forEach { m -> if (seen.add(m.id)) hero.add(m) }
+
+        // Top 3 from recommendations
+        recommendations.take(3).forEach { m ->
+            if (seen.add(m.id)) hero.add(m)
+        }
+
+        return hero
     }
 
     private fun groupMoviesIntoRails(

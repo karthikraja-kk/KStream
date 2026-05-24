@@ -98,6 +98,7 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
+    implementation(libs.lottie.compose)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

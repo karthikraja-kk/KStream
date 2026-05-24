@@ -29,6 +29,7 @@ class KStreamDataStore @Inject constructor(
     private val DOWNLOAD_LOCATION = stringPreferencesKey("download_location")
     private val DOWNLOAD_LOCATION_URI = stringPreferencesKey("download_location_uri")
     private val POSTER_BASE_URL = stringPreferencesKey("poster_base_url")
+    private val HD_ONLY_FILTER = booleanPreferencesKey("hd_only_filter")
 
     val username: Flow<String> = context.dataStore.data.map { it[USERNAME] ?: "Guest" }
     val isFirstLaunchCompleted: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH_COMPLETED] ?: false }
@@ -36,6 +37,7 @@ class KStreamDataStore @Inject constructor(
     val downloadLocation: Flow<String> = context.dataStore.data.map { it[DOWNLOAD_LOCATION] ?: "Internal Storage" }
     val downloadLocationUri: Flow<String> = context.dataStore.data.map { it[DOWNLOAD_LOCATION_URI] ?: "" }
     val posterBaseUrl: Flow<String> = context.dataStore.data.map { it[POSTER_BASE_URL] ?: "" }
+    val isHdOnlyFilter: Flow<Boolean> = context.dataStore.data.map { it[HD_ONLY_FILTER] ?: false }
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         decodeRecentSearches(it[RECENT_SEARCHES])
     }
@@ -66,6 +68,10 @@ class KStreamDataStore @Inject constructor(
 
     suspend fun setWifiOnlyDownload(wifiOnly: Boolean) {
         context.dataStore.edit { it[WIFI_ONLY_DOWNLOAD] = wifiOnly }
+    }
+
+    suspend fun setHdOnlyFilter(hdOnly: Boolean) {
+        context.dataStore.edit { it[HD_ONLY_FILTER] = hdOnly }
     }
 
     suspend fun clearAll() {

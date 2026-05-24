@@ -2,7 +2,6 @@ package com.kstream.feature.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,20 +52,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -94,7 +90,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.tvFocusBorder
-import androidx.compose.ui.input.key.onKeyEvent
 import kotlinx.coroutines.delay
 
 private val BrandRed = Color(0xFFE50914)
@@ -336,6 +331,10 @@ fun PlayerRoute(
                                 .size(40.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.1f))
+                                .then(
+                                    if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                    else Modifier
+                                )
                                 .clickable { onBackClick() },
                             contentAlignment = Alignment.Center
                         ) {
@@ -388,14 +387,14 @@ fun PlayerRoute(
                             .size(52.dp)
                             .clip(CircleShape)
                             .background(Color.Black.copy(alpha = 0.4f))
-                            .clickable {
-                                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-                                resetHideTimer()
-                            }
                             .then(
                                 if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                                 else Modifier
-                            ),
+                            )
+                            .clickable {
+                                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                                resetHideTimer()
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -416,16 +415,6 @@ fun PlayerRoute(
                                 if (isTV) Modifier
                                     .focusRequester(playPauseFocusRequester)
                                     .tvFocusBorder(shape = RoundedCornerShape(50))
-                                    .onPreviewKeyEvent { keyEvent ->
-                                        if (keyEvent.type == KeyEventType.KeyDown &&
-                                            (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
-                                        ) {
-                                            if (player.isPlaying) player.pause() else player.play()
-                                            resetHideTimer()
-                                            true
-                                        } else false
-                                    }
-                                    .focusable()
                                 else Modifier
                             )
                             .clickable {
@@ -448,14 +437,14 @@ fun PlayerRoute(
                             .size(52.dp)
                             .clip(CircleShape)
                             .background(Color.Black.copy(alpha = 0.4f))
-                            .clickable {
-                                player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
-                                resetHideTimer()
-                            }
                             .then(
                                 if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                                 else Modifier
-                            ),
+                            )
+                            .clickable {
+                                player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
+                                resetHideTimer()
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -537,11 +526,11 @@ fun PlayerRoute(
                                     .size(36.dp)
                                     .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.1f))
-                                    .clickable { showQualityMenu = true }
                                     .then(
                                         if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                                         else Modifier
-                                    ),
+                                    )
+                                    .clickable { showQualityMenu = true },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -583,11 +572,11 @@ fun PlayerRoute(
                                 .size(36.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.1f))
-                                .clickable { if (isFullscreen) exitFullscreen() else enterFullscreen() }
                                 .then(
                                     if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
                                     else Modifier
-                                ),
+                                )
+                                .clickable { if (isFullscreen) exitFullscreen() else enterFullscreen() },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(

@@ -50,11 +50,6 @@ import com.kstream.core.ui.components.tvFocusBorder
 import com.kstream.core.ui.components.tvFocusScale
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import java.util.Locale
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -119,9 +114,6 @@ fun DownloadRoute(
                          else "$totalFiles file${if (totalFiles != 1) "s" else ""} • ${formatBytes(totalBytes)} saved"
 
     Scaffold(
-        modifier = if (platform == Platform.TV) Modifier.onKeyEvent { keyEvent ->
-            keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft
-        } else Modifier,
         containerColor = BgPage,
         topBar = {
             when {
