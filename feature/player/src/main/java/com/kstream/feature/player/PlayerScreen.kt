@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -277,26 +278,18 @@ fun PlayerRoute(
                             }
                         }
                         Key.DirectionLeft -> {
-                            if (!controlsVisible) {
-                                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-                                controlsVisible = true
-                                resetHideTimer()
-                                true
-                            } else {
-                                resetHideTimer()
-                                false
-                            }
+                            val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
+                            currentPosition = newPos
+                            player.seekTo(newPos)
+                            if (controlsVisible) resetHideTimer()
+                            true
                         }
                         Key.DirectionRight -> {
-                            if (!controlsVisible) {
-                                player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
-                                controlsVisible = true
-                                resetHideTimer()
-                                true
-                            } else {
-                                resetHideTimer()
-                                false
-                            }
+                            val newPos = (currentPosition + 10_000L).coerceAtMost(duration)
+                            currentPosition = newPos
+                            player.seekTo(newPos)
+                            if (controlsVisible) resetHideTimer()
+                            true
                         }
                         else -> false
                     }
@@ -492,13 +485,14 @@ fun PlayerRoute(
                         val progress = currentPosition.toFloat() / duration.toFloat()
                         val buffered = bufferedPosition.toFloat() / duration.toFloat()
 
+                        var seekBarFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(32.dp)
                                 .then(
                                     if (isTV) Modifier
-                                        .tvFocusBorder(shape = RoundedCornerShape(16.dp))
+                                        .onFocusChanged { seekBarFocused = it.isFocused }
                                         .onPreviewKeyEvent { keyEvent ->
                                             if (keyEvent.type == KeyEventType.KeyDown) {
                                                 when (keyEvent.key) {
@@ -548,12 +542,12 @@ fun PlayerRoute(
                                 enabled = !isTV,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = SliderDefaults.colors(
-                                    thumbColor = BrandRed,
-                                    activeTrackColor = BrandRed,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.15f),
-                                    disabledThumbColor = BrandRed,
-                                    disabledActiveTrackColor = BrandRed,
-                                    disabledInactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                    thumbColor = if (seekBarFocused) Color.White else BrandRed,
+                                    activeTrackColor = if (seekBarFocused) BrandRed.copy(alpha = 1f) else BrandRed,
+                                    inactiveTrackColor = if (seekBarFocused) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f),
+                                    disabledThumbColor = if (seekBarFocused) Color.White else BrandRed,
+                                    disabledActiveTrackColor = if (seekBarFocused) BrandRed.copy(alpha = 1f) else BrandRed,
+                                    disabledInactiveTrackColor = if (seekBarFocused) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f)
                                 )
                             )
                         }

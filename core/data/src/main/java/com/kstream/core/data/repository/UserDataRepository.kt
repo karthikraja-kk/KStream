@@ -16,6 +16,7 @@ class DefaultUserDataRepository @Inject constructor(
     override val recentSearches: Flow<List<String>> = dataStore.recentSearches
     override val isHdOnlyFilter: Flow<Boolean> = dataStore.isHdOnlyFilter
     override val isCarouselEnabled: Flow<Boolean> = dataStore.isCarouselEnabled
+    override val isDownloadRecoveryDone: Flow<Boolean> = dataStore.isDownloadRecoveryDone
 
     override suspend fun setUsername(name: String) = dataStore.setUsername(name)
     override suspend fun setDownloadLocation(location: String) = dataStore.setDownloadLocation(location)
@@ -24,6 +25,7 @@ class DefaultUserDataRepository @Inject constructor(
     override suspend fun setWifiOnlyDownload(wifiOnly: Boolean) = dataStore.setWifiOnlyDownload(wifiOnly)
     override suspend fun setHdOnlyFilter(hdOnly: Boolean) = dataStore.setHdOnlyFilter(hdOnly)
     override suspend fun setCarouselEnabled(enabled: Boolean) = dataStore.setCarouselEnabled(enabled)
+    override suspend fun setDownloadRecoveryDone(done: Boolean) = dataStore.setDownloadRecoveryDone(done)
     override suspend fun addRecentSearch(query: String) = dataStore.addRecentSearch(query)
     override suspend fun clearRecentSearches() = dataStore.clearRecentSearches()
     override suspend fun clearAllData() = dataStore.clearAll()

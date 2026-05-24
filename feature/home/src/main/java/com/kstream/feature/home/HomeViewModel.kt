@@ -12,6 +12,7 @@ import com.kstream.core.domain.repository.DownloadRepository
 import com.kstream.core.model.Movie
 import com.kstream.core.model.WatchProgress
 import com.kstream.core.domain.repository.LikedMovieRepository
+import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -43,6 +44,7 @@ class HomeViewModel @Inject constructor(
     private val getRecommendationsUseCase: GetRecommendationsUseCase,
     private val likedMovieRepository: LikedMovieRepository,
     private val downloadRepository: DownloadRepository,
+    private val customDownloadManager: CustomDownloadManager,
     private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository,
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
@@ -128,6 +130,9 @@ class HomeViewModel @Inject constructor(
                 lastSyncTime = System.currentTimeMillis()
                 syncMoviesUseCase()
                 try {
+                    customDownloadManager.recoverDownloads()
+                } catch (_: Exception) {}
+                try {
                     getRecommendationsUseCase.refreshRecommendations()
                 } catch (_: Exception) {
                     // Recommendations refresh is non-critical
@@ -183,6 +188,8 @@ class HomeViewModel @Inject constructor(
     private fun buildHeroMovies(movies: List<Movie>, recommendations: List<Movie>): List<Movie> {
         val seen = mutableSetOf<String>()
         val hero = mutableListOf<Movie>()
+        val dateParser = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.ENGLISH)
+        fun parseDate(s: String): Long = try { if (s.isNotBlank()) dateParser.parse(s)?.time ?: 0L else 0L } catch (_: Exception) { 0L }
 
         // Top 5 from new releases
         movies.sortedByLastUpdated().take(5).forEach { m ->
@@ -197,7 +204,7 @@ class HomeViewModel @Inject constructor(
         // Top 3 highest-rated (exclude ratings >= 10)
         movies
             .filter { it.rating.isNotBlank() && (it.rating.toDoubleOrNull() ?: 0.0) < 10.0 }
-            .sortedWith(compareByDescending<Movie> { it.rating.toDoubleOrNull() ?: 0.0 }.thenByDescending { it.lastUpdated })
+            .sortedWith(compareByDescending<Movie> { it.rating.toDoubleOrNull() ?: 0.0 }.thenByDescending { parseDate(it.lastUpdated) })
             .take(3)
             .forEach { m -> if (seen.add(m.id)) hero.add(m) }
 
@@ -275,7 +282,12 @@ class HomeViewModel @Inject constructor(
      * Movies with empty lastUpdated go to the end.
      */
     private fun List<Movie>.sortedByLastUpdated(): List<Movie> {
-        return sortedWith(compareByDescending<Movie> { it.lastUpdated.isNotBlank() }
-            .thenByDescending { it.lastUpdated })
+        val formatter = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.ENGLISH)
+        return sortedByDescending { movie ->
+            try {
+                if (movie.lastUpdated.isNotBlank()) formatter.parse(movie.lastUpdated)?.time ?: 0L
+                else 0L
+            } catch (_: Exception) { 0L }
+        }
     }
 }

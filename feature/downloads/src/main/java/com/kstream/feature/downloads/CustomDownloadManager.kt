@@ -8,17 +8,22 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Base64
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.model.Download
 import com.kstream.core.model.DownloadStatus
 import com.kstream.core.domain.repository.DownloadRepository
+import com.kstream.core.domain.repository.MovieRepository
 import com.kstream.core.domain.repository.UserDataRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -30,6 +35,7 @@ import javax.inject.Singleton
 class CustomDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val downloadRepository: DownloadRepository,
+    private val movieRepository: MovieRepository,
     private val userDataRepository: UserDataRepository,
     private val networkMonitor: NetworkMonitor
 ) {
@@ -204,7 +210,7 @@ class CustomDownloadManager @Inject constructor(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful && response.code != 206) {
                 if (response.code == 416) { 
-                    finalizeDownload(id, videoUri!!, baseFileName)
+                    finalizeDownload(id, movieId, quality, videoUri!!, baseFileName)
                     return@use
                 }
                 throw Exception("Server returned ${response.code}")
@@ -241,10 +247,10 @@ class CustomDownloadManager @Inject constructor(
             }
         }
 
-        finalizeDownload(id, videoUri!!, baseFileName)
+        finalizeDownload(id, movieId, quality, videoUri!!, baseFileName)
     }
 
-    private suspend fun finalizeDownload(id: String, videoUri: Uri, finalFileName: String) {
+    private suspend fun finalizeDownload(id: String, movieId: String, quality: String, videoUri: Uri, finalFileName: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.Video.Media.DISPLAY_NAME, finalFileName)
@@ -258,6 +264,7 @@ class CustomDownloadManager @Inject constructor(
             MediaScannerConnection.scanFile(context, arrayOf(finalFile.absolutePath), null, null)
         }
         downloadRepository.markDownloadComplete(id, videoUri.toString())
+        addMetadataEntry(movieId, quality)
     }
 
     fun pauseDownload(id: String) {
@@ -325,6 +332,7 @@ class CustomDownloadManager @Inject constructor(
         } catch (e: Exception) {
         }
         downloadRepository.deleteDownload(id)
+        removeMetadataEntry(movieId, quality)
         return true
     }
 
@@ -339,4 +347,127 @@ class CustomDownloadManager @Inject constructor(
     }
     suspend fun getFolderUri(): String? = "/Movies/KStream"
     fun getDownloadDirectoryDisplay(): String = "/Movies/KStream"
+
+    private companion object {
+        const val METADATA_FILE_NAME = ".metadata"
+    }
+
+    private fun getKStreamDir(): File {
+        return File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+            "KStream"
+        )
+    }
+
+    private fun readMetadataEntries(): List<Pair<String, String>> {
+        try {
+            val metadataFile = File(getKStreamDir(), METADATA_FILE_NAME)
+            if (!metadataFile.exists()) return emptyList()
+            val encoded = metadataFile.readText().trim()
+            if (encoded.isEmpty()) return emptyList()
+            val decoded = String(Base64.decode(encoded, Base64.NO_WRAP))
+            val jsonArray = JSONArray(decoded)
+            return (0 until jsonArray.length()).map { i ->
+                val obj = jsonArray.getJSONObject(i)
+                Pair(obj.getString("movieId"), obj.getString("quality"))
+            }
+        } catch (e: Exception) {
+            Log.e("CustomDownloadManager", "Failed to read .metadata", e)
+            return emptyList()
+        }
+    }
+
+    private fun writeMetadataEntries(entries: List<Pair<String, String>>) {
+        try {
+            val kStreamDir = getKStreamDir()
+            if (!kStreamDir.exists()) kStreamDir.mkdirs()
+            val jsonArray = JSONArray()
+            entries.forEach { (movieId, quality) ->
+                jsonArray.put(JSONObject().apply {
+                    put("movieId", movieId)
+                    put("quality", quality)
+                })
+            }
+            val encoded = Base64.encodeToString(jsonArray.toString().toByteArray(), Base64.NO_WRAP)
+            File(kStreamDir, METADATA_FILE_NAME).writeText(encoded)
+        } catch (e: Exception) {
+            Log.e("CustomDownloadManager", "Failed to write .metadata", e)
+        }
+    }
+
+    private fun addMetadataEntry(movieId: String, quality: String) {
+        val entries = readMetadataEntries().toMutableList()
+        if (entries.none { it.first == movieId && it.second == quality }) {
+            entries.add(Pair(movieId, quality))
+            writeMetadataEntries(entries)
+        }
+    }
+
+    private fun removeMetadataEntry(movieId: String, quality: String) {
+        val entries = readMetadataEntries().toMutableList()
+        val removed = entries.removeAll { it.first == movieId && it.second == quality }
+        if (removed) writeMetadataEntries(entries)
+    }
+
+    suspend fun recoverDownloads() = withContext(Dispatchers.IO) {
+        try {
+            val recoveryDone = userDataRepository.isDownloadRecoveryDone.first()
+            if (recoveryDone) return@withContext
+
+            val kStreamDir = getKStreamDir()
+            if (!kStreamDir.exists()) {
+                userDataRepository.setDownloadRecoveryDone(true)
+                return@withContext
+            }
+
+            val entries = readMetadataEntries()
+            if (entries.isEmpty()) {
+                userDataRepository.setDownloadRecoveryDone(true)
+                return@withContext
+            }
+
+            for ((movieId, quality) in entries) {
+                val downloadId = "${movieId}_${quality}"
+                val existing = downloadRepository.getDownload(downloadId)
+                if (existing != null) continue
+
+                val movieWithMedia = movieRepository.getMovieWithMedia(movieId) ?: continue
+                val movie = movieWithMedia.movie
+                val media = movieWithMedia.media.firstOrNull { it.quality == quality }
+
+                val fileName = "${movie.movieName.replace("[^a-zA-Z0-9]".toRegex(), "_")}_${quality}.mp4"
+                val mp4File = File(kStreamDir, fileName)
+                val mp4Exists = mp4File.exists()
+
+                val localFilePath = if (mp4Exists) Uri.fromFile(mp4File).toString() else ""
+                val fileSize = if (mp4Exists) {
+                    val sizeBytes = mp4File.length()
+                    val sizeMB = sizeBytes / (1024.0 * 1024.0)
+                    if (sizeMB >= 1024) String.format("%.1f GB", sizeMB / 1024.0)
+                    else String.format("%.0f MB", sizeMB)
+                } else media?.fileSize ?: "0"
+
+                val download = Download(
+                    id = downloadId,
+                    movieId = movieId,
+                    title = movie.movieName,
+                    posterUrl = movie.posterUrl,
+                    quality = quality,
+                    fileSize = fileSize,
+                    downloadUrl = media?.downloadUrl1 ?: "",
+                    localFilePath = localFilePath,
+                    status = if (mp4Exists) DownloadStatus.COMPLETED else DownloadStatus.FAILED,
+                    progress = if (mp4Exists) 1f else 0f,
+                    downloadedBytes = if (mp4Exists) mp4File.length() else 0L,
+                    totalBytes = if (mp4Exists) mp4File.length() else 0L,
+                    statusMessage = if (mp4Exists) null else "File moved or deleted"
+                )
+                downloadRepository.insertDownload(download)
+            }
+
+            userDataRepository.setDownloadRecoveryDone(true)
+        } catch (e: Exception) {
+            Log.e("CustomDownloadManager", "Download recovery failed", e)
+        }
+    }
 }

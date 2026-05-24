@@ -31,6 +31,7 @@ class KStreamDataStore @Inject constructor(
     private val POSTER_BASE_URL = stringPreferencesKey("poster_base_url")
     private val HD_ONLY_FILTER = booleanPreferencesKey("hd_only_filter")
     private val CAROUSEL_ENABLED = booleanPreferencesKey("carousel_enabled")
+    private val DOWNLOAD_RECOVERY_DONE = booleanPreferencesKey("download_recovery_done")
 
     val username: Flow<String> = context.dataStore.data.map { it[USERNAME] ?: "Guest" }
     val isFirstLaunchCompleted: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH_COMPLETED] ?: false }
@@ -40,6 +41,7 @@ class KStreamDataStore @Inject constructor(
     val posterBaseUrl: Flow<String> = context.dataStore.data.map { it[POSTER_BASE_URL] ?: "" }
     val isHdOnlyFilter: Flow<Boolean> = context.dataStore.data.map { it[HD_ONLY_FILTER] ?: false }
     val isCarouselEnabled: Flow<Boolean> = context.dataStore.data.map { it[CAROUSEL_ENABLED] ?: true }
+    val isDownloadRecoveryDone: Flow<Boolean> = context.dataStore.data.map { it[DOWNLOAD_RECOVERY_DONE] ?: false }
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         decodeRecentSearches(it[RECENT_SEARCHES])
     }
@@ -78,6 +80,10 @@ class KStreamDataStore @Inject constructor(
 
     suspend fun setCarouselEnabled(enabled: Boolean) {
         context.dataStore.edit { it[CAROUSEL_ENABLED] = enabled }
+    }
+
+    suspend fun setDownloadRecoveryDone(done: Boolean) {
+        context.dataStore.edit { it[DOWNLOAD_RECOVERY_DONE] = done }
     }
 
     suspend fun clearAll() {
