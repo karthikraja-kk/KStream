@@ -130,24 +130,29 @@ class DetailsViewModel @Inject constructor(
 
     fun fetchMovieDetails() {
         viewModelScope.launch {
-            try {
-                _uiState.update { it.copy(isLoading = true, error = null) }
-                val result = getMovieDetailsUseCase(movieId)
-                val highestQualityMedia = result?.media?.maxByOrNull { 
-                    it.quality.filter { c -> c.isDigit() }.toIntOrNull() ?: 0 
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            var lastError: Exception? = null
+            for (attempt in 1..3) {
+                try {
+                    val result = getMovieDetailsUseCase(movieId)
+                    val highestQualityMedia = result?.media?.maxByOrNull { 
+                        it.quality.filter { c -> c.isDigit() }.toIntOrNull() ?: 0 
+                    }
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false, 
+                            movieWithMedia = result,
+                            selectedQuality = highestQualityMedia?.quality,
+                            selectedFileSize = highestQualityMedia?.fileSize
+                        ) 
+                    }
+                    return@launch
+                } catch (e: Exception) {
+                    lastError = e
+                    if (attempt < 3) kotlinx.coroutines.delay(1000L * attempt)
                 }
-                
-                _uiState.update { 
-                    it.copy(
-                        isLoading = false, 
-                        movieWithMedia = result,
-                        selectedQuality = highestQualityMedia?.quality,
-                        selectedFileSize = highestQualityMedia?.fileSize
-                    ) 
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
             }
+            _uiState.update { it.copy(isLoading = false, error = lastError?.toUserMessage() ?: "Failed to load movie") }
         }
     }
 

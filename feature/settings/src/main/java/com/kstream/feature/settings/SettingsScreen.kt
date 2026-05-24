@@ -512,20 +512,11 @@ private fun ProfileRow(
     val platform = LocalPlatform.current
     val isTv = platform == Platform.TV
     val textFieldFocusRequester = remember { FocusRequester() }
-    var textFieldActive by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // When editing starts on TV, focus the text field area
+    // When editing starts on TV, focus the text field and show keyboard
     LaunchedEffect(isEditing) {
         if (isEditing && isTv) {
-            textFieldActive = false
-            try { textFieldFocusRequester.requestFocus() } catch (_: Exception) {}
-        }
-    }
-
-    // When textFieldActive becomes true, show keyboard
-    LaunchedEffect(textFieldActive) {
-        if (textFieldActive && isTv) {
             try { textFieldFocusRequester.requestFocus() } catch (_: Exception) {}
             keyboardController?.show()
         }
@@ -553,18 +544,15 @@ private fun ProfileRow(
         Column(Modifier.weight(1f)) {
             if (isEditing) {
                 if (isTv) {
-                    // On TV: show as a focusable box with white border highlight.
-                    // Only open keyboard (make editable) when user presses Enter/click.
                     OutlinedTextField(
                         value = tempUsername,
                         onValueChange = onTempChange,
                         label = { Text("Username", style = TextStyle(color = TextSecond, fontSize = 12.sp)) },
                         singleLine = true,
-                        readOnly = !textFieldActive,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = if (textFieldActive) BrandRed else Color.White,
+                            focusedBorderColor = BrandRed,
                             unfocusedBorderColor = BorderMid,
                             cursorColor = BrandRed
                         ),
@@ -572,16 +560,9 @@ private fun ProfileRow(
                             .fillMaxWidth()
                             .focusRequester(textFieldFocusRequester)
                             .onPreviewKeyEvent { event ->
-                                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
-                                    when (event.key) {
-                                        androidx.compose.ui.input.key.Key.DirectionLeft -> true // consume left
-                                        androidx.compose.ui.input.key.Key.Enter,
-                                        androidx.compose.ui.input.key.Key.NumPadEnter -> {
-                                            if (!textFieldActive) { textFieldActive = true; true }
-                                            else false
-                                        }
-                                        else -> false
-                                    }
+                                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                                    event.key == androidx.compose.ui.input.key.Key.DirectionLeft) {
+                                    true // consume left to prevent sidebar
                                 } else false
                             }
                     )

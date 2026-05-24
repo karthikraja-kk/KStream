@@ -54,6 +54,7 @@ class HomeViewModel @Inject constructor(
     
     private var lastSyncTime = 0L
     private val syncDebounceMs = 5000L
+    private var isSyncing = false
     
     init {
         refreshContent()
@@ -103,7 +104,7 @@ class HomeViewModel @Inject constructor(
             val heroMovies = buildHeroMovies(filteredMovies, filteredRecs)
             _uiState.update {
                 it.copy(
-                    isLoading = false,
+                    isLoading = if (rails.isEmpty() && isSyncing) true else false,
                     userName = data.username,
                     rails = rails,
                     heroMovies = heroMovies,
@@ -118,6 +119,7 @@ class HomeViewModel @Inject constructor(
     fun refreshContent() {
         viewModelScope.launch {
             try {
+                isSyncing = true
                 _uiState.update { it.copy(isLoading = true, error = null) }
                 lastSyncTime = System.currentTimeMillis()
                 syncMoviesUseCase()
@@ -133,6 +135,8 @@ class HomeViewModel @Inject constructor(
                     // Cached data available or offline — don't show error screen
                     _uiState.update { it.copy(isLoading = false) }
                 }
+            } finally {
+                isSyncing = false
             }
         }
     }
@@ -181,17 +185,17 @@ class HomeViewModel @Inject constructor(
             if (seen.add(m.id)) hero.add(m)
         }
 
-        // Top 3 highest-rated new releases
-        movies
-            .filter { it.rating.isNotBlank() }
-            .sortedWith(compareByDescending<Movie> { it.rating.toDoubleOrNull() ?: 0.0 }.thenByDescending { it.lastUpdated })
-            .take(3)
-            .forEach { m -> if (seen.add(m.id)) hero.add(m) }
-
         // Top 3 from recommendations
         recommendations.take(3).forEach { m ->
             if (seen.add(m.id)) hero.add(m)
         }
+
+        // Top 3 highest-rated (exclude ratings >= 10)
+        movies
+            .filter { it.rating.isNotBlank() && (it.rating.toDoubleOrNull() ?: 0.0) < 10.0 }
+            .sortedWith(compareByDescending<Movie> { it.rating.toDoubleOrNull() ?: 0.0 }.thenByDescending { it.lastUpdated })
+            .take(3)
+            .forEach { m -> if (seen.add(m.id)) hero.add(m) }
 
         return hero
     }
