@@ -277,9 +277,9 @@ fun PlayerRoute(
                             }
                         }
                         Key.DirectionLeft -> {
-                            if (isTV || !controlsVisible) {
+                            if (!controlsVisible) {
                                 player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-                                if (!controlsVisible) controlsVisible = true
+                                controlsVisible = true
                                 resetHideTimer()
                                 true
                             } else {
@@ -288,9 +288,9 @@ fun PlayerRoute(
                             }
                         }
                         Key.DirectionRight -> {
-                            if (isTV || !controlsVisible) {
+                            if (!controlsVisible) {
                                 player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
-                                if (!controlsVisible) controlsVisible = true
+                                controlsVisible = true
                                 resetHideTimer()
                                 true
                             } else {
@@ -492,7 +492,38 @@ fun PlayerRoute(
                         val progress = currentPosition.toFloat() / duration.toFloat()
                         val buffered = bufferedPosition.toFloat() / duration.toFloat()
 
-                        Box(modifier = Modifier.fillMaxWidth().height(32.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(32.dp)
+                                .then(
+                                    if (isTV) Modifier
+                                        .tvFocusBorder(shape = RoundedCornerShape(16.dp))
+                                        .onPreviewKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.key) {
+                                                    Key.DirectionLeft -> {
+                                                        val newPos = (player.currentPosition - 10_000L).coerceAtLeast(0L)
+                                                        player.seekTo(newPos)
+                                                        currentPosition = newPos
+                                                        resetHideTimer()
+                                                        true
+                                                    }
+                                                    Key.DirectionRight -> {
+                                                        val newPos = (player.currentPosition + 10_000L).coerceAtMost(player.duration)
+                                                        player.seekTo(newPos)
+                                                        currentPosition = newPos
+                                                        resetHideTimer()
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
+                                        .focusable()
+                                    else Modifier
+                                )
+                        ) {
                             // Buffered track
                             Box(
                                 modifier = Modifier
@@ -514,11 +545,15 @@ fun PlayerRoute(
                                     player.seekTo(currentPosition)
                                     isSeeking = false
                                 },
+                                enabled = !isTV,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = SliderDefaults.colors(
                                     thumbColor = BrandRed,
                                     activeTrackColor = BrandRed,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.15f),
+                                    disabledThumbColor = BrandRed,
+                                    disabledActiveTrackColor = BrandRed,
+                                    disabledInactiveTrackColor = Color.White.copy(alpha = 0.15f)
                                 )
                             )
                         }

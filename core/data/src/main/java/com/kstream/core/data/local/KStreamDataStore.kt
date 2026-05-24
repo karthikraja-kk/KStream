@@ -30,6 +30,7 @@ class KStreamDataStore @Inject constructor(
     private val DOWNLOAD_LOCATION_URI = stringPreferencesKey("download_location_uri")
     private val POSTER_BASE_URL = stringPreferencesKey("poster_base_url")
     private val HD_ONLY_FILTER = booleanPreferencesKey("hd_only_filter")
+    private val CAROUSEL_ENABLED = booleanPreferencesKey("carousel_enabled")
 
     val username: Flow<String> = context.dataStore.data.map { it[USERNAME] ?: "Guest" }
     val isFirstLaunchCompleted: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH_COMPLETED] ?: false }
@@ -38,6 +39,7 @@ class KStreamDataStore @Inject constructor(
     val downloadLocationUri: Flow<String> = context.dataStore.data.map { it[DOWNLOAD_LOCATION_URI] ?: "" }
     val posterBaseUrl: Flow<String> = context.dataStore.data.map { it[POSTER_BASE_URL] ?: "" }
     val isHdOnlyFilter: Flow<Boolean> = context.dataStore.data.map { it[HD_ONLY_FILTER] ?: false }
+    val isCarouselEnabled: Flow<Boolean> = context.dataStore.data.map { it[CAROUSEL_ENABLED] ?: true }
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         decodeRecentSearches(it[RECENT_SEARCHES])
     }
@@ -72,6 +74,10 @@ class KStreamDataStore @Inject constructor(
 
     suspend fun setHdOnlyFilter(hdOnly: Boolean) {
         context.dataStore.edit { it[HD_ONLY_FILTER] = hdOnly }
+    }
+
+    suspend fun setCarouselEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[CAROUSEL_ENABLED] = enabled }
     }
 
     suspend fun clearAll() {

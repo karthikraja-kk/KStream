@@ -58,6 +58,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import coil.compose.AsyncImage
 import com.kstream.core.ui.components.AppEmptyScreen
 import com.kstream.core.ui.components.AppLoadingScreen
@@ -320,6 +322,39 @@ fun SettingsRoute(
                         if (uiState.cacheCleared) {
                             Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
                         }
+                    }
+                }
+            }
+
+            // ── Display ──────────────────────────────────────────────────────
+            SettingsSection("DISPLAY", Icons.Default.Visibility)
+            SettingsCard {
+                var carouselFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (carouselFocused) BgRow else Color.Transparent)
+                        .onFocusChanged { carouselFocused = it.hasFocus }
+                        .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+                ) {
+                    SettingsRow(
+                        icon = if (uiState.isCarouselEnabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        title = "Hero Carousel",
+                        subtitle = "Show featured movies carousel on home screen",
+                        modifier = Modifier.clickableRow {
+                            viewModel.toggleCarousel(!uiState.isCarouselEnabled)
+                        }
+                    ) {
+                        Switch(
+                            checked = uiState.isCarouselEnabled,
+                            onCheckedChange = { viewModel.toggleCarousel(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = BrandRed,
+                                uncheckedThumbColor = TextDim,
+                                uncheckedTrackColor = BorderMid
+                            )
+                        )
                     }
                 }
             }

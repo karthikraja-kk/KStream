@@ -52,7 +52,8 @@ data class SettingsUiState(
     val cacheCleared: Boolean = false,
     val watchHistory: List<WatchHistoryItem> = emptyList(),
     val isLoadingHistory: Boolean = false,
-    val successMessage: String? = null
+    val successMessage: String? = null,
+    val isCarouselEnabled: Boolean = true
 )
 
 @HiltViewModel
@@ -87,12 +88,23 @@ class SettingsViewModel @Inject constructor(
             .onEach { username -> _uiState.update { it.copy(username = username) } }
             .launchIn(viewModelScope)
 
+        userDataRepository.isCarouselEnabled
+            .catch { emit(true) }
+            .onEach { enabled -> _uiState.update { it.copy(isCarouselEnabled = enabled) } }
+            .launchIn(viewModelScope)
+
         startLiveScanMonitor()
         startWatchHistoryMonitor()
     }
 
     fun onUsernameChange(newName: String) {
         _uiState.update { it.copy(username = newName) }
+    }
+
+    fun toggleCarousel(enabled: Boolean) {
+        viewModelScope.launch {
+            userDataRepository.setCarouselEnabled(enabled)
+        }
     }
 
     fun saveUsername() {

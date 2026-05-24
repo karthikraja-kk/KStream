@@ -96,12 +96,16 @@ class HomeViewModel @Inject constructor(
             data class CombinedData(val movies: List<Movie>, val progress: List<WatchProgress>, val username: String, val likedIds: List<String>, val recommendations: List<Movie>)
             CombinedData(movies, progress, username, likedIds, recommendations)
         }.combine(
-            userDataRepository.isHdOnlyFilter.catch { emit(false) }
-        ) { data, hdOnly ->
+            combine(
+                userDataRepository.isHdOnlyFilter.catch { emit(false) },
+                userDataRepository.isCarouselEnabled.catch { emit(true) }
+            ) { hd, carousel -> Pair(hd, carousel) }
+        ) { data, prefs ->
+            val (hdOnly, carouselEnabled) = prefs
             val filteredMovies = if (hdOnly) data.movies.filter { it.type.equals("Original HD", ignoreCase = true) } else data.movies
             val filteredRecs = if (hdOnly) data.recommendations.filter { it.type.equals("Original HD", ignoreCase = true) } else data.recommendations
             val rails = groupMoviesIntoRails(filteredMovies, data.progress, data.likedIds, filteredRecs)
-            val heroMovies = buildHeroMovies(filteredMovies, filteredRecs)
+            val heroMovies = if (carouselEnabled) buildHeroMovies(filteredMovies, filteredRecs) else emptyList()
             _uiState.update {
                 it.copy(
                     isLoading = if (rails.isEmpty() && isSyncing) true else false,
