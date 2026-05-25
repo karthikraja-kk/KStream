@@ -99,6 +99,11 @@ fun KStreamTvSideNav(
     val navOrder = listOf("home", "search", "downloads", "settings")
     var currentFocusedNav by remember { mutableStateOf(currentRoute ?: "home") }
 
+    val handleNavClick: (String) -> Unit = { route ->
+        onNavigate(route)
+        sidebarExpanded = false
+    }
+
     Row(modifier = Modifier.fillMaxSize()) {
         // Sidebar — always visible on top-level routes
         if (currentRoute in topLevelRoutes) {
@@ -156,7 +161,7 @@ fun KStreamTvSideNav(
                     label = "Home",
                     selected = currentRoute == "home",
                     expanded = sidebarExpanded,
-                    onClick = { onNavigate("home") },
+                    onClick = { handleNavClick("home") },
                     focusRequester = navFocusRequesters["home"]!!,
                     onFocusedChange = { if (it) currentFocusedNav = "home" }
                 )
@@ -165,7 +170,7 @@ fun KStreamTvSideNav(
                     label = "Search",
                     selected = currentRoute == "search",
                     expanded = sidebarExpanded,
-                    onClick = { onNavigate("search") },
+                    onClick = { handleNavClick("search") },
                     focusRequester = navFocusRequesters["search"]!!,
                     onFocusedChange = { if (it) currentFocusedNav = "search" }
                 )
@@ -174,7 +179,7 @@ fun KStreamTvSideNav(
                     label = "Downloads",
                     selected = currentRoute == "downloads",
                     expanded = sidebarExpanded,
-                    onClick = { onNavigate("downloads") },
+                    onClick = { handleNavClick("downloads") },
                     focusRequester = navFocusRequesters["downloads"]!!,
                     onFocusedChange = { if (it) currentFocusedNav = "downloads" }
                 )
@@ -186,7 +191,7 @@ fun KStreamTvSideNav(
                     label = "Settings",
                     selected = currentRoute == "settings",
                     expanded = sidebarExpanded,
-                    onClick = { onNavigate("settings") },
+                    onClick = { handleNavClick("settings") },
                     focusRequester = navFocusRequesters["settings"]!!,
                     onFocusedChange = { if (it) currentFocusedNav = "settings" }
                 )

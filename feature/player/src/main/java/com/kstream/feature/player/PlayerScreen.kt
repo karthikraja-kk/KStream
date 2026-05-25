@@ -127,6 +127,9 @@ fun PlayerRoute(
     var duration by remember { mutableLongStateOf(0L) }
     var bufferedPosition by remember { mutableLongStateOf(0L) }
     var isSeeking by remember { mutableStateOf(false) }
+    var seekAccumulated by remember { mutableLongStateOf(0L) }
+    var seekIndicatorVisible by remember { mutableStateOf(false) }
+    var seekIndicatorKey by remember { mutableLongStateOf(0L) }
 
     // Poll player state
     LaunchedEffect(Unit) {
@@ -146,6 +149,15 @@ fun PlayerRoute(
         if (controlsVisible && !isSeeking) {
             delay(4000)
             controlsVisible = false
+        }
+    }
+
+    // Auto-hide seek indicator after 1 second of no input
+    LaunchedEffect(seekIndicatorKey) {
+        if (seekIndicatorVisible) {
+            delay(1000)
+            seekIndicatorVisible = false
+            seekAccumulated = 0L
         }
     }
 
@@ -278,18 +290,32 @@ fun PlayerRoute(
                             }
                         }
                         Key.DirectionLeft -> {
-                            val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
-                            currentPosition = newPos
-                            player.seekTo(newPos)
-                            if (controlsVisible) resetHideTimer()
-                            true
+                            if (!controlsVisible) {
+                                val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
+                                currentPosition = newPos
+                                player.seekTo(newPos)
+                                seekAccumulated -= 10
+                                seekIndicatorVisible = true
+                                seekIndicatorKey = System.currentTimeMillis()
+                                true
+                            } else {
+                                resetHideTimer()
+                                false
+                            }
                         }
                         Key.DirectionRight -> {
-                            val newPos = (currentPosition + 10_000L).coerceAtMost(duration)
-                            currentPosition = newPos
-                            player.seekTo(newPos)
-                            if (controlsVisible) resetHideTimer()
-                            true
+                            if (!controlsVisible) {
+                                val newPos = (currentPosition + 10_000L).coerceAtMost(duration)
+                                currentPosition = newPos
+                                player.seekTo(newPos)
+                                seekAccumulated += 10
+                                seekIndicatorVisible = true
+                                seekIndicatorKey = System.currentTimeMillis()
+                                true
+                            } else {
+                                resetHideTimer()
+                                false
+                            }
                         }
                         else -> false
                     }
@@ -310,6 +336,27 @@ fun PlayerRoute(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Seek indicator overlay
+        AnimatedVisibility(
+            visible = seekIndicatorVisible,
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(300)),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = if (seekAccumulated >= 0) "⏩ +${seekAccumulated}s" else "⏪ ${seekAccumulated}s",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
 
         // ─── Custom controls overlay ──────────────────────────────────────────
         AnimatedVisibility(
