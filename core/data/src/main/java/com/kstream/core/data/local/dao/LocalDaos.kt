@@ -24,14 +24,13 @@ interface MovieDao {
         OR castMembers LIKE :query
         OR genres LIKE :query
         OR language LIKE :query
-        LIMIT 100
     """)
     suspend fun searchMovies(query: String): List<MovieEntity>
 
-    @Query("SELECT * FROM movies_cache WHERE genres LIKE :genre LIMIT 100")
+    @Query("SELECT * FROM movies_cache WHERE genres LIKE :genre")
     suspend fun searchByGenre(genre: String): List<MovieEntity>
 
-    @Query("SELECT * FROM movies_cache WHERE year = :year LIMIT 100")
+    @Query("SELECT * FROM movies_cache WHERE year = :year")
     suspend fun searchByYear(year: Int): List<MovieEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -115,17 +115,17 @@ class OfflineFirstMovieRepository @Inject constructor(
             "New Releases" -> {
                 return try {
                     val localMovies = movieDao.getAllMovies()
-                    localMovies.map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }.take(100)
+                    localMovies.map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }
                 } catch (e: Exception) {
-                    network.getMovies().map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }.take(100)
+                    network.getMovies().map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }
                 }
             }
             "You Might Like" -> {
                 return try {
                     val localMovies = movieDao.getAllMovies()
-                    localMovies.map { it.asExternalModel(baseUrl) }.take(100)
+                    localMovies.map { it.asExternalModel(baseUrl) }
                 } catch (e: Exception) {
-                    network.getMovies().map { it.asExternalModel(baseUrl) }.take(100)
+                    network.getMovies().map { it.asExternalModel(baseUrl) }
                 }
             }
         }
