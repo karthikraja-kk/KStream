@@ -91,10 +91,14 @@ fun KStreamAppContent() {
         ?.substringBefore("?")
 
     val onTvNavigate: (String) -> Unit = { route ->
-        navController.navigate(route) {
-            popUpTo("home") { saveState = true }
-            launchSingleTop = true
-            restoreState = true
+        if (route == "home") {
+            navController.popBackStack("home", inclusive = false)
+        } else {
+            navController.navigate(route) {
+                popUpTo("home") { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
         }
     }
 
