@@ -18,6 +18,8 @@ import com.kstream.core.domain.repository.MovieRepository
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.text.SimpleDateFormat
+import java.util.Locale
 import javax.inject.Inject
 
 class OfflineFirstMovieRepository @Inject constructor(
@@ -78,7 +80,7 @@ class OfflineFirstMovieRepository @Inject constructor(
             if (genre.isNotEmpty()) {
                 return try {
                     val localResults = movieDao.searchByGenre("%$genre%")
-                    localResults.map { it.asExternalModel(baseUrl) }
+                    localResults.map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
                 } catch (e: Exception) {
                     Log.e("MovieRepository", "Local genre search failed: ${e.message}", e)
                     emptyList()
@@ -92,7 +94,7 @@ class OfflineFirstMovieRepository @Inject constructor(
             if (year != null) {
                 return try {
                     val localResults = movieDao.searchByYear(year)
-                    localResults.map { it.asExternalModel(baseUrl) }
+                    localResults.map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
                 } catch (e: Exception) {
                     Log.e("MovieRepository", "Local year search failed: ${e.message}", e)
                     emptyList()
@@ -104,9 +106,9 @@ class OfflineFirstMovieRepository @Inject constructor(
         if (normalizedQuery == "*") {
             return try {
                 val localMovies = movieDao.getAllMovies()
-                localMovies.map { it.asExternalModel(baseUrl) }
+                localMovies.map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
             } catch (e: Exception) {
-                network.getMovies().map { it.asExternalModel(baseUrl) }
+                network.getMovies().map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
             }
         }
 
@@ -115,17 +117,17 @@ class OfflineFirstMovieRepository @Inject constructor(
             "New Releases" -> {
                 return try {
                     val localMovies = movieDao.getAllMovies()
-                    localMovies.map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }
+                    localMovies.map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
                 } catch (e: Exception) {
-                    network.getMovies().map { it.asExternalModel(baseUrl) }.sortedByDescending { it.year }
+                    network.getMovies().map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
                 }
             }
             "You Might Like" -> {
                 return try {
                     val localMovies = movieDao.getAllMovies()
-                    localMovies.map { it.asExternalModel(baseUrl) }
+                    localMovies.map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
                 } catch (e: Exception) {
-                    network.getMovies().map { it.asExternalModel(baseUrl) }
+                    network.getMovies().map { it.asExternalModel(baseUrl) }.sortedByLastUpdated()
                 }
             }
         }
@@ -305,5 +307,15 @@ private fun String?.toScanStatus(): ScanStatus {
         "completed" -> ScanStatus.COMPLETED
         "failed" -> ScanStatus.FAILED
         else -> ScanStatus.IDLE
+    }
+}
+
+private fun List<Movie>.sortedByLastUpdated(): List<Movie> {
+    val formatter = SimpleDateFormat("dd MMMM yyyy", Locale.ENGLISH)
+    return sortedByDescending { movie ->
+        try {
+            if (movie.lastUpdated.isNotBlank()) formatter.parse(movie.lastUpdated)?.time ?: 0L
+            else 0L
+        } catch (_: Exception) { 0L }
     }
 }

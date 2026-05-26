@@ -101,13 +101,21 @@ class SearchViewModel @Inject constructor(
     fun setInitialQuery(query: String) {
         if (_uiState.value.activeQuery == query) return
         val displayQuery = if (isReservedQuery(query)) "" else query
-        _uiState.update { it.copy(query = displayQuery, activeQuery = query) }
+        val defaultSort = if (shouldDefaultToLatest(query)) SortOption.LATEST_FIRST else SortOption.NONE
+        _uiState.update { it.copy(query = displayQuery, activeQuery = query, sortOption = defaultSort) }
         if (query.isNotEmpty()) {
             searchJob?.cancel()
             searchJob = viewModelScope.launch {
                 executeSearch(query)
             }
         }
+    }
+
+    private fun shouldDefaultToLatest(query: String): Boolean {
+        val trimmed = query.trim()
+        return trimmed == "all:*" ||
+                trimmed.startsWith("genre:", ignoreCase = true) ||
+                trimmed.startsWith("year:", ignoreCase = true)
     }
 
     fun onQueryChange(newQuery: String) {

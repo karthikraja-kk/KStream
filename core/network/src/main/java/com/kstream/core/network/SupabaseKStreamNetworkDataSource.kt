@@ -18,10 +18,24 @@ class SupabaseKStreamNetworkDataSource @Inject constructor(
     override suspend fun getMovies(): List<NetworkMovie> {
         return try {
             Log.d("KStreamNetwork", "Fetching movies from Supabase...")
-            val response = client.postgrest["movies"].select()
-            val movies = response.decodeList<NetworkMovie>()
-            Log.d("KStreamNetwork", "Successfully fetched ${movies.size} movies. Raw data: ${response.data}")
-            movies
+            val allMovies = mutableListOf<NetworkMovie>()
+            val pageSize = 1000
+            var offset = 0L
+
+            while (true) {
+                val batch = client.postgrest["movies"]
+                    .select {
+                        range(offset, offset + pageSize - 1)
+                    }
+                    .decodeList<NetworkMovie>()
+
+                allMovies.addAll(batch)
+                if (batch.size < pageSize) break
+                offset += pageSize
+            }
+
+            Log.d("KStreamNetwork", "Successfully fetched ${allMovies.size} movies")
+            allMovies
         } catch (e: Exception) {
             Log.e("KStreamNetwork", "Error fetching movies: ${e.message}", e)
             throw e
