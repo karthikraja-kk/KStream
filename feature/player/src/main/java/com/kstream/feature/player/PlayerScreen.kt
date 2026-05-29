@@ -350,7 +350,7 @@ fun PlayerRoute(
                     .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
                 Text(
-                    text = if (seekAccumulated >= 0) "⏩ +${seekAccumulated}s" else "⏪ ${seekAccumulated}s",
+                    text = if (seekAccumulated >= 0) "+${seekAccumulated}s" else "${seekAccumulated}s",
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
