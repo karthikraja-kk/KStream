@@ -264,10 +264,31 @@ fun PlayerRoute(
             .background(Color.Black)
             .focusRequester(playerBoxFocusRequester)
             .pointerInput(Unit) {
-                detectTapGestures {
-                    controlsVisible = !controlsVisible
-                    if (controlsVisible) resetHideTimer()
-                }
+                detectTapGestures(
+                    onDoubleTap = { offset ->
+                        if (offset.x > size.width / 2) {
+                            // Double-tap right half → forward 10s
+                            val newPos = (currentPosition + 10_000L).coerceAtMost(duration)
+                            currentPosition = newPos
+                            player.seekTo(newPos)
+                            seekAccumulated += 10
+                            seekIndicatorVisible = true
+                            seekIndicatorKey = System.currentTimeMillis()
+                        } else {
+                            // Double-tap left half → rewind 10s
+                            val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
+                            currentPosition = newPos
+                            player.seekTo(newPos)
+                            seekAccumulated -= 10
+                            seekIndicatorVisible = true
+                            seekIndicatorKey = System.currentTimeMillis()
+                        }
+                    },
+                    onTap = {
+                        controlsVisible = !controlsVisible
+                        if (controlsVisible) resetHideTimer()
+                    }
+                )
             }
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
