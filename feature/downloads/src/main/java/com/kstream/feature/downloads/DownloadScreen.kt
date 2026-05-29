@@ -242,6 +242,8 @@ fun DownloadRoute(
                             },
                             onWatch = { quality -> onWatchClick(download.movieId, quality) },
                             onRedownload = { viewModel.redownload(download.id) },
+                            onRetry = { viewModel.retryDownload(download.id) },
+                            hasBeenRetried = download.id in viewModel.retriedIds,
                             onPause = { viewModel.pauseDownload(download.id) },
                             onResume = { viewModel.resumeDownload(download.id) },
                             onRemove = { downloadToRemove = download }
@@ -665,6 +667,8 @@ fun DownloadItem(
     onLongPress: () -> Unit = {},
     onWatch: (String) -> Unit,
     onRedownload: () -> Unit,
+    onRetry: () -> Unit,
+    hasBeenRetried: Boolean = false,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRemove: () -> Unit
@@ -798,11 +802,26 @@ fun DownloadItem(
                         Spacer(Modifier.height(3.dp))
                         val downloaded = formatBytes(download.downloadedBytes)
                         val total = formatBytes(download.totalBytes)
+                        val eta = rememberDownloadEta(
+                            downloadedBytes = download.downloadedBytes,
+                            totalBytes = download.totalBytes,
+                            isActive = download.status == DownloadStatus.DOWNLOADING
+                        )
                         Text(
                             if (download.status == DownloadStatus.QUEUED) "Queued"
                             else "$downloaded / $total",
                             style = TextStyle(color = TextSecond, fontSize = 11.sp)
                         )
+                        if (download.status == DownloadStatus.DOWNLOADING) {
+                            val etaLabel = listOfNotNull(
+                                eta.speedText.ifEmpty { null },
+                                eta.etaText.ifEmpty { null }
+                            ).joinToString(" • ")
+                            if (etaLabel.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(etaLabel, style = TextStyle(color = TextDim, fontSize = 10.sp))
+                            }
+                        }
                         Spacer(Modifier.height(6.dp))
                         // Pause / Resume chip
                         if (download.status == DownloadStatus.DOWNLOADING) {
@@ -851,7 +870,7 @@ fun DownloadItem(
                             Text("Watch Now", style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
                         }
                     }
-                    // ── File missing / failed / deleted: Redownload ─────
+                    // ── File missing / failed / deleted: Retry or Redownload ─
                     else -> {
                         if (!fileExists || download.status == DownloadStatus.FAILED) {
                             val warningColor = if (download.status == DownloadStatus.FAILED) BrandRed
@@ -863,18 +882,53 @@ fun DownloadItem(
                             )
                             Spacer(Modifier.height(6.dp))
                         }
-                        OutlinedButton(
-                            onClick = onRedownload,
-                            modifier = Modifier
-                                .height(28.dp)
-                                .tvFocusBorder(shape = RoundedCornerShape(14.dp)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            border = BorderStroke(1.dp, BorderMid)
-                        ) {
-                            Icon(Icons.Default.Refresh, null, tint = TextSecond, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Redownload", style = TextStyle(color = TextSecond, fontSize = 12.sp))
+                        if (download.status == DownloadStatus.FAILED) {
+                            // Failed download: show Retry (resume from partial)
+                            OutlinedButton(
+                                onClick = onRetry,
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .tvFocusBorder(shape = RoundedCornerShape(14.dp)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, BrandRed.copy(alpha = 0.5f))
+                            ) {
+                                Icon(Icons.Default.Refresh, null, tint = BrandRed, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Retry", style = TextStyle(color = BrandRed, fontSize = 12.sp))
+                            }
+                            // After a failed retry, also offer Start Over
+                            if (hasBeenRetried) {
+                                Spacer(Modifier.height(4.dp))
+                                OutlinedButton(
+                                    onClick = onRedownload,
+                                    modifier = Modifier
+                                        .height(28.dp)
+                                        .tvFocusBorder(shape = RoundedCornerShape(14.dp)),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, BorderMid)
+                                ) {
+                                    Icon(Icons.Default.RestartAlt, null, tint = TextSecond, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Start Over", style = TextStyle(color = TextSecond, fontSize = 12.sp))
+                                }
+                            }
+                        } else {
+                            // Completed but file missing: Redownload
+                            OutlinedButton(
+                                onClick = onRedownload,
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .tvFocusBorder(shape = RoundedCornerShape(14.dp)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, BorderMid)
+                            ) {
+                                Icon(Icons.Default.Refresh, null, tint = TextSecond, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Redownload", style = TextStyle(color = TextSecond, fontSize = 12.sp))
+                            }
                         }
                     }
                 }
@@ -921,4 +975,75 @@ private fun formatBytes(bytes: Long): String {
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
     val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
     return String.format(Locale.US, "%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+private fun formatSpeed(bytesPerSec: Double): String {
+    if (bytesPerSec <= 0) return ""
+    return when {
+        bytesPerSec >= 1_073_741_824 -> String.format(Locale.US, "%.1f GB/s", bytesPerSec / 1_073_741_824)
+        bytesPerSec >= 1_048_576     -> String.format(Locale.US, "%.1f MB/s", bytesPerSec / 1_048_576)
+        bytesPerSec >= 1_024         -> String.format(Locale.US, "%.0f KB/s", bytesPerSec / 1_024)
+        else                         -> String.format(Locale.US, "%.0f B/s", bytesPerSec)
+    }
+}
+
+private fun formatEta(seconds: Long): String = when {
+    seconds < 0  -> ""
+    seconds < 5  -> "a few seconds left"
+    seconds < 60 -> "${seconds}s left"
+    seconds < 3600 -> {
+        val m = seconds / 60
+        val s = seconds % 60
+        if (s == 0L) "${m}m left" else "${m}m ${s}s left"
+    }
+    else -> {
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        if (m == 0L) "${h}h left" else "${h}h ${m}m left"
+    }
+}
+
+data class DownloadEta(val speedText: String, val etaText: String)
+
+@Composable
+private fun rememberDownloadEta(downloadedBytes: Long, totalBytes: Long, isActive: Boolean): DownloadEta {
+    var speedBps by remember { mutableDoubleStateOf(0.0) }
+    var prevBytes by remember { mutableLongStateOf(downloadedBytes) }
+    var prevTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var sampleCount by remember { mutableIntStateOf(0) }
+
+    // Reset tracking when download restarts or switches
+    LaunchedEffect(isActive) {
+        if (isActive) {
+            prevBytes = downloadedBytes
+            prevTime = System.currentTimeMillis()
+            speedBps = 0.0
+            sampleCount = 0
+        }
+    }
+
+    LaunchedEffect(downloadedBytes) {
+        if (!isActive || downloadedBytes <= 0) return@LaunchedEffect
+        val now = System.currentTimeMillis()
+        val dt = (now - prevTime) / 1000.0
+        if (dt < 0.3) return@LaunchedEffect  // skip updates faster than 300ms
+
+        val bytesDelta = downloadedBytes - prevBytes
+        if (bytesDelta > 0 && dt > 0) {
+            val instantSpeed = bytesDelta / dt
+            speedBps = if (sampleCount < 2) instantSpeed
+                       else speedBps * 0.7 + instantSpeed * 0.3
+            sampleCount++
+        }
+        prevBytes = downloadedBytes
+        prevTime = now
+    }
+
+    val speedText = if (isActive && sampleCount >= 1) formatSpeed(speedBps) else ""
+    val etaText = if (isActive && sampleCount >= 2 && speedBps > 0 && totalBytes > downloadedBytes) {
+        val remaining = totalBytes - downloadedBytes
+        formatEta((remaining / speedBps).toLong())
+    } else ""
+
+    return DownloadEta(speedText, etaText)
 }

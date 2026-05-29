@@ -8,7 +8,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import android.util.Base64
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.kstream.core.common.NetworkMonitor
@@ -22,8 +21,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -41,7 +38,7 @@ class CustomDownloadManager @Inject constructor(
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     private val activeDownloads = ConcurrentHashMap<String, Job>()
@@ -226,11 +223,12 @@ class CustomDownloadManager @Inject constructor(
                 contentResolver.openOutputStream(videoUri, if (currentBytes > 0) "wa" else "wt")
             } ?: throw Exception("Failed to open output stream")
 
-            outputStream.use { out ->
+            java.io.BufferedOutputStream(outputStream, 256 * 1024).use { out ->
                 body.byteStream().use { input ->
-                    val buffer = ByteArray(8192)
+                    val buffer = ByteArray(128 * 1024) // 128KB buffer for faster throughput
                     var bytesRead: Int
                     var downloadedBytes = currentBytes
+                    var lastProgressUpdate = System.currentTimeMillis()
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         ensureActive()
@@ -238,10 +236,21 @@ class CustomDownloadManager @Inject constructor(
                         downloadedBytes += bytesRead
 
                         if (totalBytes > 0) {
-                            val progress = downloadedBytes.toFloat() / totalBytes
-                            onProgress(progress)
-                            downloadRepository.updateDownloadProgress(id, progress, downloadedBytes, totalBytes)
+                            val now = System.currentTimeMillis()
+                            // Throttle progress updates to every 500ms to reduce DB writes
+                            if (now - lastProgressUpdate >= 500) {
+                                val progress = downloadedBytes.toFloat() / totalBytes
+                                onProgress(progress)
+                                downloadRepository.updateDownloadProgress(id, progress, downloadedBytes, totalBytes)
+                                lastProgressUpdate = now
+                            }
                         }
+                    }
+                    // Final progress update to ensure 100% is recorded
+                    if (totalBytes > 0) {
+                        val progress = downloadedBytes.toFloat() / totalBytes
+                        onProgress(progress)
+                        downloadRepository.updateDownloadProgress(id, progress, downloadedBytes, totalBytes)
                     }
                 }
             }
@@ -255,6 +264,7 @@ class CustomDownloadManager @Inject constructor(
             val contentValues = ContentValues().apply {
                 put(MediaStore.Video.Media.DISPLAY_NAME, finalFileName)
                 put(MediaStore.Video.Media.IS_PENDING, 0)
+                put(MediaStore.Video.Media.DESCRIPTION, "$movieId|$quality")
             }
             context.contentResolver.update(videoUri, contentValues, null, null)
         } else {
@@ -264,7 +274,6 @@ class CustomDownloadManager @Inject constructor(
             MediaScannerConnection.scanFile(context, arrayOf(finalFile.absolutePath), null, null)
         }
         downloadRepository.markDownloadComplete(id, videoUri.toString())
-        addMetadataEntry(movieId, quality)
     }
 
     fun pauseDownload(id: String) {
@@ -332,7 +341,6 @@ class CustomDownloadManager @Inject constructor(
         } catch (e: Exception) {
         }
         downloadRepository.deleteDownload(id)
-        removeMetadataEntry(movieId, quality)
         return true
     }
 
@@ -348,10 +356,6 @@ class CustomDownloadManager @Inject constructor(
     suspend fun getFolderUri(): String? = "/Movies/KStream"
     fun getDownloadDirectoryDisplay(): String = "/Movies/KStream"
 
-    private companion object {
-        const val METADATA_FILE_NAME = ".metadata"
-    }
-
     private fun getKStreamDir(): File {
         return File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
@@ -359,175 +363,135 @@ class CustomDownloadManager @Inject constructor(
         )
     }
 
-    private fun readMetadataEntries(): List<Pair<String, String>> {
-        try {
-            val encoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val projection = arrayOf(MediaStore.Files.FileColumns._ID)
-                val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ? AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} = ?"
-                val selectionArgs = arrayOf(METADATA_FILE_NAME, "${Environment.DIRECTORY_MOVIES}/KStream/")
-                val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                val uri = context.contentResolver.query(
-                    filesUri, projection, selection, selectionArgs, null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID))
-                        Uri.withAppendedPath(filesUri, id.toString())
-                    } else null
-                } ?: return emptyList()
-                context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()?.trim()
-                    ?: return emptyList()
-            } else {
-                val metadataFile = File(getKStreamDir(), METADATA_FILE_NAME)
-                if (!metadataFile.exists()) return emptyList()
-                metadataFile.readText().trim()
-            }
-            if (encoded.isEmpty()) return emptyList()
-            val decoded = String(Base64.decode(encoded, Base64.NO_WRAP))
-            val jsonArray = JSONArray(decoded)
-            return (0 until jsonArray.length()).map { i ->
-                val obj = jsonArray.getJSONObject(i)
-                Pair(obj.getString("movieId"), obj.getString("quality"))
-            }
-        } catch (e: Exception) {
-            Log.e("CustomDownloadManager", "Failed to read .metadata", e)
-            return emptyList()
-        }
-    }
-
-    private fun writeMetadataEntries(entries: List<Pair<String, String>>) {
-        try {
-            val jsonArray = JSONArray()
-            entries.forEach { (movieId, quality) ->
-                jsonArray.put(JSONObject().apply {
-                    put("movieId", movieId)
-                    put("quality", quality)
-                })
-            }
-            val encoded = Base64.encodeToString(jsonArray.toString().toByteArray(), Base64.NO_WRAP)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val projection = arrayOf(MediaStore.Files.FileColumns._ID)
-                val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ? AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} = ?"
-                val selectionArgs = arrayOf(METADATA_FILE_NAME, "${Environment.DIRECTORY_MOVIES}/KStream/")
-                val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                val existingUri = context.contentResolver.query(
-                    filesUri, projection, selection, selectionArgs, null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID))
-                        Uri.withAppendedPath(filesUri, id.toString())
-                    } else null
-                }
-
-                val uri = existingUri ?: run {
-                    val contentValues = ContentValues().apply {
-                        put(MediaStore.Files.FileColumns.DISPLAY_NAME, METADATA_FILE_NAME)
-                        put(MediaStore.Files.FileColumns.MIME_TYPE, "application/octet-stream")
-                        put(MediaStore.Files.FileColumns.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/KStream")
-                    }
-                    context.contentResolver.insert(filesUri, contentValues)
-                } ?: throw Exception("Failed to create .metadata via MediaStore")
-
-                context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(encoded.toByteArray()) }
-            } else {
-                val kStreamDir = getKStreamDir()
-                if (!kStreamDir.exists()) kStreamDir.mkdirs()
-                File(kStreamDir, METADATA_FILE_NAME).writeText(encoded)
-            }
-        } catch (e: Exception) {
-            Log.e("CustomDownloadManager", "Failed to write .metadata", e)
-        }
-    }
-
-    private fun addMetadataEntry(movieId: String, quality: String) {
-        val entries = readMetadataEntries().toMutableList()
-        if (entries.none { it.first == movieId && it.second == quality }) {
-            entries.add(Pair(movieId, quality))
-            writeMetadataEntries(entries)
-        }
-    }
-
-    private fun removeMetadataEntry(movieId: String, quality: String) {
-        val entries = readMetadataEntries().toMutableList()
-        val removed = entries.removeAll { it.first == movieId && it.second == quality }
-        if (removed) writeMetadataEntries(entries)
-    }
-
     suspend fun recoverDownloads() = withContext(Dispatchers.IO) {
         try {
-            val recoveryDone = userDataRepository.isDownloadRecoveryDone.first()
-            if (recoveryDone) return@withContext
-
-            val entries = readMetadataEntries()
-            if (entries.isEmpty()) {
-                userDataRepository.setDownloadRecoveryDone(true)
-                return@withContext
-            }
-
-            for ((movieId, quality) in entries) {
-                val downloadId = "${movieId}_${quality}"
-                val existing = downloadRepository.getDownload(downloadId)
-                if (existing != null) continue
-
-                val movieWithMedia = movieRepository.getMovieWithMedia(movieId) ?: continue
-                val movie = movieWithMedia.movie
-                val media = movieWithMedia.media.firstOrNull { it.quality == quality }
-
-                val fileName = "${movie.movieName.replace("[^a-zA-Z0-9]".toRegex(), "_")}_${quality}.mp4"
-                val fileResult = findDownloadedFile(fileName)
-                val fileExists = fileResult != null
-
-                val localFilePath = fileResult?.first?.toString() ?: ""
-                val fileSizeBytes = fileResult?.second ?: 0L
-                val fileSize = if (fileExists) {
-                    val sizeMB = fileSizeBytes / (1024.0 * 1024.0)
-                    if (sizeMB >= 1024) String.format("%.1f GB", sizeMB / 1024.0)
-                    else String.format("%.0f MB", sizeMB)
-                } else media?.fileSize ?: "0"
-
-                val download = Download(
-                    id = downloadId,
-                    movieId = movieId,
-                    title = movie.movieName,
-                    posterUrl = movie.posterUrl,
-                    quality = quality,
-                    fileSize = fileSize,
-                    downloadUrl = media?.downloadUrl1 ?: "",
-                    localFilePath = localFilePath,
-                    status = if (fileExists) DownloadStatus.COMPLETED else DownloadStatus.FAILED,
-                    progress = if (fileExists) 1f else 0f,
-                    downloadedBytes = fileSizeBytes,
-                    totalBytes = fileSizeBytes,
-                    statusMessage = if (fileExists) null else "File moved or deleted"
-                )
-                downloadRepository.insertDownload(download)
-            }
-
-            userDataRepository.setDownloadRecoveryDone(true)
+            fileScanRecovery()
         } catch (e: Exception) {
             Log.e("CustomDownloadManager", "Download recovery failed", e)
         }
     }
 
-    /** Find a downloaded MP4 file by name. Returns (Uri, sizeBytes) or null. */
-    private fun findDownloadedFile(fileName: String): Pair<Uri, Long>? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val projection = arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.SIZE)
-            val selection = "${MediaStore.Video.Media.DISPLAY_NAME} = ? AND ${MediaStore.Video.Media.RELATIVE_PATH} = ?"
-            val selectionArgs = arrayOf(fileName, "${Environment.DIRECTORY_MOVIES}/KStream/")
-            context.contentResolver.query(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI, projection, selection, selectionArgs, null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID))
-                    val size = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE))
-                    val uri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id.toString())
-                    Pair(uri, size)
-                } else null
+    private suspend fun fileScanRecovery() {
+        val videoFiles = listVideoFilesInKStream()
+        if (videoFiles.isEmpty()) return
+
+        val existingIds = downloadRepository.getDownloads().first().map { it.id }.toSet()
+        val allMovies = movieRepository.getMovies().first()
+        if (allMovies.isEmpty()) return
+
+        val sortedMovies = allMovies.sortedByDescending { it.movieName.length }
+
+        for ((uri, fileName, sizeBytes, description) in videoFiles) {
+            // Try description-based matching first (embedded during download)
+            val descParts = description?.split("|")
+            if (descParts != null && descParts.size == 2) {
+                val movieId = descParts[0]
+                val quality = descParts[1]
+                val downloadId = "${movieId}_$quality"
+                if (downloadId in existingIds) continue
+
+                val movieWithMedia = movieRepository.getMovieWithMedia(movieId)
+                if (movieWithMedia != null) {
+                    val media = movieWithMedia.media.firstOrNull { it.quality == quality }
+                    val download = Download(
+                        id = downloadId,
+                        movieId = movieId,
+                        title = movieWithMedia.movie.movieName,
+                        posterUrl = movieWithMedia.movie.posterUrl,
+                        quality = quality,
+                        fileSize = formatBytesForDisplay(sizeBytes),
+                        downloadUrl = media?.downloadUrl1 ?: "",
+                        localFilePath = uri.toString(),
+                        status = DownloadStatus.COMPLETED,
+                        progress = 1f,
+                        downloadedBytes = sizeBytes,
+                        totalBytes = sizeBytes
+                    )
+                    downloadRepository.insertDownload(download)
+                    continue
+                }
             }
-        } else {
-            val file = File(getKStreamDir(), fileName)
-            if (file.exists()) Pair(Uri.fromFile(file), file.length()) else null
+
+            // Fallback: filename-based matching
+            val nameWithoutExt = fileName.removeSuffix(".mp4").removeSuffix(".MP4")
+            for (movie in sortedMovies) {
+                val sanitizedName = movie.movieName.replace("[^a-zA-Z0-9]".toRegex(), "_")
+                if (!nameWithoutExt.startsWith("${sanitizedName}_")) continue
+
+                val quality = nameWithoutExt.removePrefix("${sanitizedName}_")
+                if (quality.isBlank()) continue
+
+                val downloadId = "${movie.id}_$quality"
+                if (downloadId in existingIds) break
+
+                val movieWithMedia = movieRepository.getMovieWithMedia(movie.id) ?: continue
+                val media = movieWithMedia.media.firstOrNull { it.quality == quality }
+                if (media == null) continue
+
+                val download = Download(
+                    id = downloadId,
+                    movieId = movie.id,
+                    title = movie.movieName,
+                    posterUrl = movie.posterUrl,
+                    quality = quality,
+                    fileSize = formatBytesForDisplay(sizeBytes),
+                    downloadUrl = media.downloadUrl1 ?: "",
+                    localFilePath = uri.toString(),
+                    status = DownloadStatus.COMPLETED,
+                    progress = 1f,
+                    downloadedBytes = sizeBytes,
+                    totalBytes = sizeBytes
+                )
+                downloadRepository.insertDownload(download)
+                break
+            }
         }
     }
+
+    private data class VideoFileInfo(val uri: Uri, val fileName: String, val sizeBytes: Long, val description: String?)
+
+    private fun listVideoFilesInKStream(): List<VideoFileInfo> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val projection = arrayOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.DISPLAY_NAME,
+                MediaStore.Video.Media.SIZE,
+                MediaStore.Video.Media.DESCRIPTION
+            )
+            val selection = "${MediaStore.Video.Media.RELATIVE_PATH} = ?"
+            val selectionArgs = arrayOf("${Environment.DIRECTORY_MOVIES}/KStream/")
+            val results = mutableListOf<VideoFileInfo>()
+            context.contentResolver.query(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                projection, selection, selectionArgs, null
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val descCol = cursor.getColumnIndex(MediaStore.Video.Media.DESCRIPTION)
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val name = cursor.getString(nameCol) ?: continue
+                    val size = cursor.getLong(sizeCol)
+                    val desc = if (descCol >= 0) cursor.getString(descCol) else null
+                    val uri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id.toString())
+                    results.add(VideoFileInfo(uri, name, size, desc))
+                }
+            }
+            results
+        } else {
+            val kStreamDir = getKStreamDir()
+            if (!kStreamDir.exists()) return emptyList()
+            kStreamDir.listFiles()?.filter { it.extension.equals("mp4", ignoreCase = true) }
+                ?.map { VideoFileInfo(Uri.fromFile(it), it.name, it.length(), null) }
+                ?: emptyList()
+        }
+    }
+
+    private fun formatBytesForDisplay(bytes: Long): String {
+        val sizeMB = bytes / (1024.0 * 1024.0)
+        return if (sizeMB >= 1024) String.format("%.1f GB", sizeMB / 1024.0)
+        else String.format("%.0f MB", sizeMB)
+    }
+
 }

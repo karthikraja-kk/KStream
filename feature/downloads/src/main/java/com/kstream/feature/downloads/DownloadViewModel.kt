@@ -42,6 +42,9 @@ class DownloadViewModel @Inject constructor(
     private val _events = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val events: SharedFlow<String> = _events.asSharedFlow()
 
+    private val _retriedIds = mutableSetOf<String>()
+    val retriedIds: Set<String> get() = _retriedIds
+
     init {
         // Auto-resume paused downloads when connectivity returns
         networkMonitor.isOnline
@@ -155,7 +158,13 @@ class DownloadViewModel @Inject constructor(
         }
     }
 
+    fun retryDownload(id: String) {
+        _retriedIds.add(id)
+        resumeDownload(id)
+    }
+
     fun redownload(id: String) {
+        _retriedIds.remove(id)
         viewModelScope.launch {
             try {
                 val download = downloadRepository.getDownload(id) ?: return@launch
