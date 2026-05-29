@@ -300,9 +300,13 @@ class CustomDownloadManager @Inject constructor(
 
     private fun getFileSize(uri: Uri): Long {
         return try {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { 
-                it.statSize
-            } ?: 0L
+            if (uri.scheme == "file") {
+                File(uri.path!!).length()
+            } else {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { 
+                    it.statSize
+                } ?: 0L
+            }
         } catch (e: Exception) {
             0L
         }
@@ -323,7 +327,12 @@ class CustomDownloadManager @Inject constructor(
         if (filePath.isNullOrBlank()) return false
         return try {
             val uri = Uri.parse(filePath)
-            context.contentResolver.openInputStream(uri)?.use { true } ?: false
+            if (uri.scheme == "file") {
+                val file = File(uri.path!!)
+                file.exists() && file.length() > 0
+            } else {
+                context.contentResolver.openInputStream(uri)?.use { true } ?: false
+            }
         } catch (e: Exception) {
             false
         }
@@ -337,7 +346,11 @@ class CustomDownloadManager @Inject constructor(
         val download = downloadRepository.getDownload(id) ?: return false
         try {
             val uri = Uri.parse(download.localFilePath)
-            context.contentResolver.delete(uri, null, null)
+            if (uri.scheme == "file") {
+                File(uri.path!!).delete()
+            } else {
+                context.contentResolver.delete(uri, null, null)
+            }
         } catch (e: Exception) {
         }
         downloadRepository.deleteDownload(id)
@@ -451,40 +464,15 @@ class CustomDownloadManager @Inject constructor(
     private data class VideoFileInfo(val uri: Uri, val fileName: String, val sizeBytes: Long, val description: String?)
 
     private fun listVideoFilesInKStream(): List<VideoFileInfo> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val projection = arrayOf(
-                MediaStore.Video.Media._ID,
-                MediaStore.Video.Media.DISPLAY_NAME,
-                MediaStore.Video.Media.SIZE,
-                MediaStore.Video.Media.DESCRIPTION
-            )
-            val selection = "${MediaStore.Video.Media.RELATIVE_PATH} = ?"
-            val selectionArgs = arrayOf("${Environment.DIRECTORY_MOVIES}/KStream/")
-            val results = mutableListOf<VideoFileInfo>()
-            context.contentResolver.query(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                projection, selection, selectionArgs, null
-            )?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
-                val descCol = cursor.getColumnIndex(MediaStore.Video.Media.DESCRIPTION)
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idCol)
-                    val name = cursor.getString(nameCol) ?: continue
-                    val size = cursor.getLong(sizeCol)
-                    val desc = if (descCol >= 0) cursor.getString(descCol) else null
-                    val uri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id.toString())
-                    results.add(VideoFileInfo(uri, name, size, desc))
-                }
-            }
-            results
-        } else {
-            val kStreamDir = getKStreamDir()
-            if (!kStreamDir.exists()) return emptyList()
-            kStreamDir.listFiles()?.filter { it.extension.equals("mp4", ignoreCase = true) }
-                ?.map { VideoFileInfo(Uri.fromFile(it), it.name, it.length(), null) }
-                ?: emptyList()
+        val kStreamDir = getKStreamDir()
+        if (!kStreamDir.exists()) return emptyList()
+
+        val mp4Files = kStreamDir.listFiles()?.filter {
+            it.isFile && it.extension.equals("mp4", ignoreCase = true)
+        } ?: return emptyList()
+
+        return mp4Files.map { file ->
+            VideoFileInfo(Uri.fromFile(file), file.name, file.length(), null)
         }
     }
 
