@@ -29,12 +29,19 @@ class PlayerManager @Inject constructor(
     private var networkObserverJob: Job? = null
     private var wasPlayingBeforePause = false
     private var hasRetriedCurrentUrl = false
+    private var isReleased = false
     private val scope = CoroutineScope(Dispatchers.Main)
 
     private val _allUrlsFailed = kotlinx.coroutines.flow.MutableSharedFlow<PlaybackException>(extraBufferCapacity = 1)
     val allUrlsFailed: kotlinx.coroutines.flow.SharedFlow<PlaybackException> = _allUrlsFailed
 
     fun getPlayer(): Player {
+        if (isReleased) {
+            // After release, return existing player if still around, or create minimally
+            if (exoPlayer != null) return exoPlayer!!
+            // Recreate only if truly needed (e.g., nav restored the screen)
+            isReleased = false
+        }
         if (exoPlayer == null) {
             exoPlayer = ExoPlayer.Builder(context).build().apply {
                 addListener(object : Player.Listener {
@@ -176,13 +183,23 @@ class PlayerManager @Inject constructor(
         return true // Defaulting to true as the player handles errors internally anyway
     }
 
+    fun pauseIfExists() {
+        try {
+            exoPlayer?.pause()
+        } catch (e: Exception) {
+            // Player may be in a bad state during cleanup
+        }
+    }
+
+    fun playerOrNull(): Player? = exoPlayer
+
     fun release() {
+        isReleased = true
         networkObserverJob?.cancel()
         networkObserverJob = null
         exoPlayer?.release()
         exoPlayer = null
         try {
-            // Cancel the scope to stop all internal coroutines
             scope.cancel()
         } catch (e: Exception) {}
     }

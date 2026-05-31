@@ -131,15 +131,22 @@ fun PlayerRoute(
     var seekIndicatorVisible by remember { mutableStateOf(false) }
     var seekIndicatorKey by remember { mutableLongStateOf(0L) }
 
+    // Safe duration: returns 0L for C.TIME_UNSET or negative values
+    fun safeDuration(): Long = duration.takeIf { it > 0 } ?: 0L
+
     // Poll player state
     LaunchedEffect(Unit) {
         while (true) {
-            if (!isSeeking) {
-                currentPosition = player.currentPosition.coerceAtLeast(0L)
+            val p = viewModel.playerManager.playerOrNull()
+            if (p != null) {
+                if (!isSeeking) {
+                    currentPosition = p.currentPosition.coerceAtLeast(0L)
+                }
+                val rawDuration = p.duration
+                duration = if (rawDuration > 0 && rawDuration != androidx.media3.common.C.TIME_UNSET) rawDuration else 0L
+                bufferedPosition = p.bufferedPosition.coerceAtLeast(0L)
+                isPlaying = p.isPlaying
             }
-            duration = player.duration.coerceAtLeast(0L)
-            bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
-            isPlaying = player.isPlaying
             delay(500)
         }
     }
@@ -161,13 +168,18 @@ fun PlayerRoute(
         }
     }
 
+    // Actual controls visibility (must match AnimatedVisibility conditions)
+    val controlsActuallyVisible = controlsVisible && !uiState.isLoading && uiState.loadError == null &&
+            uiState.refreshError == null && !uiState.localFileMissing &&
+            !(uiState.isOffline && !uiState.isPlayingLocal)
+
     // Focus requester for TV
     val playPauseFocusRequester = remember { FocusRequester() }
     val playerBoxFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(controlsVisible) {
+    LaunchedEffect(controlsActuallyVisible) {
         if (isTV) {
-            delay(150)
-            if (controlsVisible) {
+            delay(250) // wait for AnimatedVisibility to settle
+            if (controlsActuallyVisible) {
                 try { playPauseFocusRequester.requestFocus() } catch (_: Exception) {}
             } else {
                 try { playerBoxFocusRequester.requestFocus() } catch (_: Exception) {}
@@ -225,7 +237,7 @@ fun PlayerRoute(
 
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.playerManager.getPlayer().pause()
+            viewModel.playerManager.pauseIfExists()
         }
     }
 
@@ -233,7 +245,7 @@ fun PlayerRoute(
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
-                viewModel.playerManager.getPlayer().pause()
+                viewModel.playerManager.pauseIfExists()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -266,22 +278,23 @@ fun PlayerRoute(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = { offset ->
-                        if (offset.x > size.width / 2) {
-                            // Double-tap right half → forward 10s
-                            val newPos = (currentPosition + 10_000L).coerceAtMost(duration)
-                            currentPosition = newPos
-                            player.seekTo(newPos)
-                            seekAccumulated += 10
-                            seekIndicatorVisible = true
-                            seekIndicatorKey = System.currentTimeMillis()
-                        } else {
-                            // Double-tap left half → rewind 10s
-                            val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
-                            currentPosition = newPos
-                            player.seekTo(newPos)
-                            seekAccumulated -= 10
-                            seekIndicatorVisible = true
-                            seekIndicatorKey = System.currentTimeMillis()
+                        val sd = safeDuration()
+                        if (sd > 0) {
+                            if (offset.x > size.width / 2) {
+                                val newPos = (currentPosition + 10_000L).coerceAtMost(sd)
+                                currentPosition = newPos
+                                player.seekTo(newPos)
+                                seekAccumulated += 10
+                                seekIndicatorVisible = true
+                                seekIndicatorKey = System.currentTimeMillis()
+                            } else {
+                                val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
+                                currentPosition = newPos
+                                player.seekTo(newPos)
+                                seekAccumulated -= 10
+                                seekIndicatorVisible = true
+                                seekIndicatorKey = System.currentTimeMillis()
+                            }
                         }
                     },
                     onTap = {
@@ -312,12 +325,15 @@ fun PlayerRoute(
                         }
                         Key.DirectionLeft -> {
                             if (!controlsVisible) {
-                                val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
-                                currentPosition = newPos
-                                player.seekTo(newPos)
-                                seekAccumulated -= 10
-                                seekIndicatorVisible = true
-                                seekIndicatorKey = System.currentTimeMillis()
+                                val sd = safeDuration()
+                                if (sd > 0) {
+                                    val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
+                                    currentPosition = newPos
+                                    player.seekTo(newPos)
+                                    seekAccumulated -= 10
+                                    seekIndicatorVisible = true
+                                    seekIndicatorKey = System.currentTimeMillis()
+                                }
                                 true
                             } else {
                                 resetHideTimer()
@@ -326,12 +342,15 @@ fun PlayerRoute(
                         }
                         Key.DirectionRight -> {
                             if (!controlsVisible) {
-                                val newPos = (currentPosition + 10_000L).coerceAtMost(duration)
-                                currentPosition = newPos
-                                player.seekTo(newPos)
-                                seekAccumulated += 10
-                                seekIndicatorVisible = true
-                                seekIndicatorKey = System.currentTimeMillis()
+                                val sd = safeDuration()
+                                if (sd > 0) {
+                                    val newPos = (currentPosition + 10_000L).coerceAtMost(sd)
+                                    currentPosition = newPos
+                                    player.seekTo(newPos)
+                                    seekAccumulated += 10
+                                    seekIndicatorVisible = true
+                                    seekIndicatorKey = System.currentTimeMillis()
+                                }
                                 true
                             } else {
                                 resetHideTimer()
@@ -354,6 +373,14 @@ fun PlayerRoute(
                     isFocusable = false
                     isFocusableInTouchMode = false
                 }
+            },
+            update = { playerView ->
+                if (playerView.player == null) {
+                    playerView.player = viewModel.playerManager.playerOrNull()
+                }
+            },
+            onRelease = { playerView ->
+                playerView.player = null
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -381,9 +408,7 @@ fun PlayerRoute(
 
         // ─── Custom controls overlay ──────────────────────────────────────────
         AnimatedVisibility(
-            visible = controlsVisible && !uiState.isLoading && uiState.loadError == null &&
-                    uiState.refreshError == null && !uiState.localFileMissing &&
-                    !(uiState.isOffline && !uiState.isPlayingLocal),
+            visible = controlsActuallyVisible,
             enter = fadeIn(tween(200)),
             exit = fadeOut(tween(300))
         ) {
@@ -472,7 +497,10 @@ fun PlayerRoute(
                                 else Modifier
                             )
                             .clickable {
-                                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                                val sd = safeDuration()
+                                if (sd > 0) {
+                                    player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                                }
                                 resetHideTimer()
                             },
                         contentAlignment = Alignment.Center
@@ -522,7 +550,10 @@ fun PlayerRoute(
                                 else Modifier
                             )
                             .clickable {
-                                player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration))
+                                val sd = safeDuration()
+                                if (sd > 0) {
+                                    player.seekTo((player.currentPosition + 10_000L).coerceAtMost(sd))
+                                }
                                 resetHideTimer()
                             },
                         contentAlignment = Alignment.Center
@@ -572,9 +603,12 @@ fun PlayerRoute(
                                                         true
                                                     }
                                                     Key.DirectionRight -> {
-                                                        val newPos = (player.currentPosition + 10_000L).coerceAtMost(player.duration)
-                                                        player.seekTo(newPos)
-                                                        currentPosition = newPos
+                                                        val sd = safeDuration()
+                                                        if (sd > 0) {
+                                                            val newPos = (player.currentPosition + 10_000L).coerceAtMost(sd)
+                                                            player.seekTo(newPos)
+                                                            currentPosition = newPos
+                                                        }
                                                         resetHideTimer()
                                                         true
                                                     }
