@@ -49,17 +49,21 @@ class DetailsViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val movieId: String = android.net.Uri.decode(checkNotNull(savedStateHandle["movieId"]))
+    private val movieId: String = android.net.Uri.decode(savedStateHandle.get<String>("movieId") ?: "")
 
     private val _uiState = MutableStateFlow(DetailsUiState(isLoading = true))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
 
     init {
-        fetchMovieDetails()
-        observeDownloads()
-        observeNetworkState()
-        observeWatchProgress()
-        observeLikedState()
+        if (movieId.isBlank()) {
+            _uiState.update { it.copy(isLoading = false, error = "Movie not found") }
+        } else {
+            fetchMovieDetails()
+            observeDownloads()
+            observeNetworkState()
+            observeWatchProgress()
+            observeLikedState()
+        }
     }
 
     private fun observeNetworkState() {

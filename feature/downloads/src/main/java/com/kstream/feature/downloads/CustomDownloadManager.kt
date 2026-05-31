@@ -464,6 +464,9 @@ class CustomDownloadManager @Inject constructor(
     private data class VideoFileInfo(val uri: Uri, val fileName: String, val sizeBytes: Long, val description: String?)
 
     private fun listVideoFilesInKStream(): List<VideoFileInfo> {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return listVideoFilesViaMediaStore()
+        }
         val kStreamDir = getKStreamDir()
         if (!kStreamDir.exists()) return emptyList()
 
@@ -474,6 +477,40 @@ class CustomDownloadManager @Inject constructor(
         return mp4Files.map { file ->
             VideoFileInfo(Uri.fromFile(file), file.name, file.length(), null)
         }
+    }
+
+    private fun listVideoFilesViaMediaStore(): List<VideoFileInfo> {
+        val results = mutableListOf<VideoFileInfo>()
+        val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val projection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.DISPLAY_NAME,
+            MediaStore.Video.Media.SIZE,
+            MediaStore.Video.Media.DESCRIPTION
+        )
+        val selection = "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?"
+        val selectionArgs = arrayOf("${Environment.DIRECTORY_MOVIES}/KStream%")
+
+        try {
+            context.contentResolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val descCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DESCRIPTION)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val name = cursor.getString(nameCol) ?: continue
+                    val size = cursor.getLong(sizeCol)
+                    val desc = cursor.getString(descCol)
+                    val uri = android.content.ContentUris.withAppendedId(collection, id)
+                    results.add(VideoFileInfo(uri, name, size, desc))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CustomDownloadManager", "MediaStore query failed", e)
+        }
+        return results
     }
 
     private fun formatBytesForDisplay(bytes: Long): String {

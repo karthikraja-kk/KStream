@@ -6,6 +6,7 @@ import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.common.toUserMessage
 import com.kstream.core.domain.GetMoviesUseCase
 import com.kstream.core.domain.SyncMoviesUseCase
+import com.kstream.core.domain.StartupSyncManager
 import com.kstream.core.domain.GetAllWatchProgressUseCase
 import com.kstream.core.domain.GetRecommendationsUseCase
 import com.kstream.core.domain.repository.DownloadRepository
@@ -40,6 +41,7 @@ data class MovieRail(
 class HomeViewModel @Inject constructor(
     private val getMoviesUseCase: GetMoviesUseCase,
     private val syncMoviesUseCase: SyncMoviesUseCase,
+    private val startupSyncManager: StartupSyncManager,
     private val getAllWatchProgressUseCase: GetAllWatchProgressUseCase,
     private val getRecommendationsUseCase: GetRecommendationsUseCase,
     private val likedMovieRepository: LikedMovieRepository,
@@ -126,22 +128,33 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 isSyncing = true
-                _uiState.update { it.copy(isLoading = true, error = null) }
+                // Only show loading if no cached data — otherwise show stale data immediately
+                if (_uiState.value.rails.isEmpty()) {
+                    _uiState.update { it.copy(isLoading = true, error = null) }
+                } else {
+                    _uiState.update { it.copy(error = null) }
+                }
                 lastSyncTime = System.currentTimeMillis()
-                syncMoviesUseCase()
-                try {
-                    customDownloadManager.recoverDownloads()
-                } catch (_: Exception) {}
-                try {
-                    getRecommendationsUseCase.refreshRecommendations()
-                } catch (_: Exception) {
-                    // Recommendations refresh is non-critical
+
+                // Run sync first (recovery needs movie data), then recovery + recommendations in parallel
+                kotlinx.coroutines.coroutineScope {
+                    // Sync must complete before recovery can match files to movies
+                    val splashSynced = startupSyncManager.awaitOrSkip()
+                    if (!splashSynced) {
+                        syncMoviesUseCase()
+                    }
+
+                    launch {
+                        try { customDownloadManager.recoverDownloads() } catch (_: Exception) {}
+                    }
+                    launch {
+                        try { getRecommendationsUseCase.refreshRecommendations() } catch (_: Exception) {}
+                    }
                 }
             } catch (e: Exception) {
                 if (isOnline.value && _uiState.value.rails.isEmpty()) {
                     _uiState.update { it.copy(error = e.toUserMessage(), isLoading = false) }
                 } else {
-                    // Cached data available or offline — don't show error screen
                     _uiState.update { it.copy(isLoading = false) }
                 }
             } finally {
@@ -176,20 +189,12 @@ class HomeViewModel @Inject constructor(
                 } catch (_: Exception) {}
             }
             .launchIn(viewModelScope)
-
-        // Initial computation on app start
-        viewModelScope.launch {
-            try {
-                getRecommendationsUseCase.refreshRecommendations()
-            } catch (_: Exception) {}
-        }
     }
 
     private fun buildHeroMovies(movies: List<Movie>, recommendations: List<Movie>): List<Movie> {
         val seen = mutableSetOf<String>()
         val hero = mutableListOf<Movie>()
-        val dateParser = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.ENGLISH)
-        fun parseDate(s: String): Long = try { if (s.isNotBlank()) dateParser.parse(s)?.time ?: 0L else 0L } catch (_: Exception) { 0L }
+        fun parseDate(s: String): Long = try { if (s.isNotBlank()) DATE_FORMATTER.parse(s)?.time ?: 0L else 0L } catch (_: Exception) { 0L }
 
         // Top 5 from new releases
         movies.sortedByLastUpdated().take(5).forEach { m ->
@@ -282,12 +287,15 @@ class HomeViewModel @Inject constructor(
      * Movies with empty lastUpdated go to the end.
      */
     private fun List<Movie>.sortedByLastUpdated(): List<Movie> {
-        val formatter = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.ENGLISH)
         return sortedByDescending { movie ->
             try {
-                if (movie.lastUpdated.isNotBlank()) formatter.parse(movie.lastUpdated)?.time ?: 0L
+                if (movie.lastUpdated.isNotBlank()) DATE_FORMATTER.parse(movie.lastUpdated)?.time ?: 0L
                 else 0L
             } catch (_: Exception) { 0L }
         }
+    }
+
+    companion object {
+        private val DATE_FORMATTER = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.ENGLISH)
     }
 }

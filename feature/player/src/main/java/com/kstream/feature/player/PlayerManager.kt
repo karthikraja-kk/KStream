@@ -178,9 +178,9 @@ class PlayerManager @Inject constructor(
     }
 
     fun isNetworkAvailable(): Boolean {
-        // runBlocking on a continuous flow deadlocks the main thread.
-        // This method is not used, but let's provide a safe implementation if needed.
-        return true // Defaulting to true as the player handles errors internally anyway
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        return caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
     fun pauseIfExists() {

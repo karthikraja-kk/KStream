@@ -176,8 +176,8 @@ class SearchViewModel @Inject constructor(
             SortOption.NONE -> movies
             SortOption.ALPHABET_ASC -> movies.sortedBy { it.movieName.lowercase() }
             SortOption.ALPHABET_DESC -> movies.sortedByDescending { it.movieName.lowercase() }
-            SortOption.RATING_HIGH -> movies.sortedByDescending { it.rating }
-            SortOption.RATING_LOW -> movies.sortedBy { it.rating }
+            SortOption.RATING_HIGH -> movies.sortedByDescending { it.rating.toDoubleOrNull() ?: 0.0 }
+            SortOption.RATING_LOW -> movies.sortedBy { it.rating.toDoubleOrNull() ?: 0.0 }
             SortOption.LATEST_FIRST -> movies.sortedWith(
                 compareByDescending<Movie> { it.lastUpdated.isNotBlank() }
                     .thenByDescending { parseLastUpdated(it.lastUpdated) }

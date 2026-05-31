@@ -408,6 +408,7 @@ class SettingsViewModel @Inject constructor(
 
                 userDataRepository.clearAllData()
 
+                // Delete downloaded files: folder delete + bulk MediaStore delete
                 try {
                     val moviesDir = File(
                         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
@@ -415,6 +416,19 @@ class SettingsViewModel @Inject constructor(
                     )
                     if (moviesDir.exists()) moviesDir.deleteRecursively()
                 } catch (_: Exception) {}
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    try {
+                        val collection = android.provider.MediaStore.Video.Media.getContentUri(
+                            android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY
+                        )
+                        context.contentResolver.delete(
+                            collection,
+                            "${android.provider.MediaStore.Video.Media.RELATIVE_PATH} LIKE ?",
+                            arrayOf("${Environment.DIRECTORY_MOVIES}/KStream%")
+                        )
+                    } catch (_: Exception) {}
+                }
 
                 try { context.cacheDir.deleteRecursively() } catch (_: Exception) {}
 

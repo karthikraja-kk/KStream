@@ -170,7 +170,7 @@ private fun HeroSlide(
         SubcomposeAsyncImage(
             model = ImageRequest.Builder(context)
                 .data(movie.posterUrl)
-                .crossfade(true)
+                .size(480, 270)
                 .build(),
             contentDescription = null,
             modifier = Modifier

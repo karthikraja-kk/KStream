@@ -30,7 +30,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,12 +84,8 @@ fun KStreamTvSideNav(
         )
     }
 
-    LaunchedEffect(sidebarExpanded) {
+    LaunchedEffect(sidebarExpanded, currentRoute) {
         if (sidebarExpanded) {
-            // Delay allows SideNavItem composables to finish their Box→Row layout update
-            // before we request focus — without this, requestFocus() silently fails because
-            // the FocusRequester is briefly detached during the composable type switch.
-            delay(100)
             val target = navFocusRequesters[currentRoute] ?: navFocusRequesters["home"]
             try { target?.requestFocus() } catch (_: Exception) {}
         }

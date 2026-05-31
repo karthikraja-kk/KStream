@@ -12,8 +12,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.graphicsLayer
@@ -31,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.SubcomposeAsyncImage
@@ -179,12 +185,7 @@ fun DetailsScreenMobile(
             )
             Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.isLoading) {
-            AppLoadingScreen(
-                title = "Loading Movie",
-                message = "Fetching details and available quality options...",
-                isTv = false,
-                modifier = Modifier.fillMaxSize()
-            )
+            DetailsSkeletonMobile(modifier = Modifier.fillMaxSize())
             Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.error != null) {
             AppErrorScreen(
@@ -337,7 +338,9 @@ fun DetailsScreenMobile(
                     Text(text = "Select Quality", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         mediaList.forEach { media ->
@@ -439,6 +442,297 @@ private fun formatSizeString(sizeStr: String): String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Details-specific shimmer skeleton
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun shimmerBrush(shimmerOffset: Float, width: Float = 300f): Brush {
+    val sweepX = shimmerOffset * width
+    return Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF2A2A2A),
+            Color(0xFF3D3D3D),
+            Color(0xFF4A4A4A),
+            Color(0xFF3D3D3D),
+            Color(0xFF2A2A2A)
+        ),
+        start = androidx.compose.ui.geometry.Offset(sweepX - width * 0.5f, 0f),
+        end = androidx.compose.ui.geometry.Offset(sweepX + width * 0.5f, 0f)
+    )
+}
+
+@Composable
+private fun ShimmerBox(
+    shimmerOffset: Float,
+    modifier: Modifier = Modifier,
+    widthDp: Dp = 100.dp
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(shimmerBrush(shimmerOffset, widthDp.value))
+    )
+}
+
+@Composable
+private fun DetailsSkeletonMobile(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "detailsShimmer")
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerOffset"
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Poster placeholder
+        ShimmerBox(shimmerOffset, Modifier.fillMaxWidth().height(400.dp), 400.dp)
+
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Title + like icon row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ShimmerBox(shimmerOffset, Modifier.weight(1f).height(28.dp), 250.dp)
+                Spacer(modifier = Modifier.width(12.dp))
+                ShimmerBox(shimmerOffset, Modifier.size(32.dp), 32.dp)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Metadata badges row
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(5) {
+                    ShimmerBox(
+                        shimmerOffset,
+                        Modifier
+                            .width(if (it == 3) 60.dp else 50.dp)
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        60.dp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            // Genre badges row
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(3) {
+                    ShimmerBox(
+                        shimmerOffset,
+                        Modifier
+                            .width(64.dp)
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        64.dp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            // Synopsis lines
+            repeat(4) {
+                ShimmerBox(
+                    shimmerOffset,
+                    Modifier
+                        .fillMaxWidth(if (it == 3) 0.6f else 1f)
+                        .height(14.dp),
+                    350.dp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            // Director
+            ShimmerBox(shimmerOffset, Modifier.width(200.dp).height(14.dp), 200.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            // Cast
+            ShimmerBox(shimmerOffset, Modifier.width(280.dp).height(14.dp), 280.dp)
+
+            Spacer(modifier = Modifier.height(24.dp))
+            // "Select Quality" label
+            ShimmerBox(shimmerOffset, Modifier.width(120.dp).height(18.dp), 120.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            // Quality chips
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(3) {
+                    ShimmerBox(
+                        shimmerOffset,
+                        Modifier
+                            .width(72.dp)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(16.dp)),
+                        72.dp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            // Watch + Download buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ShimmerBox(
+                    shimmerOffset,
+                    Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(24.dp)),
+                    180.dp
+                )
+                ShimmerBox(
+                    shimmerOffset,
+                    Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(24.dp)),
+                    180.dp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailsSkeletonTv(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "detailsTvShimmer")
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerOffset"
+    )
+
+    Row(modifier = modifier.fillMaxSize()) {
+        // Left: poster placeholder
+        ShimmerBox(
+            shimmerOffset,
+            Modifier.fillMaxHeight().weight(1f),
+            400.dp
+        )
+
+        // Right: info column
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(1.5f)
+                .padding(48.dp)
+        ) {
+            // Title + like icon row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ShimmerBox(shimmerOffset, Modifier.weight(1f).height(36.dp), 300.dp)
+                Spacer(modifier = Modifier.width(16.dp))
+                ShimmerBox(shimmerOffset, Modifier.size(36.dp), 36.dp)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Metadata badges row
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(5) {
+                    ShimmerBox(
+                        shimmerOffset,
+                        Modifier
+                            .width(if (it == 3) 70.dp else 60.dp)
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        70.dp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            // Genre badges
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(3) {
+                    ShimmerBox(
+                        shimmerOffset,
+                        Modifier
+                            .width(76.dp)
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        76.dp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            // Synopsis lines
+            repeat(5) {
+                ShimmerBox(
+                    shimmerOffset,
+                    Modifier
+                        .fillMaxWidth(if (it == 4) 0.5f else 1f)
+                        .height(16.dp),
+                    500.dp
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            // Director
+            ShimmerBox(shimmerOffset, Modifier.width(240.dp).height(16.dp), 240.dp)
+            Spacer(modifier = Modifier.height(12.dp))
+            // Cast
+            ShimmerBox(shimmerOffset, Modifier.width(340.dp).height(16.dp), 340.dp)
+
+            Spacer(modifier = Modifier.height(48.dp))
+            // "Select Quality" label
+            ShimmerBox(shimmerOffset, Modifier.width(140.dp).height(22.dp), 140.dp)
+            Spacer(modifier = Modifier.height(16.dp))
+            // Quality chips
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                repeat(3) {
+                    ShimmerBox(
+                        shimmerOffset,
+                        Modifier
+                            .width(88.dp)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        88.dp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
+            // Watch + Download buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                ShimmerBox(
+                    shimmerOffset,
+                    Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp)),
+                    220.dp
+                )
+                ShimmerBox(
+                    shimmerOffset,
+                    Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp)),
+                    220.dp
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun KStreamLogoFallback() {
     Box(
@@ -498,12 +792,7 @@ fun DetailsScreenTv(
             onGoToDownloads = onGoToDownloads
         )
     } else if (uiState.isLoading) {
-        AppLoadingScreen(
-            title = "Loading Movie",
-            message = "Fetching details and available quality options...",
-            isTv = true,
-            modifier = Modifier.fillMaxSize()
-        )
+        DetailsSkeletonTv(modifier = Modifier.fillMaxSize())
     } else if (uiState.error != null) {
         AppErrorScreen(
             title = "Couldn't Load Movie",

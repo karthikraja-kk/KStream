@@ -405,7 +405,7 @@ fun HomeScreenMobile(
                     }
                 }
                 item {
-                    val greeting = remember { getTimeBasedGreeting(uiState.userName) }
+                    val greeting = remember(uiState.userName) { getTimeBasedGreeting(uiState.userName) }
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = greeting.title,
@@ -418,7 +418,7 @@ fun HomeScreenMobile(
                         )
                     }
                 }
-                items(uiState.rails) { rail ->
+                items(uiState.rails, key = { it.title }) { rail ->
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         Row(
                             modifier = Modifier
@@ -431,13 +431,10 @@ fun HomeScreenMobile(
                                 text = rail.title,
                                 style = MaterialTheme.typography.titleLarge
                             )
-                            val showSeeMore = true
-                            if (showSeeMore) {
-                                val query = rail.seeMoreQuery ?: "all:*"
+                            val query = rail.seeMoreQuery ?: "all:*"
                                 TextButton(onClick = { onSeeMoreClick(query) }) {
                                     Text("See More")
                                 }
-                            }
                         }
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -632,7 +629,7 @@ fun HomeScreenTv(
                     }
                 }
                 item {
-                    val greeting = remember { getTimeBasedGreeting(uiState.userName) }
+                    val greeting = remember(uiState.userName) { getTimeBasedGreeting(uiState.userName) }
                     Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 24.dp)) {
                         TvText(
                             text = greeting.title,
@@ -646,7 +643,7 @@ fun HomeScreenTv(
                         )
                     }
                 }
-                tvItems(uiState.rails) { rail ->
+                tvItems(uiState.rails, key = { it.title }) { rail ->
                     Column(modifier = Modifier.padding(vertical = 16.dp)) {
                         Row(
                             modifier = Modifier
@@ -660,9 +657,7 @@ fun HomeScreenTv(
                                 style = TvMaterialTheme.typography.titleLarge,
                                 color = TvMaterialTheme.colorScheme.onSurface
                             )
-                            val showSeeMore = true
-                            if (showSeeMore) {
-                                val query = rail.seeMoreQuery ?: "all:*"
+                            val query = rail.seeMoreQuery ?: "all:*"
                                 androidx.tv.material3.Button(
                                     onClick = { onSeeMoreClick(query) },
                                     modifier = Modifier.tvFocusScale(),
@@ -680,7 +675,6 @@ fun HomeScreenTv(
                                 ) {
                                     TvText("See More")
                                 }
-                            }
                         }
                         val tilesFocusRequesters = remember(rail.movies.size) {
                             Array(rail.movies.size) { FocusRequester() }

@@ -119,6 +119,7 @@ fun PlayerRoute(
     val isTV = LocalPlatform.current == Platform.TV
     var controlsVisible by remember { mutableStateOf(true) }
     var hideTimerKey by remember { mutableLongStateOf(0L) }
+    var focusedControlId by remember { mutableStateOf<String?>(null) }
 
     // Playback state tracking
     val player = viewModel.playerManager.getPlayer()
@@ -131,8 +132,46 @@ fun PlayerRoute(
     var seekIndicatorVisible by remember { mutableStateOf(false) }
     var seekIndicatorKey by remember { mutableLongStateOf(0L) }
 
+    val controlsFocused = focusedControlId != null || showQualityMenu
+
     // Safe duration: returns 0L for C.TIME_UNSET or negative values
     fun safeDuration(): Long = duration.takeIf { it > 0 } ?: 0L
+
+    fun resetHideTimer() { hideTimerKey = System.currentTimeMillis() }
+
+    fun showControls() {
+        controlsVisible = true
+        resetHideTimer()
+    }
+
+    fun Modifier.trackControlsFocus(controlId: String): Modifier =
+        if (isTV) {
+            this.onFocusChanged { focusState ->
+                focusedControlId = when {
+                    focusState.isFocused || focusState.hasFocus -> controlId
+                    focusedControlId == controlId -> null
+                    else -> focusedControlId
+                }
+            }
+        } else {
+            this
+        }
+
+    fun seekBy(deltaMs: Long) {
+        val sd = safeDuration()
+        if (sd <= 0) return
+
+        val basePosition = currentPosition.coerceIn(0L, sd)
+        val newPosition = (basePosition + deltaMs).coerceIn(0L, sd)
+        val appliedDeltaMs = newPosition - basePosition
+        if (appliedDeltaMs == 0L) return
+
+        currentPosition = newPosition
+        player.seekTo(newPosition)
+        seekAccumulated += appliedDeltaMs / 1000L
+        seekIndicatorVisible = true
+        seekIndicatorKey++
+    }
 
     // Poll player state
     LaunchedEffect(Unit) {
@@ -152,10 +191,12 @@ fun PlayerRoute(
     }
 
     // Auto-hide controls after 4 seconds
-    LaunchedEffect(controlsVisible, hideTimerKey) {
+    LaunchedEffect(controlsVisible, hideTimerKey, controlsFocused, isSeeking) {
         if (controlsVisible && !isSeeking) {
             delay(4000)
-            controlsVisible = false
+            if (!controlsFocused) {
+                controlsVisible = false
+            }
         }
     }
 
@@ -182,12 +223,11 @@ fun PlayerRoute(
             if (controlsActuallyVisible) {
                 try { playPauseFocusRequester.requestFocus() } catch (_: Exception) {}
             } else {
+                focusedControlId = null
                 try { playerBoxFocusRequester.requestFocus() } catch (_: Exception) {}
             }
         }
     }
-
-    fun resetHideTimer() { hideTimerKey = System.currentTimeMillis() }
 
     fun enterFullscreen() {
         isFullscreen = true
@@ -278,24 +318,7 @@ fun PlayerRoute(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = { offset ->
-                        val sd = safeDuration()
-                        if (sd > 0) {
-                            if (offset.x > size.width / 2) {
-                                val newPos = (currentPosition + 10_000L).coerceAtMost(sd)
-                                currentPosition = newPos
-                                player.seekTo(newPos)
-                                seekAccumulated += 10
-                                seekIndicatorVisible = true
-                                seekIndicatorKey = System.currentTimeMillis()
-                            } else {
-                                val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
-                                currentPosition = newPos
-                                player.seekTo(newPos)
-                                seekAccumulated -= 10
-                                seekIndicatorVisible = true
-                                seekIndicatorKey = System.currentTimeMillis()
-                            }
-                        }
+                        seekBy(if (offset.x > size.width / 2) 10_000L else -10_000L)
                     },
                     onTap = {
                         controlsVisible = !controlsVisible
@@ -305,55 +328,46 @@ fun PlayerRoute(
             }
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
+                    val isDpadKey = when (keyEvent.key) {
+                        Key.DirectionCenter,
+                        Key.Enter,
+                        Key.DirectionUp,
+                        Key.DirectionDown,
+                        Key.DirectionLeft,
+                        Key.DirectionRight -> true
+                        else -> false
+                    }
+                    if (isDpadKey) {
+                        resetHideTimer()
+                    }
                     when (keyEvent.key) {
                         Key.DirectionCenter, Key.Enter -> {
                             if (!controlsVisible) {
-                                controlsVisible = true
-                                resetHideTimer()
+                                showControls()
                                 true
                             } else false
                         }
                         Key.DirectionUp, Key.DirectionDown -> {
                             if (!controlsVisible) {
-                                controlsVisible = true
-                                resetHideTimer()
+                                showControls()
                                 true
                             } else {
-                                resetHideTimer()
                                 false
                             }
                         }
                         Key.DirectionLeft -> {
                             if (!controlsVisible) {
-                                val sd = safeDuration()
-                                if (sd > 0) {
-                                    val newPos = (currentPosition - 10_000L).coerceAtLeast(0L)
-                                    currentPosition = newPos
-                                    player.seekTo(newPos)
-                                    seekAccumulated -= 10
-                                    seekIndicatorVisible = true
-                                    seekIndicatorKey = System.currentTimeMillis()
-                                }
+                                seekBy(-10_000L)
                                 true
                             } else {
-                                resetHideTimer()
                                 false
                             }
                         }
                         Key.DirectionRight -> {
                             if (!controlsVisible) {
-                                val sd = safeDuration()
-                                if (sd > 0) {
-                                    val newPos = (currentPosition + 10_000L).coerceAtMost(sd)
-                                    currentPosition = newPos
-                                    player.seekTo(newPos)
-                                    seekAccumulated += 10
-                                    seekIndicatorVisible = true
-                                    seekIndicatorKey = System.currentTimeMillis()
-                                }
+                                seekBy(10_000L)
                                 true
                             } else {
-                                resetHideTimer()
                                 false
                             }
                         }
@@ -437,7 +451,9 @@ fun PlayerRoute(
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.1f))
                                 .then(
-                                    if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                    if (isTV) Modifier
+                                        .trackControlsFocus("backButton")
+                                        .tvFocusBorder(shape = RoundedCornerShape(50))
                                     else Modifier
                                 )
                                 .clickable { onBackClick() },
@@ -493,14 +509,13 @@ fun PlayerRoute(
                             .clip(CircleShape)
                             .background(Color.Black.copy(alpha = 0.4f))
                             .then(
-                                if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                if (isTV) Modifier
+                                    .trackControlsFocus("skipBack")
+                                    .tvFocusBorder(shape = RoundedCornerShape(50))
                                 else Modifier
                             )
                             .clickable {
-                                val sd = safeDuration()
-                                if (sd > 0) {
-                                    player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-                                }
+                                seekBy(-10_000L)
                                 resetHideTimer()
                             },
                         contentAlignment = Alignment.Center
@@ -522,6 +537,7 @@ fun PlayerRoute(
                             .then(
                                 if (isTV) Modifier
                                     .focusRequester(playPauseFocusRequester)
+                                    .trackControlsFocus("playPause")
                                     .tvFocusBorder(shape = RoundedCornerShape(50))
                                 else Modifier
                             )
@@ -546,14 +562,13 @@ fun PlayerRoute(
                             .clip(CircleShape)
                             .background(Color.Black.copy(alpha = 0.4f))
                             .then(
-                                if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                if (isTV) Modifier
+                                    .trackControlsFocus("skipForward")
+                                    .tvFocusBorder(shape = RoundedCornerShape(50))
                                 else Modifier
                             )
                             .clickable {
-                                val sd = safeDuration()
-                                if (sd > 0) {
-                                    player.seekTo((player.currentPosition + 10_000L).coerceAtMost(sd))
-                                }
+                                seekBy(10_000L)
                                 resetHideTimer()
                             },
                         contentAlignment = Alignment.Center
@@ -591,24 +606,28 @@ fun PlayerRoute(
                                 .height(32.dp)
                                 .then(
                                     if (isTV) Modifier
-                                        .onFocusChanged { seekBarFocused = it.isFocused }
+                                        .trackControlsFocus("seekBar")
+                                        .onFocusChanged {
+                                            seekBarFocused = it.isFocused
+                                            if (!it.hasFocus) {
+                                                isSeeking = false
+                                            }
+                                        }
                                         .onPreviewKeyEvent { keyEvent ->
                                             if (keyEvent.type == KeyEventType.KeyDown) {
                                                 when (keyEvent.key) {
                                                     Key.DirectionLeft -> {
-                                                        val newPos = (player.currentPosition - 10_000L).coerceAtLeast(0L)
-                                                        player.seekTo(newPos)
-                                                        currentPosition = newPos
-                                                        resetHideTimer()
+                                                        isSeeking = true
+                                                        seekBy(-10_000L)
                                                         true
                                                     }
                                                     Key.DirectionRight -> {
-                                                        val sd = safeDuration()
-                                                        if (sd > 0) {
-                                                            val newPos = (player.currentPosition + 10_000L).coerceAtMost(sd)
-                                                            player.seekTo(newPos)
-                                                            currentPosition = newPos
-                                                        }
+                                                        isSeeking = true
+                                                        seekBy(10_000L)
+                                                        true
+                                                    }
+                                                    Key.Enter, Key.DirectionCenter -> {
+                                                        isSeeking = false
                                                         resetHideTimer()
                                                         true
                                                     }
@@ -677,10 +696,15 @@ fun PlayerRoute(
                                     .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.1f))
                                     .then(
-                                        if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                        if (isTV) Modifier
+                                            .trackControlsFocus("qualityButton")
+                                            .tvFocusBorder(shape = RoundedCornerShape(50))
                                         else Modifier
                                     )
-                                    .clickable { showQualityMenu = true },
+                                    .clickable {
+                                        showQualityMenu = true
+                                        resetHideTimer()
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -723,7 +747,9 @@ fun PlayerRoute(
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.1f))
                                 .then(
-                                    if (isTV) Modifier.tvFocusBorder(shape = RoundedCornerShape(50))
+                                    if (isTV) Modifier
+                                        .trackControlsFocus("fullscreenButton")
+                                        .tvFocusBorder(shape = RoundedCornerShape(50))
                                     else Modifier
                                 )
                                 .clickable { if (isFullscreen) exitFullscreen() else enterFullscreen() },

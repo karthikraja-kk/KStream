@@ -310,11 +310,12 @@ private fun String?.toScanStatus(): ScanStatus {
     }
 }
 
+private val REPO_DATE_FORMATTER = SimpleDateFormat("dd MMMM yyyy", Locale.ENGLISH)
+
 private fun List<Movie>.sortedByLastUpdated(): List<Movie> {
-    val formatter = SimpleDateFormat("dd MMMM yyyy", Locale.ENGLISH)
     return sortedByDescending { movie ->
         try {
-            if (movie.lastUpdated.isNotBlank()) formatter.parse(movie.lastUpdated)?.time ?: 0L
+            if (movie.lastUpdated.isNotBlank()) REPO_DATE_FORMATTER.parse(movie.lastUpdated)?.time ?: 0L
             else 0L
         } catch (_: Exception) { 0L }
     }

@@ -1,5 +1,6 @@
 package com.kstream.core.network.model
 
+import android.util.Log
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
@@ -48,7 +49,7 @@ object DateTimeAsLongSerializer : KSerializer<Long?> {
                 return sdf.parse(value)?.time
             } catch (_: Exception) { }
         }
-        println("DateTimeAsLongSerializer: Failed to parse date string '$value'")
+        Log.d("DateTimeSerializer", "Failed to parse date string '$value'")
         return null
     }
 }

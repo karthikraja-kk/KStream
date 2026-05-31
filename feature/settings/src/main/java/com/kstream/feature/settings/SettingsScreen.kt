@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
@@ -169,7 +170,7 @@ fun SettingsRoute(
     onTermsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isEditingUsername by remember { mutableStateOf(false) }
     var tempUsername by remember { mutableStateOf("") }
     var showClearLikedDialog by remember { mutableStateOf(false) }
