@@ -369,154 +369,24 @@ class CustomDownloadManager @Inject constructor(
     suspend fun getFolderUri(): String? = "/Movies/KStream"
     fun getDownloadDirectoryDisplay(): String = "/Movies/KStream"
 
-    private fun getKStreamDir(): File {
-        return File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-            "KStream"
-        )
-    }
-
-    suspend fun recoverDownloads() = withContext(Dispatchers.IO) {
+    /**
+     * Cancel all active download jobs and clear the in-memory active set.
+     * Used by reset flow before bulk-deleting files so no writer races with the delete.
+     */
+    fun cancelAllDownloads() {
         try {
-            fileScanRecovery()
+            val ids = activeDownloads.keys.toList()
+            ids.forEach { id ->
+                try {
+                    activeDownloads[id]?.cancel("Reset requested")
+                } catch (_: Exception) {}
+            }
+            activeDownloads.clear()
+            networkPauseJob.getAndSet(null)?.cancel()
         } catch (e: Exception) {
-            Log.e("CustomDownloadManager", "Download recovery failed", e)
+            Log.w("CustomDownloadManager", "cancelAllDownloads error", e)
+        } finally {
+            updateForegroundService()
         }
     }
-
-    private suspend fun fileScanRecovery() {
-        val videoFiles = listVideoFilesInKStream()
-        if (videoFiles.isEmpty()) return
-
-        val existingIds = downloadRepository.getDownloads().first().map { it.id }.toSet()
-        val allMovies = movieRepository.getMovies().first()
-        if (allMovies.isEmpty()) return
-
-        val sortedMovies = allMovies.sortedByDescending { it.movieName.length }
-
-        for ((uri, fileName, sizeBytes, description) in videoFiles) {
-            // Try description-based matching first (embedded during download)
-            val descParts = description?.split("|")
-            if (descParts != null && descParts.size == 2) {
-                val movieId = descParts[0]
-                val quality = descParts[1]
-                val downloadId = "${movieId}_$quality"
-                if (downloadId in existingIds) continue
-
-                val movieWithMedia = movieRepository.getMovieWithMedia(movieId)
-                if (movieWithMedia != null) {
-                    val media = movieWithMedia.media.firstOrNull { it.quality == quality }
-                    val download = Download(
-                        id = downloadId,
-                        movieId = movieId,
-                        title = movieWithMedia.movie.movieName,
-                        posterUrl = movieWithMedia.movie.posterUrl,
-                        quality = quality,
-                        fileSize = formatBytesForDisplay(sizeBytes),
-                        downloadUrl = media?.downloadUrl1 ?: "",
-                        localFilePath = uri.toString(),
-                        status = DownloadStatus.COMPLETED,
-                        progress = 1f,
-                        downloadedBytes = sizeBytes,
-                        totalBytes = sizeBytes
-                    )
-                    downloadRepository.insertDownload(download)
-                    continue
-                }
-            }
-
-            // Fallback: filename-based matching
-            val nameWithoutExt = fileName.removeSuffix(".mp4").removeSuffix(".MP4")
-            for (movie in sortedMovies) {
-                val sanitizedName = movie.movieName.replace("[^a-zA-Z0-9]".toRegex(), "_")
-                if (!nameWithoutExt.startsWith("${sanitizedName}_")) continue
-
-                val quality = nameWithoutExt.removePrefix("${sanitizedName}_")
-                if (quality.isBlank()) continue
-
-                val downloadId = "${movie.id}_$quality"
-                if (downloadId in existingIds) break
-
-                val movieWithMedia = movieRepository.getMovieWithMedia(movie.id) ?: continue
-                val media = movieWithMedia.media.firstOrNull { it.quality == quality }
-                if (media == null) continue
-
-                val download = Download(
-                    id = downloadId,
-                    movieId = movie.id,
-                    title = movie.movieName,
-                    posterUrl = movie.posterUrl,
-                    quality = quality,
-                    fileSize = formatBytesForDisplay(sizeBytes),
-                    downloadUrl = media.downloadUrl1 ?: "",
-                    localFilePath = uri.toString(),
-                    status = DownloadStatus.COMPLETED,
-                    progress = 1f,
-                    downloadedBytes = sizeBytes,
-                    totalBytes = sizeBytes
-                )
-                downloadRepository.insertDownload(download)
-                break
-            }
-        }
-    }
-
-    private data class VideoFileInfo(val uri: Uri, val fileName: String, val sizeBytes: Long, val description: String?)
-
-    private fun listVideoFilesInKStream(): List<VideoFileInfo> {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return listVideoFilesViaMediaStore()
-        }
-        val kStreamDir = getKStreamDir()
-        if (!kStreamDir.exists()) return emptyList()
-
-        val mp4Files = kStreamDir.listFiles()?.filter {
-            it.isFile && it.extension.equals("mp4", ignoreCase = true)
-        } ?: return emptyList()
-
-        return mp4Files.map { file ->
-            VideoFileInfo(Uri.fromFile(file), file.name, file.length(), null)
-        }
-    }
-
-    private fun listVideoFilesViaMediaStore(): List<VideoFileInfo> {
-        val results = mutableListOf<VideoFileInfo>()
-        val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        val projection = arrayOf(
-            MediaStore.Video.Media._ID,
-            MediaStore.Video.Media.DISPLAY_NAME,
-            MediaStore.Video.Media.SIZE,
-            MediaStore.Video.Media.DESCRIPTION
-        )
-        val selection = "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?"
-        val selectionArgs = arrayOf("${Environment.DIRECTORY_MOVIES}/KStream%")
-
-        try {
-            context.contentResolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
-                val descCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DESCRIPTION)
-
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idCol)
-                    val name = cursor.getString(nameCol) ?: continue
-                    val size = cursor.getLong(sizeCol)
-                    val desc = cursor.getString(descCol)
-                    val uri = android.content.ContentUris.withAppendedId(collection, id)
-                    results.add(VideoFileInfo(uri, name, size, desc))
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("CustomDownloadManager", "MediaStore query failed", e)
-        }
-        return results
-    }
-
-    private fun formatBytesForDisplay(bytes: Long): String {
-        val sizeMB = bytes / (1024.0 * 1024.0)
-        return if (sizeMB >= 1024) String.format("%.1f GB", sizeMB / 1024.0)
-        else String.format("%.0f MB", sizeMB)
-    }
-
 }

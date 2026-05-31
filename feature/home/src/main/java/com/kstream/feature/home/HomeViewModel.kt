@@ -13,7 +13,6 @@ import com.kstream.core.domain.repository.DownloadRepository
 import com.kstream.core.model.Movie
 import com.kstream.core.model.WatchProgress
 import com.kstream.core.domain.repository.LikedMovieRepository
-import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -46,7 +45,6 @@ class HomeViewModel @Inject constructor(
     private val getRecommendationsUseCase: GetRecommendationsUseCase,
     private val likedMovieRepository: LikedMovieRepository,
     private val downloadRepository: DownloadRepository,
-    private val customDownloadManager: CustomDownloadManager,
     private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository,
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
@@ -136,17 +134,13 @@ class HomeViewModel @Inject constructor(
                 }
                 lastSyncTime = System.currentTimeMillis()
 
-                // Run sync first (recovery needs movie data), then recovery + recommendations in parallel
+                // Sync ensures latest movie data; recommendations refresh in parallel.
                 kotlinx.coroutines.coroutineScope {
-                    // Sync must complete before recovery can match files to movies
                     val splashSynced = startupSyncManager.awaitOrSkip()
                     if (!splashSynced) {
                         syncMoviesUseCase()
                     }
 
-                    launch {
-                        try { customDownloadManager.recoverDownloads() } catch (_: Exception) {}
-                    }
                     launch {
                         try { getRecommendationsUseCase.refreshRecommendations() } catch (_: Exception) {}
                     }

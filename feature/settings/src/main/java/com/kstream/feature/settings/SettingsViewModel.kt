@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.content.Context
 import android.os.Environment
+import android.util.Log
 import coil.Coil
 import coil.annotation.ExperimentalCoilApi
 import com.kstream.core.common.toUserMessage
@@ -17,13 +18,16 @@ import com.kstream.core.domain.TriggerScanUseCase
 import com.kstream.core.domain.GetScanStatusUseCase
 import com.kstream.core.domain.SyncMoviesUseCase
 import com.kstream.core.model.ScanStatus
+import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,6 +71,7 @@ class SettingsViewModel @Inject constructor(
     private val triggerScanUseCase: TriggerScanUseCase,
     private val getScanStatusUseCase: GetScanStatusUseCase,
     private val syncMoviesUseCase: SyncMoviesUseCase,
+    private val customDownloadManager: CustomDownloadManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -395,51 +400,92 @@ class SettingsViewModel @Inject constructor(
     @OptIn(ExperimentalCoilApi::class)
     fun resetAllAndRestart() {
         viewModelScope.launch {
-            try {
-                likedMovieRepository.clearAll()
-                watchProgressRepository.deleteAllProgress()
-                downloadRepository.deleteAllDownloads()
-                movieRepository.clearCache()
-                recommendationRepository.clearAll()
-
-                val imageLoader = Coil.imageLoader(context)
-                imageLoader.memoryCache?.clear()
-                imageLoader.diskCache?.clear()
-
-                userDataRepository.clearAllData()
-
-                // Delete downloaded files: folder delete + bulk MediaStore delete
+            // Run all destructive work off the Main dispatcher so file I/O actually
+            // completes before we restart the process.
+            withContext(Dispatchers.IO) {
+                val tag = "ResetAndRestart"
                 try {
-                    val moviesDir = File(
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-                        "KStream"
-                    )
-                    if (moviesDir.exists()) moviesDir.deleteRecursively()
-                } catch (_: Exception) {}
-
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    // 1) Stop any in-flight downloads so they don't race the delete
                     try {
-                        val collection = android.provider.MediaStore.Video.Media.getContentUri(
-                            android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY
+                        customDownloadManager.cancelAllDownloads()
+                    } catch (e: Exception) {
+                        Log.w(tag, "cancelAllDownloads failed", e)
+                    }
+
+                    // 2) Clear DB state
+                    try { likedMovieRepository.clearAll() } catch (e: Exception) { Log.w(tag, "clear likes", e) }
+                    try { watchProgressRepository.deleteAllProgress() } catch (e: Exception) { Log.w(tag, "clear progress", e) }
+                    try { downloadRepository.deleteAllDownloads() } catch (e: Exception) { Log.w(tag, "clear downloads db", e) }
+                    try { movieRepository.clearCache() } catch (e: Exception) { Log.w(tag, "clear movie cache", e) }
+                    try { recommendationRepository.clearAll() } catch (e: Exception) { Log.w(tag, "clear recs", e) }
+
+                    // 3) Clear image caches
+                    try {
+                        val imageLoader = Coil.imageLoader(context)
+                        imageLoader.memoryCache?.clear()
+                        imageLoader.diskCache?.clear()
+                    } catch (e: Exception) { Log.w(tag, "clear coil", e) }
+
+                    // 4) Clear user prefs
+                    try { userDataRepository.clearAllData() } catch (e: Exception) { Log.w(tag, "clear prefs", e) }
+
+                    // 5) ONE bulk MediaStore delete — wipes all entries this install owns
+                    //    under Movies/KStream in a single SQL-like operation.
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        try {
+                            val collection = android.provider.MediaStore.Video.Media.getContentUri(
+                                android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY
+                            )
+                            val deleted = context.contentResolver.delete(
+                                collection,
+                                "${android.provider.MediaStore.Video.Media.RELATIVE_PATH} LIKE ?",
+                                arrayOf("${Environment.DIRECTORY_MOVIES}/KStream%")
+                            )
+                            Log.d(tag, "MediaStore bulk delete removed $deleted entries")
+                        } catch (e: Exception) {
+                            Log.w(tag, "MediaStore bulk delete failed", e)
+                        }
+                    }
+
+                    // 6) ONE whole-folder delete — catches any file not tracked by MediaStore
+                    //    and handles pre-Q legacy installs.
+                    try {
+                        val moviesDir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                            "KStream"
                         )
-                        context.contentResolver.delete(
-                            collection,
-                            "${android.provider.MediaStore.Video.Media.RELATIVE_PATH} LIKE ?",
-                            arrayOf("${Environment.DIRECTORY_MOVIES}/KStream%")
-                        )
-                    } catch (_: Exception) {}
+                        if (moviesDir.exists()) {
+                            val ok = moviesDir.deleteRecursively()
+                            Log.d(tag, "Folder deleteRecursively: $ok (still exists=${moviesDir.exists()})")
+                        } else {
+                            Log.d(tag, "KStream folder did not exist")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(tag, "Folder delete failed", e)
+                    }
+
+                    // 7) App cache
+                    try { context.cacheDir.deleteRecursively() } catch (e: Exception) { Log.w(tag, "cache dir", e) }
+
+                    // 8) Give the FS / MediaStore a moment to flush before exit
+                    delay(150)
+                } catch (e: Exception) {
+                    Log.e(tag, "resetAllAndRestart fatal", e)
                 }
 
-                try { context.cacheDir.deleteRecursively() } catch (_: Exception) {}
-
-                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                intent?.addFlags(
-                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-                )
-                context.startActivity(intent)
+                // 9) Restart the activity stack and kill the process
+                try {
+                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    intent?.addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                        android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    )
+                    if (intent != null) context.startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e("ResetAndRestart", "restart intent failed", e)
+                }
                 Runtime.getRuntime().exit(0)
-            } catch (_: Exception) { }
+            }
         }
     }
 
