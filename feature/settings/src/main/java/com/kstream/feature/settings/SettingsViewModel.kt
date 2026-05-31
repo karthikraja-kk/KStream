@@ -2,8 +2,11 @@ package com.kstream.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
 import android.os.Environment
+import android.os.SystemClock
 import android.util.Log
 import coil.Coil
 import coil.annotation.ExperimentalCoilApi
@@ -23,6 +26,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
@@ -32,6 +36,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 enum class ScanState {
@@ -81,6 +86,7 @@ class SettingsViewModel @Inject constructor(
     private var pollingJob: Job? = null
     private var cooldownTickerJob: Job? = null
     private var lastObservedScanStatus: ScanStatus? = null
+    private val isResetting = AtomicBoolean(false)
 
     companion object {
         private const val POLL_INTERVAL_MS = 5000L
@@ -399,10 +405,15 @@ class SettingsViewModel @Inject constructor(
 
     @OptIn(ExperimentalCoilApi::class)
     fun resetAllAndRestart() {
+        // T3: prevent overlapping resets if user double-taps or the dialog re-fires
+        if (!isResetting.compareAndSet(false, true)) {
+            Log.d("ResetAndRestart", "reset already in progress, ignoring")
+            return
+        }
         viewModelScope.launch {
-            // Run all destructive work off the Main dispatcher so file I/O actually
-            // completes before we restart the process.
-            withContext(Dispatchers.IO) {
+            // T1: NonCancellable — ViewModel teardown (config change / nav away) must
+            // NOT abort an in-flight wipe. We always reach the restart step.
+            withContext(NonCancellable + Dispatchers.IO) {
                 val tag = "ResetAndRestart"
                 try {
                     // 1) Stop any in-flight downloads so they don't race the delete
@@ -473,16 +484,36 @@ class SettingsViewModel @Inject constructor(
                     Log.e(tag, "resetAllAndRestart fatal", e)
                 }
 
-                // 9) Restart the activity stack and kill the process
+                // 9) T2: schedule restart via AlarmManager (reliable across OEMs),
+                //    then kill the process. AlarmManager survives our exit and
+                //    the system will launch the activity ~100 ms later.
                 try {
                     val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                    intent?.addFlags(
-                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                        android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    )
-                    if (intent != null) context.startActivity(intent)
+                    if (intent != null) {
+                        intent.addFlags(
+                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                            android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        )
+                        val piFlags = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        } else {
+                            PendingIntent.FLAG_UPDATE_CURRENT
+                        }
+                        val pendingIntent = PendingIntent.getActivity(
+                            context, 0xCAFE, intent, piFlags
+                        )
+                        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                        alarmManager?.set(
+                            AlarmManager.ELAPSED_REALTIME,
+                            SystemClock.elapsedRealtime() + 250,
+                            pendingIntent
+                        )
+                        Log.d(tag, "Restart scheduled via AlarmManager")
+                    } else {
+                        Log.w(tag, "Launch intent is null — cannot schedule restart")
+                    }
                 } catch (e: Exception) {
-                    Log.e("ResetAndRestart", "restart intent failed", e)
+                    Log.e("ResetAndRestart", "AlarmManager restart failed", e)
                 }
                 Runtime.getRuntime().exit(0)
             }

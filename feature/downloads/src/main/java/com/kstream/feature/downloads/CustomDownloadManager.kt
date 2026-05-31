@@ -14,8 +14,6 @@ import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.model.Download
 import com.kstream.core.model.DownloadStatus
 import com.kstream.core.domain.repository.DownloadRepository
-import com.kstream.core.domain.repository.MovieRepository
-import com.kstream.core.domain.repository.UserDataRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -32,8 +30,6 @@ import javax.inject.Singleton
 class CustomDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val downloadRepository: DownloadRepository,
-    private val movieRepository: MovieRepository,
-    private val userDataRepository: UserDataRepository,
     private val networkMonitor: NetworkMonitor
 ) {
     private val client = OkHttpClient.Builder()
@@ -207,7 +203,7 @@ class CustomDownloadManager @Inject constructor(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful && response.code != 206) {
                 if (response.code == 416) { 
-                    finalizeDownload(id, movieId, quality, videoUri!!, baseFileName)
+                    finalizeDownload(id, videoUri!!, baseFileName)
                     return@use
                 }
                 throw Exception("Server returned ${response.code}")
@@ -256,15 +252,14 @@ class CustomDownloadManager @Inject constructor(
             }
         }
 
-        finalizeDownload(id, movieId, quality, videoUri!!, baseFileName)
+        finalizeDownload(id, videoUri!!, baseFileName)
     }
 
-    private suspend fun finalizeDownload(id: String, movieId: String, quality: String, videoUri: Uri, finalFileName: String) {
+    private suspend fun finalizeDownload(id: String, videoUri: Uri, finalFileName: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.Video.Media.DISPLAY_NAME, finalFileName)
                 put(MediaStore.Video.Media.IS_PENDING, 0)
-                put(MediaStore.Video.Media.DESCRIPTION, "$movieId|$quality")
             }
             context.contentResolver.update(videoUri, contentValues, null, null)
         } else {
