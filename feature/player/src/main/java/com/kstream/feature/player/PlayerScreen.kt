@@ -124,8 +124,9 @@ fun PlayerRoute(
     var hideTimerKey by remember { mutableLongStateOf(0L) }
     var focusedControlId by remember { mutableStateOf<String?>(null) }
 
-    // Playback state tracking
-    val player = viewModel.playerManager.getPlayer()
+    // Playback state tracking — always fetch fresh player to avoid stale references after release/recreate
+    fun currentPlayer() = viewModel.playerManager.getPlayer()
+    val player = currentPlayer()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
@@ -170,7 +171,7 @@ fun PlayerRoute(
         if (appliedDeltaMs == 0L) return
 
         currentPosition = newPosition
-        player.seekTo(newPosition)
+        try { currentPlayer().seekTo(newPosition) } catch (_: Exception) {}
         seekAccumulated += appliedDeltaMs / 1000L
         seekIndicatorVisible = true
         seekIndicatorKey++
@@ -561,7 +562,10 @@ fun PlayerRoute(
                                 else Modifier
                             )
                             .clickable {
-                                if (player.isPlaying) player.pause() else player.play()
+                                try {
+                                    val p = currentPlayer()
+                                    if (p.isPlaying) p.pause() else p.play()
+                                } catch (_: Exception) {}
                                 resetHideTimer()
                             },
                         contentAlignment = Alignment.Center
@@ -676,7 +680,7 @@ fun PlayerRoute(
                                     resetHideTimer()
                                 },
                                 onValueChangeFinished = {
-                                    player.seekTo(currentPosition)
+                                    try { currentPlayer().seekTo(currentPosition) } catch (_: Exception) {}
                                     isSeeking = false
                                 },
                                 enabled = !isTV,
