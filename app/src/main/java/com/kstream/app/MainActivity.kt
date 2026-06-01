@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,21 +50,37 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+            val crashLog = checkForCrashLog()
             PlatformProvider {
                 val platform = LocalPlatform.current
                 if (platform == Platform.TV) {
                     KStreamTvTheme {
                         KStreamTheme {
                             KStreamAppContent()
+                            if (crashLog != null) {
+                                CrashInfoDialog(crashLog) { clearCrashLog() }
+                            }
                         }
                     }
                 } else {
                     KStreamTheme {
                         KStreamAppContent()
+                        if (crashLog != null) {
+                            CrashInfoDialog(crashLog) { clearCrashLog() }
+                        }
                     }
                 }
             }
         }
+    }
+
+    private fun checkForCrashLog(): String? {
+        val prefs = getSharedPreferences("crash_log", MODE_PRIVATE)
+        return prefs.getString("last_crash", null)
+    }
+
+    private fun clearCrashLog() {
+        getSharedPreferences("crash_log", MODE_PRIVATE).edit().clear().apply()
     }
 }
 
@@ -418,4 +436,29 @@ fun SplashScreenWithNav(
             modifier = Modifier.fillMaxSize()
         )
     }
+}
+
+@Composable
+private fun CrashInfoDialog(crashLog: String, onDismiss: () -> Unit) {
+    var dismissed by remember { mutableStateOf(false) }
+    if (dismissed) return
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { dismissed = true; onDismiss() },
+        title = { androidx.compose.material3.Text("Crash Report") },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.Text(
+                    text = crashLog.take(1500),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    maxLines = 30
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { dismissed = true; onDismiss() }) {
+                androidx.compose.material3.Text("OK")
+            }
+        }
+    )
 }

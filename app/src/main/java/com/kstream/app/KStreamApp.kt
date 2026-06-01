@@ -14,6 +14,30 @@ import java.util.concurrent.TimeUnit
 @HiltAndroidApp
 class KStreamApp : Application(), ImageLoaderFactory {
 
+    override fun onCreate() {
+        super.onCreate()
+        setupCrashHandler()
+    }
+
+    private fun setupCrashHandler() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val sw = java.io.StringWriter()
+                throwable.printStackTrace(java.io.PrintWriter(sw))
+                val stackTrace = sw.toString()
+                val crashInfo = "Thread: ${thread.name}\n${throwable::class.java.name}: ${throwable.message}\n\n$stackTrace"
+                android.util.Log.e("KStreamCrash", crashInfo)
+                getSharedPreferences("crash_log", MODE_PRIVATE)
+                    .edit()
+                    .putString("last_crash", crashInfo)
+                    .putLong("crash_time", System.currentTimeMillis())
+                    .commit()
+            } catch (_: Exception) {}
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+    }
+
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .okHttpClient {
