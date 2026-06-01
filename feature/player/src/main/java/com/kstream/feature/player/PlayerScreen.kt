@@ -229,10 +229,15 @@ fun PlayerRoute(
         }
     }
 
-    fun enterFullscreen() {
+    // forceOrientation = true (manual button): locks to landscape so user sees widescreen immediately.
+    // forceOrientation = false (auto-rotate): device is already landscape, no lock needed —
+    // this keeps configuration.orientation responsive so rotating back to portrait exits fullscreen.
+    fun enterFullscreen(forceOrientation: Boolean = true) {
         isFullscreen = true
         val activity = context as? Activity ?: return
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        if (forceOrientation) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
         val window = activity.window
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -248,6 +253,17 @@ fun PlayerRoute(
         WindowCompat.setDecorFitsSystemWindows(window, true)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+    }
+
+    // Auto-fullscreen on rotation (mobile only).
+    LaunchedEffect(configuration.orientation) {
+        if (!isTV) {
+            if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && !isFullscreen) {
+                enterFullscreen(forceOrientation = false)
+            } else if (configuration.orientation == Configuration.ORIENTATION_PORTRAIT && isFullscreen) {
+                exitFullscreen()
+            }
+        }
     }
 
     LaunchedEffect(isFullscreen) {
