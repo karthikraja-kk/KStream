@@ -188,7 +188,7 @@ class HomeViewModel @Inject constructor(
     private fun buildHeroMovies(movies: List<Movie>, recommendations: List<Movie>): List<Movie> {
         val seen = mutableSetOf<String>()
         val hero = mutableListOf<Movie>()
-        fun parseDate(s: String): Long = try { if (s.isNotBlank()) DATE_FORMATTER.parse(s)?.time ?: 0L else 0L } catch (_: Exception) { 0L }
+        fun parseDate(s: String): Long = try { if (s.isNotBlank()) DATE_FORMAT.parse(s)?.time ?: 0L else 0L } catch (_: Exception) { 0L }
 
         // Top 5 from new releases
         movies.sortedByLastUpdated().take(5).forEach { m ->
@@ -283,13 +283,13 @@ class HomeViewModel @Inject constructor(
     private fun List<Movie>.sortedByLastUpdated(): List<Movie> {
         return sortedByDescending { movie ->
             try {
-                if (movie.lastUpdated.isNotBlank()) DATE_FORMATTER.parse(movie.lastUpdated)?.time ?: 0L
+                if (movie.lastUpdated.isNotBlank()) DATE_FORMAT.parse(movie.lastUpdated)?.time ?: 0L
                 else 0L
             } catch (_: Exception) { 0L }
         }
     }
 
     companion object {
-        private val DATE_FORMATTER = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.ENGLISH)
+        private val DATE_FORMAT = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.ENGLISH)
     }
 }
