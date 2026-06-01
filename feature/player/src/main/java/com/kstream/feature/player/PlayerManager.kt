@@ -35,11 +35,12 @@ class PlayerManager @Inject constructor(
     private val _allUrlsFailed = kotlinx.coroutines.flow.MutableSharedFlow<PlaybackException>(extraBufferCapacity = 1)
     val allUrlsFailed: kotlinx.coroutines.flow.SharedFlow<PlaybackException> = _allUrlsFailed
 
+    private var errorRetryCount: Int = 0
+    private val maxErrorRetries: Int = 3
+
     fun getPlayer(): Player {
         if (isReleased) {
-            // After release, return existing player if still around, or create minimally
             if (exoPlayer != null) return exoPlayer!!
-            // Recreate only if truly needed (e.g., nav restored the screen)
             isReleased = false
         }
         if (exoPlayer == null) {
@@ -49,6 +50,7 @@ class PlayerManager @Inject constructor(
                         if (playbackState == Player.STATE_READY && isPlaying) {
                             lastPlaybackPosition = currentPosition
                             hasRetriedCurrentUrl = false
+                            errorRetryCount = 0
                         }
                     }
 
@@ -60,23 +62,30 @@ class PlayerManager @Inject constructor(
 
                     override fun onPlayerError(error: PlaybackException) {
                         val player = exoPlayer ?: return
-                        
+
                         if (isStreamingMode) {
                             when (error.errorCode) {
                                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
                                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
-                                    lastPlaybackPosition = player.currentPosition
-                                    player.pause()
+                                    try {
+                                        lastPlaybackPosition = player.currentPosition
+                                        player.pause()
+                                    } catch (_: Exception) {}
                                     return
                                 }
                             }
                         }
 
-                        // On app resume, URLs may still be valid — retry current URL once
+                        // Limit total retries to prevent infinite retry loop (ANR on low-end TVs)
+                        errorRetryCount++
+                        if (errorRetryCount > maxErrorRetries) {
+                            _allUrlsFailed.tryEmit(error)
+                            return
+                        }
+
                         if (!hasRetriedCurrentUrl) {
                             hasRetriedCurrentUrl = true
-                            player.prepare()
-                            player.play()
+                            try { player.prepare(); player.play() } catch (_: Exception) {}
                             return
                         }
                         hasRetriedCurrentUrl = false
@@ -84,11 +93,12 @@ class PlayerManager @Inject constructor(
                         val next = fallbackUrls.getOrNull(fallbackIndex + 1)
                         if (next != null) {
                             fallbackIndex += 1
-                            player.setMediaItem(MediaItem.fromUri(next))
-                            player.prepare()
-                            player.play()
+                            try {
+                                player.setMediaItem(MediaItem.fromUri(next))
+                                player.prepare()
+                                player.play()
+                            } catch (_: Exception) {}
                         } else {
-                            // All fallback URLs exhausted — signal for media refresh
                             _allUrlsFailed.tryEmit(error)
                         }
                     }
@@ -195,12 +205,11 @@ class PlayerManager @Inject constructor(
 
     fun release() {
         isReleased = true
+        errorRetryCount = 0
         networkObserverJob?.cancel()
         networkObserverJob = null
-        exoPlayer?.release()
+        try { exoPlayer?.release() } catch (_: Exception) {}
         exoPlayer = null
-        try {
-            scope.cancel()
-        } catch (e: Exception) {}
+        try { scope.cancel() } catch (_: Exception) {}
     }
 }

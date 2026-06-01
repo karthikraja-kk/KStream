@@ -171,26 +171,31 @@ fun PlayerRoute(
         if (appliedDeltaMs == 0L) return
 
         currentPosition = newPosition
-        try { currentPlayer().seekTo(newPosition) } catch (_: Exception) {}
+        try {
+            viewModel.playerManager.playerOrNull()?.seekTo(newPosition)
+        } catch (_: Exception) {}
         seekAccumulated += appliedDeltaMs / 1000L
         seekIndicatorVisible = true
         seekIndicatorKey++
     }
 
-    // Poll player state
+    // Poll player state — less frequent on TV to reduce ANR risk on low-end hardware
     LaunchedEffect(Unit) {
+        val pollInterval = if (isTV) 1000L else 500L
         while (true) {
-            val p = viewModel.playerManager.playerOrNull()
-            if (p != null) {
-                if (!isSeeking) {
-                    currentPosition = p.currentPosition.coerceAtLeast(0L)
+            try {
+                val p = viewModel.playerManager.playerOrNull()
+                if (p != null) {
+                    if (!isSeeking) {
+                        currentPosition = p.currentPosition.coerceAtLeast(0L)
+                    }
+                    val rawDuration = p.duration
+                    duration = if (rawDuration > 0 && rawDuration != androidx.media3.common.C.TIME_UNSET) rawDuration else 0L
+                    bufferedPosition = p.bufferedPosition.coerceAtLeast(0L)
+                    isPlaying = p.isPlaying
                 }
-                val rawDuration = p.duration
-                duration = if (rawDuration > 0 && rawDuration != androidx.media3.common.C.TIME_UNSET) rawDuration else 0L
-                bufferedPosition = p.bufferedPosition.coerceAtLeast(0L)
-                isPlaying = p.isPlaying
-            }
-            delay(500)
+            } catch (_: Exception) {}
+            delay(pollInterval)
         }
     }
 
@@ -317,15 +322,15 @@ fun PlayerRoute(
     DisposableEffect(player) {
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                viewModel.onBufferingStateChanged(playbackState == androidx.media3.common.Player.STATE_BUFFERING)
+                try { viewModel.onBufferingStateChanged(playbackState == androidx.media3.common.Player.STATE_BUFFERING) } catch (_: Exception) {}
             }
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
             }
         }
-        player.addListener(listener)
+        try { player.addListener(listener) } catch (_: Exception) {}
         onDispose {
-            player.removeListener(listener)
+            try { player.removeListener(listener) } catch (_: Exception) {}
         }
     }
 
