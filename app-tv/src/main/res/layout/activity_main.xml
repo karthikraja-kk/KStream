@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Post-welcome home shell. P3 placeholder: shows the brand wordmark and a
-  status line. P4 replaces the content area with a Leanback BrowseFragment.
+  Post-welcome host. The Leanback BrowseFragment (HomeBrowseFragment) is
+  attached to `main_browse_container` from MainActivity.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/main_root"
@@ -9,34 +9,9 @@
     android:layout_height="match_parent"
     android:background="@color/bg_base">
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:orientation="vertical">
-
-        <ImageView
-            android:layout_width="160dp"
-            android:layout_height="wrap_content"
-            android:contentDescription="@string/app_name"
-            android:src="@drawable/kstream_logo" />
-
-        <View
-            android:layout_width="80dp"
-            android:layout_height="3dp"
-            android:layout_marginTop="@dimen/space_md"
-            android:background="@color/accent_gold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_lg"
-            android:letterSpacing="0.2"
-            android:text="@string/home_placeholder_label"
-            android:textAllCaps="true"
-            android:textAppearance="@style/TextAppearance.KStream.Meta" />
-
-    </LinearLayout>
+    <FrameLayout
+        android:id="@+id/main_browse_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </FrameLayout>

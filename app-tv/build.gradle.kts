@@ -74,11 +74,13 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:domain"))
 
-    // Feature ViewModels are pulled in as each phase wires its screen (P3+).
+    // Feature ViewModels (each phase wires the screen that uses them).
+    implementation(project(":feature:home"))
 
     // AndroidX foundation
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.constraintlayout)
