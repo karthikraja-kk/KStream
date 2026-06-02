@@ -36,6 +36,9 @@ class MovieCardPresenter : Presenter() {
     @Volatile
     private var progressMap: Map<String, WatchProgress> = emptyMap()
 
+    /** Optional movie-level click handler. Wired by the host fragment. */
+    var onMovieClick: ((Movie) -> Unit)? = null
+
     fun updateProgress(progress: Map<String, WatchProgress>) {
         progressMap = progress
     }
@@ -75,6 +78,8 @@ class MovieCardPresenter : Presenter() {
         }
 
         bindProgress(v, progressBar, movie)
+
+        v.setOnClickListener { onMovieClick?.invoke(movie) }
 
         Glide.with(v.context)
             .load(movie.posterUrl.takeIf { it.isNotBlank() })

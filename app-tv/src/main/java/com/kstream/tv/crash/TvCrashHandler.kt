@@ -78,6 +78,30 @@ object TvCrashHandler {
         Log.i(TAG, "TvCrashHandler installed")
     }
 
+    /** Returns crash count in the last 30s window. Read by SafeMode (P13). */
+    fun getCrashCount(context: android.content.Context): Int {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+        val lastCrashTime = prefs.getLong("crash_time", 0L)
+        if (System.currentTimeMillis() - lastCrashTime > LOOP_WINDOW_MS) return 0
+        return prefs.getInt("crash_count", 0)
+    }
+
+    /** True when recent crashes warrant degraded rendering (LOW-tier behavior). */
+    fun shouldEnterSafeMode(context: android.content.Context): Boolean =
+        getCrashCount(context) >= 2
+
+    /** Returns the last saved crash text (for Settings diagnostics). */
+    fun getLastCrash(context: android.content.Context): String? {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+        return prefs.getString("last_crash", null)
+    }
+
+    /** Clears the crash log + counter (used by Settings "Acknowledge"). */
+    fun acknowledgeCrash(context: android.content.Context) {
+        context.applicationContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
+
     private fun formatCrash(thread: Thread, throwable: Throwable): String {
         val sw = StringWriter()
         throwable.printStackTrace(PrintWriter(sw))

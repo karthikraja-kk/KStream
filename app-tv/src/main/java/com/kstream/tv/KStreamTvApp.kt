@@ -5,7 +5,9 @@ import android.util.Log
 import com.bumptech.glide.Glide
 import com.kstream.core.common.MemoryGuardian
 import com.kstream.tv.crash.TvCrashHandler
+import com.kstream.tv.safemode.SafeMode
 import com.kstream.tv.tier.DeviceTier
+import com.kstream.tv.watchdog.AnrWatchdog
 import dagger.hilt.android.HiltAndroidApp
 
 /**
@@ -22,12 +24,20 @@ import dagger.hilt.android.HiltAndroidApp
 class KStreamTvApp : Application() {
 
     private lateinit var memoryGuardian: MemoryGuardian
+    private val anrWatchdog = AnrWatchdog()
 
     override fun onCreate() {
         super.onCreate()
 
         // 1. Crash handler first — every line below this must be observable on next launch.
         TvCrashHandler.install(this)
+
+        // 1b. SafeMode based on crash count, then start ANR watchdog.
+        SafeMode.init(this, TvCrashHandler.getCrashCount(this))
+        if (SafeMode.isEnabled()) {
+            Log.w(TAG, "SafeMode ENABLED (crashCount=${TvCrashHandler.getCrashCount(this)})")
+        }
+        anrWatchdog.start()
 
         // 2. Resolve and log device tier exactly once (read by Glide's AppGlideModule too).
         val tier = DeviceTier.get(this)

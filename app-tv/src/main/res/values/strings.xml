@@ -43,8 +43,14 @@
     <!-- Search / Browse / Settings (P10–P12) -->
     <string name="search_hint">Search movies and shows…</string>
     <string name="search_no_results">No results.</string>
+    <string name="search_loading">Searching…</string>
+    <string name="search_empty">No results.</string>
     <string name="browse_title">Browse</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_trigger_scan">Refresh Library</string>
+    <string name="settings_clear_cache">Clear Image Cache</string>
+    <string name="settings_clear_history">Clear Watch History</string>
+    <string name="settings_toggle_lite">Toggle Lite Mode</string>
 </resources>
 
 
