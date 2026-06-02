@@ -73,8 +73,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:data"))
     implementation(project(":core:domain"))
-
-    // Feature ViewModels (each phase wires the screen that uses them).
+    implementation(project(":core:enrichment"))
     implementation(project(":feature:home"))
 
     // AndroidX foundation
