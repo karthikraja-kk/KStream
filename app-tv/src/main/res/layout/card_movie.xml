@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Polished movie card. 2:3 poster with rounded corners, a quality badge in the
+  top-right (HD / 4K / type label), a thin gold progress bar on the bottom of
+  the poster (only shown when watch progress exists), and a title + meta line
+  below the image.
+
+  The whole card is the focusable target (a single, app-level focus node).
+  The outer FrameLayout's background is `card_focus_state` which paints the
+  glow ring or border per-tier (set at runtime by the presenter).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_root"
+    android:layout_width="@dimen/card_poster_width"
+    android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="2dp"
+        android:paddingVertical="2dp">
+
+        <!-- Poster column -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/card_poster_height">
+
+            <ImageView
+                android:id="@+id/card_poster"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/card_poster_bg"
+                android:clipToOutline="true"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                tools:src="@color/bg_surface" />
+
+            <!-- Quality badge top-right (HD / 4K / TYPE) -->
+            <TextView
+                android:id="@+id/card_quality_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_margin="@dimen/space_xs"
+                android:background="@drawable/badge_quality_bg"
+                android:paddingHorizontal="@dimen/space_xs"
+                android:paddingVertical="2dp"
+                android:textColor="@color/text_primary"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="HD"
+                tools:visibility="visible" />
+
+            <!-- Watch progress bar (gold), bottom 3dp -->
+            <View
+                android:id="@+id/card_progress"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:layout_gravity="bottom|start"
+                android:background="@color/accent_gold"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/card_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xs"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.KStream.Card"
+            tools:text="A Very Long Movie Title That Wraps" />
+
+        <TextView
+            android:id="@+id/card_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.KStream.Meta"
+            tools:text="2024  ·  1h 58m  ·  ★ 8.2" />
+
+    </LinearLayout>
+
+</FrameLayout>

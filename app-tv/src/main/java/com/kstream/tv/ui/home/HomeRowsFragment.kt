@@ -85,6 +85,7 @@ class HomeRowsFragment : RowsSupportFragment() {
     }
 
     private fun render(state: HomeUiState) {
+        cardPresenter.updateProgress(state.watchProgressMap)
         diffRailsInto(rowsAdapter, state.rails)
     }
 
