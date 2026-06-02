@@ -1,0 +1,9 @@
+# Copy this file to `local.properties` and fill in your values.
+# `local.properties` is gitignored and must never be committed.
+
+# Android SDK location (auto-set by Android Studio)
+# sdk.dir=C:\\Users\\YOU\\AppData\\Local\\Android\\Sdk
+
+# TMDb API key (free) for the :core:enrichment module on the kstream-tv branch.
+# Get a key at https://www.themoviedb.org/settings/api (Developer tier).
+TMDB_API_KEY=YOUR_TMDB_API_KEY_HERE
