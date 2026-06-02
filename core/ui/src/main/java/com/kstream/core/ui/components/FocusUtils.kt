@@ -17,15 +17,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.kstream.core.ui.LocalLiteMode
 
 /**
  * Applies a smooth scale animation when the element receives TV focus.
- * Use on movie tiles, cards, buttons, and any interactive TV element.
+ * In Lite Mode: no scale animation (returns unmodified).
  */
 fun Modifier.tvFocusScale(
     focusedScale: Float = OttConstants.FocusScaleFactor,
     animDurationMs: Int = 200
 ): Modifier = composed {
+    val liteMode = LocalLiteMode.current
+    if (liteMode) return@composed this
+
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isFocused) focusedScale else 1f,
@@ -43,12 +47,16 @@ fun Modifier.tvFocusScale(
 
 /**
  * Applies an elevation/shadow glow effect on focus.
+ * In Lite Mode: no glow (returns unmodified).
  */
 fun Modifier.tvFocusGlow(
     focusedElevation: Dp = 12.dp,
     unfocusedElevation: Dp = 0.dp,
     shape: RoundedCornerShape = RoundedCornerShape(OttConstants.TileCornerRadius)
 ): Modifier = composed {
+    val liteMode = LocalLiteMode.current
+    if (liteMode) return@composed this
+
     var isFocused by remember { mutableStateOf(false) }
     val elevation by animateFloatAsState(
         targetValue = if (isFocused) focusedElevation.value else unfocusedElevation.value,
@@ -62,8 +70,8 @@ fun Modifier.tvFocusGlow(
 }
 
 /**
- * Applies a white border on focus — the Netflix/Disney+ standard focus ring.
- * White is universally visible on dark backgrounds and red fills.
+ * Applies a border on focus — solid 2dp accent border.
+ * Works the same in both Normal and Lite mode (already lightweight).
  */
 fun Modifier.tvFocusBorder(
     color: Color = OttConstants.FocusBorderColor,

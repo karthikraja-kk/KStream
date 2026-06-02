@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.kstream.core.ui.LocalLiteMode
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.AppErrorScreen
@@ -185,8 +186,14 @@ fun DetailsScreenMobile(
             )
             Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.isLoading) {
-            DetailsSkeletonMobile(modifier = Modifier.fillMaxSize())
-            Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
+                if (LocalLiteMode.current) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0xFFE50914), strokeWidth = 3.dp)
+                    }
+                } else {
+                    DetailsSkeletonMobile(modifier = Modifier.fillMaxSize())
+                }
+                Box(modifier = Modifier.align(Alignment.TopStart)) { FloatingBackButton() }
         } else if (uiState.error != null) {
             AppErrorScreen(
                 title = "Couldn't Load Movie",
@@ -792,7 +799,13 @@ fun DetailsScreenTv(
             onGoToDownloads = onGoToDownloads
         )
     } else if (uiState.isLoading) {
-        DetailsSkeletonTv(modifier = Modifier.fillMaxSize())
+        if (LocalLiteMode.current) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color(0xFFE50914), strokeWidth = 3.dp)
+            }
+        } else {
+            DetailsSkeletonTv(modifier = Modifier.fillMaxSize())
+        }
     } else if (uiState.error != null) {
         AppErrorScreen(
             title = "Couldn't Load Movie",

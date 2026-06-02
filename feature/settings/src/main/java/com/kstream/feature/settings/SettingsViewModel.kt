@@ -62,7 +62,8 @@ data class SettingsUiState(
     val watchHistory: List<WatchHistoryItem> = emptyList(),
     val isLoadingHistory: Boolean = false,
     val successMessage: String? = null,
-    val isCarouselEnabled: Boolean = true
+    val isCarouselEnabled: Boolean = true,
+    val isLiteMode: Boolean = false
 )
 
 @HiltViewModel
@@ -104,6 +105,11 @@ class SettingsViewModel @Inject constructor(
             .onEach { enabled -> _uiState.update { it.copy(isCarouselEnabled = enabled) } }
             .launchIn(viewModelScope)
 
+        userDataRepository.isLiteMode
+            .catch { emit(false) }
+            .onEach { enabled -> _uiState.update { it.copy(isLiteMode = enabled) } }
+            .launchIn(viewModelScope)
+
         startLiveScanMonitor()
         startWatchHistoryMonitor()
     }
@@ -115,6 +121,12 @@ class SettingsViewModel @Inject constructor(
     fun toggleCarousel(enabled: Boolean) {
         viewModelScope.launch {
             userDataRepository.setCarouselEnabled(enabled)
+        }
+    }
+
+    fun toggleLiteMode(enabled: Boolean) {
+        viewModelScope.launch {
+            userDataRepository.setLiteMode(enabled)
         }
     }
 

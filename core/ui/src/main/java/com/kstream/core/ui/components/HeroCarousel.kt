@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.kstream.core.model.Movie
+import com.kstream.core.ui.LocalLiteMode
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import kotlinx.coroutines.delay
@@ -53,6 +54,23 @@ fun HeroCarousel(
 
     val platform = LocalPlatform.current
     val isTv = platform == Platform.TV
+    val isLiteMode = LocalLiteMode.current
+    val heroHeight = if (isTv) HERO_HEIGHT_TV else HERO_HEIGHT_MOBILE
+
+    // Lite Mode: single featured movie, no pager overhead
+    if (isLiteMode) {
+        val movie = movies.first()
+        Box(modifier = modifier.fillMaxWidth().height(heroHeight)) {
+            HeroSlide(
+                movie = movie,
+                isTv = isTv,
+                onMovieClick = { onMovieClick(movie.id) },
+                onFocusChanged = {}
+            )
+        }
+        return
+    }
+
     val pagerState = rememberPagerState(pageCount = { movies.size })
     val coroutineScope = rememberCoroutineScope()
     var isFocused by remember { mutableStateOf(false) }
@@ -67,8 +85,6 @@ fun HeroCarousel(
             }
         }
     }
-
-    val heroHeight = if (isTv) HERO_HEIGHT_TV else HERO_HEIGHT_MOBILE
 
     Column(
         modifier = modifier

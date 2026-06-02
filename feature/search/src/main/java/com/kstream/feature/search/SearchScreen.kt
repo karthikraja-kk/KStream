@@ -2,6 +2,7 @@ package com.kstream.feature.search
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,9 +63,6 @@ import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
 import com.kstream.core.ui.components.tvFocusScale
 import com.kstream.core.model.Movie
-import androidx.tv.foundation.lazy.grid.TvGridCells
-import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
-import androidx.tv.foundation.lazy.grid.items as tvItems
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text as TvText
 
@@ -168,10 +166,10 @@ fun SearchRoute(
                                         containerColor = if (chipFocused) Color(0xFFFF1A1A)
                                         else MaterialTheme.colorScheme.surfaceVariant
                                     ),
-                                    border = SuggestionChipDefaults.suggestionChipBorder(
-                                        borderColor = if (chipFocused) Color.White
-                                        else MaterialTheme.colorScheme.outline,
-                                        borderWidth = if (chipFocused) 2.dp else 1.dp
+                                    border = BorderStroke(
+                                        width = if (chipFocused) 2.dp else 1.dp,
+                                        color = if (chipFocused) Color.White
+                                        else MaterialTheme.colorScheme.outline
                                     )
                                 )
                             }
@@ -338,10 +336,10 @@ private fun IdleDiscoveryState(
                                 containerColor = if (chipFocused) Color(0xFFE50914)
                                 else Color(0xFF1E1E1E)
                             ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                borderColor = if (chipFocused) Color(0xFFE50914)
-                                else Color(0xFF333333),
-                                borderWidth = 1.dp
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = if (chipFocused) Color(0xFFE50914)
+                                else Color(0xFF333333)
                             )
                         )
                     }
@@ -536,8 +534,8 @@ fun SearchScreenTv(
             }
             var focusedIndex by remember { mutableIntStateOf(-1) }
 
-            TvLazyVerticalGrid(
-                columns = TvGridCells.Fixed(numColumns),
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(numColumns),
                 modifier = Modifier.onPreviewKeyEvent { event ->
                     // Mirror the Home screen pattern: consume Left to move to the left tile when
                     // not in the leftmost column; pass through when in column 0 so the sidebar opens.
@@ -554,7 +552,7 @@ fun SearchScreenTv(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                tvItems(
+                items(
                     items = uiState.results.mapIndexed { i, m -> i to m },
                     key = { (_, m) -> m.id }
                 ) { (index, movie) ->

@@ -42,6 +42,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -65,6 +67,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -91,6 +94,7 @@ import android.content.pm.ActivityInfo
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.kstream.core.ui.LocalLiteMode
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.components.tvFocusBorder
@@ -120,7 +124,23 @@ fun PlayerRoute(
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
 
     val isTV = LocalPlatform.current == Platform.TV
+    val isLiteMode = LocalLiteMode.current
     var controlsVisible by remember { mutableStateOf(true) }
+
+    // Clear image cache on player entry to free memory for video
+    LaunchedEffect(Unit) {
+        try {
+            coil.Coil.imageLoader(context).memoryCache?.clear()
+        } catch (_: Exception) {}
+        // Save player position periodically for crash recovery
+        while (true) {
+            delay(5000)
+            try {
+                val pos = viewModel.playerManager.getPlayer().currentPosition
+                com.kstream.core.common.AppState.currentPlayerPositionMs = pos
+            } catch (_: Exception) {}
+        }
+    }
     var hideTimerKey by remember { mutableLongStateOf(0L) }
     var focusedControlId by remember { mutableStateOf<String?>(null) }
 
@@ -135,6 +155,9 @@ fun PlayerRoute(
     var seekAccumulated by remember { mutableLongStateOf(0L) }
     var seekIndicatorVisible by remember { mutableStateOf(false) }
     var seekIndicatorKey by remember { mutableLongStateOf(0L) }
+    // Debounced seek: accumulate position changes, only call player.seekTo once after pause in input
+    var pendingSeekPosition by remember { mutableLongStateOf(-1L) }
+    var seekCommitKey by remember { mutableLongStateOf(0L) }
 
     val controlsFocused = focusedControlId != null || showQualityMenu
 
@@ -171,17 +194,31 @@ fun PlayerRoute(
         if (appliedDeltaMs == 0L) return
 
         currentPosition = newPosition
-        try {
-            viewModel.playerManager.playerOrNull()?.seekTo(newPosition)
-        } catch (_: Exception) {}
         seekAccumulated += appliedDeltaMs / 1000L
         seekIndicatorVisible = true
         seekIndicatorKey++
+
+        if (isTV) {
+            // Debounce on TV: UI updates instantly, seekTo fires once after 300ms of no input
+            pendingSeekPosition = newPosition
+            seekCommitKey++
+        } else {
+            try { viewModel.playerManager.playerOrNull()?.seekTo(newPosition) } catch (_: Exception) {}
+        }
     }
 
-    // Poll player state — less frequent on TV to reduce ANR risk on low-end hardware
+    // Debounced seek commit — waits for rapid key presses to stop, then seeks once
+    LaunchedEffect(seekCommitKey) {
+        if (pendingSeekPosition >= 0) {
+            delay(300)
+            try { viewModel.playerManager.playerOrNull()?.seekTo(pendingSeekPosition) } catch (_: Exception) {}
+            pendingSeekPosition = -1L
+        }
+    }
+
+    // Poll player state — much less frequent on TV to prevent main thread overload
     LaunchedEffect(Unit) {
-        val pollInterval = if (isTV) 1000L else 500L
+        val pollInterval = if (isTV) 5000L else 500L
         while (true) {
             try {
                 val p = viewModel.playerManager.playerOrNull()
@@ -335,6 +372,10 @@ fun PlayerRoute(
     }
 
     // ─── Main player area ─────────────────────────────────────────────────────
+    // Throttle key events on TV: limit to one key event per 150ms to prevent recomposition storm
+    var lastKeyEventTime by remember { mutableLongStateOf(0L) }
+    val keyThrottleMs = 150L
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -353,6 +394,15 @@ fun PlayerRoute(
             }
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
+                    // Throttle on TV: consume but ignore rapid key repeats
+                    if (isTV) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastKeyEventTime < keyThrottleMs) {
+                            return@onPreviewKeyEvent true // consume and discard
+                        }
+                        lastKeyEventTime = now
+                    }
+
                     val isDpadKey = when (keyEvent.key) {
                         Key.DirectionCenter,
                         Key.Enter,
@@ -377,7 +427,7 @@ fun PlayerRoute(
                                 showControls()
                                 true
                             } else {
-                                false
+                                false // navigate within controls (focusGroup prevents leak)
                             }
                         }
                         Key.DirectionLeft -> {
@@ -385,7 +435,7 @@ fun PlayerRoute(
                                 seekBy(-10_000L)
                                 true
                             } else {
-                                false
+                                false // navigate within controls (focusGroup prevents leak)
                             }
                         }
                         Key.DirectionRight -> {
@@ -393,7 +443,7 @@ fun PlayerRoute(
                                 seekBy(10_000L)
                                 true
                             } else {
-                                false
+                                false // navigate within controls (focusGroup prevents leak)
                             }
                         }
                         else -> false
@@ -401,6 +451,7 @@ fun PlayerRoute(
                 } else false
             }
             .focusable()
+            .focusGroup()
     ) {
         // Video surface
         AndroidView(
@@ -448,10 +499,10 @@ fun PlayerRoute(
         // ─── Custom controls overlay ──────────────────────────────────────────
         AnimatedVisibility(
             visible = controlsActuallyVisible,
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(300))
+            enter = if (isLiteMode) fadeIn() else fadeIn(tween(200)),
+            exit = if (isLiteMode) fadeOut() else fadeOut(tween(300))
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize().focusGroup()) {
                 // Top gradient + controls
                 Box(
                     modifier = Modifier
@@ -643,6 +694,11 @@ fun PlayerRoute(
                                         }
                                         .onPreviewKeyEvent { keyEvent ->
                                             if (keyEvent.type == KeyEventType.KeyDown) {
+                                                val now = System.currentTimeMillis()
+                                                if (now - lastKeyEventTime < keyThrottleMs) {
+                                                    return@onPreviewKeyEvent true
+                                                }
+                                                lastKeyEventTime = now
                                                 when (keyEvent.key) {
                                                     Key.DirectionLeft -> {
                                                         isSeeking = true
@@ -924,17 +980,21 @@ fun PlayerRoute(
                     AnimatedContent(
                         targetState = uiState.funnyMessage ?: "",
                         transitionSpec = {
-                            (fadeIn(animationSpec = tween(500)) +
-                                    slideInVertically(
-                                        animationSpec = tween(500),
-                                        initialOffsetY = { it / 2 }
-                                    )).togetherWith(
-                                fadeOut(animationSpec = tween(300)) +
-                                        slideOutVertically(
-                                            animationSpec = tween(300),
-                                            targetOffsetY = { -it / 2 }
-                                        )
-                            )
+                            if (isLiteMode) {
+                                fadeIn(tween(300)).togetherWith(fadeOut(tween(200)))
+                            } else {
+                                (fadeIn(animationSpec = tween(500)) +
+                                        slideInVertically(
+                                            animationSpec = tween(500),
+                                            initialOffsetY = { it / 2 }
+                                        )).togetherWith(
+                                    fadeOut(animationSpec = tween(300)) +
+                                            slideOutVertically(
+                                                animationSpec = tween(300),
+                                                targetOffsetY = { -it / 2 }
+                                            )
+                                )
+                            }
                         },
                         label = "funnyMessage"
                     ) { message ->

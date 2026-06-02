@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.media3.common)
 
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.coil.compose)
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)

@@ -5,7 +5,9 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import com.kstream.core.common.NetworkMonitor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +46,23 @@ class PlayerManager @Inject constructor(
             isReleased = false
         }
         if (exoPlayer == null) {
-            exoPlayer = ExoPlayer.Builder(context).build().apply {
+            val isTv = context.packageManager.hasSystemFeature("android.software.leanback")
+            val builder = ExoPlayer.Builder(context)
+            if (isTv) {
+                // Reduce buffer on TV (1GB RAM) to lower memory pressure and GC thrashing
+                builder.setLoadControl(
+                    DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(
+                            10_000,  // min buffer: 10s (default 15s)
+                            20_000,  // max buffer: 20s (default 50s)
+                            2_000,   // playback start: 2s
+                            3_000    // rebuffer start: 3s
+                        )
+                        .build()
+                )
+            }
+            exoPlayer = builder.build().apply {
+                setSeekParameters(SeekParameters.CLOSEST_SYNC) // fast keyframe seeks for TV
                 addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_READY && isPlaying) {

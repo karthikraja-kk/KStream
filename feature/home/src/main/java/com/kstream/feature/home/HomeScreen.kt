@@ -52,9 +52,11 @@ import com.kstream.core.ui.components.OfflineScreen
 import com.kstream.core.ui.components.TvOfflineScreen
 import com.kstream.core.ui.components.tvFocusBorder
 import com.kstream.core.ui.components.tvFocusScale
-import androidx.tv.foundation.lazy.list.TvLazyColumn
-import androidx.tv.foundation.lazy.list.TvLazyRow
-import androidx.tv.foundation.lazy.list.items as tvItems
+import com.kstream.core.ui.LocalLiteMode
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.Text as TvText
@@ -506,6 +508,7 @@ fun HomeScreenTv(
             )
         }
     } else {
+        val isLiteMode = LocalLiteMode.current
         val hdButtonFocusRequester = remember { FocusRequester() }
         val contentFocusRequester = remember { FocusRequester() }
 
@@ -602,8 +605,8 @@ fun HomeScreenTv(
                     }
                 }
             }
-            val tvListState = androidx.tv.foundation.lazy.list.rememberTvLazyListState()
-            TvLazyColumn(
+            val tvListState = rememberLazyListState()
+            LazyColumn(
                 state = tvListState,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -643,7 +646,7 @@ fun HomeScreenTv(
                         )
                     }
                 }
-                tvItems(uiState.rails, key = { it.title }) { rail ->
+                items(uiState.rails.let { if (isLiteMode) it.take(4) else it }, key = { it.title }) { rail ->
                     Column(modifier = Modifier.padding(vertical = 16.dp)) {
                         Row(
                             modifier = Modifier
@@ -680,7 +683,7 @@ fun HomeScreenTv(
                             Array(rail.movies.size) { FocusRequester() }
                         }
                         var focusedTileIndex by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
-                        TvLazyRow(
+                        LazyRow(
                             modifier = Modifier.onPreviewKeyEvent { event ->
                                 if (event.type == KeyEventType.KeyDown &&
                                     event.key == Key.DirectionLeft &&
@@ -693,8 +696,8 @@ fun HomeScreenTv(
                             contentPadding = PaddingValues(horizontal = 48.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            tvItems(
-                                items = rail.movies.mapIndexed { i, m -> Pair(i, m) },
+                            items(
+                                items = rail.movies.let { if (isLiteMode) it.take(8) else it }.mapIndexed { i, m -> Pair(i, m) },
                                 key = { (_, m) -> m.id }
                             ) { (index, movie) ->
                                 MovieTileTv(

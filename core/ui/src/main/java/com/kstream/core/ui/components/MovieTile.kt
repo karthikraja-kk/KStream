@@ -25,6 +25,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.delay
 import com.kstream.core.model.Movie
+import com.kstream.core.ui.LocalLiteMode
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface as TvSurface
@@ -87,6 +88,7 @@ fun MovieTileMobile(
     watchProgress: Float? = null
 ) {
     val context = LocalContext.current
+    val isLiteMode = LocalLiteMode.current
     var retryHash by remember { mutableIntStateOf(0) }
 
     Column(
@@ -105,7 +107,7 @@ fun MovieTileMobile(
                 model = ImageRequest.Builder(context)
                     .data(movie.posterUrl)
                     .setParameter("retry", retryHash)
-                    .crossfade(true)
+                    .crossfade(!isLiteMode)
                     .build(),
                 contentDescription = movie.movieName,
                 modifier = Modifier.fillMaxSize(),
@@ -182,6 +184,7 @@ fun MovieTileTv(
     watchProgress: Float? = null
 ) {
     val context = LocalContext.current
+    val isLiteMode = LocalLiteMode.current
     var retryHash by remember { mutableIntStateOf(0) }
     var isFocused by remember { mutableStateOf(false) }
 
@@ -192,7 +195,7 @@ fun MovieTileTv(
             .padding(8.dp)
             .onFocusChanged { isFocused = it.isFocused || it.hasFocus },
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(OttConstants.TileCornerRadius)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = OttConstants.FocusScaleFactor),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = if (isLiteMode) 1f else OttConstants.FocusScaleFactor),
         border = ClickableSurfaceDefaults.border(
             focusedBorder = androidx.tv.material3.Border(
                 border = BorderStroke(OttConstants.FocusBorderWidth, OttConstants.FocusBorderColor),
@@ -210,7 +213,7 @@ fun MovieTileTv(
                     model = ImageRequest.Builder(context)
                         .data(movie.posterUrl)
                         .setParameter("retry", retryHash)
-                        .crossfade(true)
+                        .crossfade(!isLiteMode)
                         .build(),
                     contentDescription = movie.movieName,
                     modifier = Modifier.fillMaxSize(),

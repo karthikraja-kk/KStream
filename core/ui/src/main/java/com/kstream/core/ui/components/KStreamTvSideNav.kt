@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
+import com.kstream.core.ui.LocalLiteMode
 import com.kstream.core.ui.R
 import com.kstream.core.ui.components.OttConstants
 
@@ -70,9 +71,10 @@ fun KStreamTvSideNav(
     content: @Composable () -> Unit
 ) {
     var sidebarExpanded by remember { mutableStateOf(false) }
+    val isLiteMode = com.kstream.core.ui.LocalLiteMode.current
     val sidebarWidth by animateDpAsState(
         targetValue = if (sidebarExpanded) 208.dp else 64.dp,
-        animationSpec = tween(250),
+        animationSpec = if (isLiteMode) tween(0) else tween(250),
         label = "sidebarWidth"
     )
     val navFocusRequesters = remember {
@@ -234,14 +236,15 @@ private fun SideNavItem(
     onFocusedChange: (Boolean) -> Unit = {}
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val liteMode = com.kstream.core.ui.LocalLiteMode.current
     val indicatorWidth by animateDpAsState(
         targetValue = if (selected || isFocused) 6.dp else 0.dp,
-        animationSpec = tween(180),
+        animationSpec = if (liteMode) tween(0) else tween(180),
         label = "navIndicatorWidth"
     )
     val indicatorAlpha by animateFloatAsState(
         targetValue = if (selected || isFocused) 1f else 0f,
-        animationSpec = tween(180),
+        animationSpec = if (liteMode) tween(0) else tween(180),
         label = "navIndicatorAlpha"
     )
 

@@ -2,6 +2,7 @@ package com.kstream.app
 
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -9,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +32,12 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.kstream.core.common.MemoryGuardian
+import com.kstream.core.common.MemoryLevel
 import com.kstream.core.ui.components.KStreamTvSideNav
+import com.kstream.core.ui.CrashRecoveryLiteModePrompt
+import com.kstream.core.ui.CrashRecoveryOptimizingLoader
+import com.kstream.core.ui.LocalLiteMode
 import com.kstream.core.ui.LocalPlatform
 import com.kstream.core.ui.Platform
 import com.kstream.core.ui.PlatformProvider
@@ -41,32 +48,79 @@ import com.kstream.feature.home.HomeRoute
 import com.kstream.feature.player.PlayerRoute
 import com.kstream.feature.welcome.WelcomeRoute
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private var lastDpadTime = 0L
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Throttle D-pad navigation keys on TV to prevent ANR from focus search overload
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val keyCode = event.keyCode
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                val now = System.currentTimeMillis()
+                if (now - lastDpadTime < 200) return true // skip if <200ms since last
+                lastDpadTime = now
+            }
+        }
+        return try {
+            super.dispatchKeyEvent(event)
+        } catch (e: IllegalStateException) {
+            val stack = e.stackTraceToString()
+            if (stack.contains("androidx.compose") || stack.contains("androidx.tv") || stack.contains("Focus")) {
+                android.util.Log.w("KStream", "Recoverable key dispatch error: ${e.message}")
+                true
+            } else {
+                throw e
+            }
+        } catch (e: IllegalArgumentException) {
+            android.util.Log.w("KStream", "Key dispatch argument error: ${e.message}")
+            true
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
         setContent {
-            val crashLog = checkForCrashLog()
+            val recoveryState = remember { checkCrashRecovery() }
             PlatformProvider {
                 val platform = LocalPlatform.current
-                if (platform == Platform.TV) {
-                    KStreamTvTheme {
-                        KStreamTheme {
-                            KStreamAppContent()
-                            if (crashLog != null) {
-                                CrashInfoDialog(crashLog) { clearCrashLog() }
+                val viewModel: MainViewModel = hiltViewModel()
+                val isTvDevice = platform == Platform.TV
+                val isLiteModeUser by viewModel.isLiteMode.collectAsStateWithLifecycle(initialValue = isTvDevice)
+                val memoryGuardian = remember { MemoryGuardian.getInstance(this@MainActivity) }
+                val memoryLevel by memoryGuardian.memoryLevel.collectAsStateWithLifecycle()
+                val effectiveLiteMode = isLiteModeUser || memoryLevel == MemoryLevel.EMERGENCY
+
+                CompositionLocalProvider(LocalLiteMode provides effectiveLiteMode) {
+                    if (platform == Platform.TV) {
+                        KStreamTvTheme {
+                            KStreamTheme {
+                                CrashRecoveryWrapper(
+                                    recoveryState = recoveryState,
+                                    onEnableLiteMode = { viewModel.setLiteMode(true) },
+                                    onCleanupComplete = { clearCrashRecovery() },
+                                    isAlreadyLiteMode = isLiteModeUser
+                                ) {
+                                    KStreamAppContent()
+                                }
                             }
                         }
-                    }
-                } else {
-                    KStreamTheme {
-                        KStreamAppContent()
-                        if (crashLog != null) {
-                            CrashInfoDialog(crashLog) { clearCrashLog() }
+                    } else {
+                        KStreamTheme {
+                            CrashRecoveryWrapper(
+                                recoveryState = recoveryState,
+                                onEnableLiteMode = { viewModel.setLiteMode(true) },
+                                onCleanupComplete = { clearCrashRecovery() },
+                                isAlreadyLiteMode = isLiteModeUser
+                            ) {
+                                KStreamAppContent()
+                            }
                         }
                     }
                 }
@@ -74,13 +128,80 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkForCrashLog(): String? {
-        val prefs = getSharedPreferences("crash_log", MODE_PRIVATE)
-        return prefs.getString("last_crash", null)
+    data class CrashRecoveryState(
+        val hasCrash: Boolean = false,
+        val isLiteMode: Boolean = false,
+        val isCrashLoop: Boolean = false,
+        val route: String? = null,
+        val playerPosition: Long = 0L
+    )
+
+    private fun checkCrashRecovery(): CrashRecoveryState {
+        val prefs = getSharedPreferences("crash_recovery", MODE_PRIVATE)
+        val lastCrash = prefs.getString("last_crash", null) ?: return CrashRecoveryState()
+        val crashCount = prefs.getInt("crash_count", 0)
+        val route = prefs.getString("recovery_route", null)
+        val position = prefs.getLong("recovery_position", 0L)
+
+        return CrashRecoveryState(
+            hasCrash = true,
+            isCrashLoop = crashCount > 3,
+            route = route,
+            playerPosition = position
+        )
     }
 
-    private fun clearCrashLog() {
-        getSharedPreferences("crash_log", MODE_PRIVATE).edit().clear().apply()
+    private fun clearCrashRecovery() {
+        getSharedPreferences("crash_recovery", MODE_PRIVATE).edit().clear().apply()
+    }
+}
+
+@Composable
+private fun CrashRecoveryWrapper(
+    recoveryState: MainActivity.CrashRecoveryState,
+    onEnableLiteMode: () -> Unit,
+    onCleanupComplete: () -> Unit,
+    isAlreadyLiteMode: Boolean,
+    content: @Composable () -> Unit
+) {
+    var showRecovery by remember { mutableStateOf(recoveryState.hasCrash && !recoveryState.isCrashLoop) }
+    var showOptimizing by remember { mutableStateOf(false) }
+
+    if (showRecovery && isAlreadyLiteMode) {
+        // Already in lite mode — show optimizing loader
+        showRecovery = false
+        showOptimizing = true
+    }
+
+    when {
+        showOptimizing -> {
+            CrashRecoveryOptimizingLoader()
+            val appContext = LocalContext.current.applicationContext
+            LaunchedEffect(Unit) {
+                val guardian = MemoryGuardian.getInstance(appContext)
+                guardian.forceCleanup()
+                delay(2500)
+                onCleanupComplete()
+                showOptimizing = false
+            }
+        }
+        showRecovery -> {
+            CrashRecoveryLiteModePrompt(
+                onEnableLiteMode = {
+                    onEnableLiteMode()
+                    onCleanupComplete()
+                    showRecovery = false
+                },
+                onContinueAnyway = {
+                    onCleanupComplete()
+                    showRecovery = false
+                }
+            )
+        }
+        else -> {
+            onCleanupComplete()
+            content()
+        }
     }
 }
 
@@ -108,6 +229,14 @@ fun KStreamAppContent() {
         ?.substringBefore("/")
         ?.substringBefore("?")
 
+    // Track current route for crash recovery
+    LaunchedEffect(navBackStackEntry) {
+        val fullRoute = navBackStackEntry?.destination?.route
+        if (fullRoute != null) {
+            com.kstream.core.common.AppState.currentRoute = fullRoute
+        }
+    }
+
     val onTvNavigate: (String) -> Unit = { route ->
         if (route == "home") {
             navController.popBackStack("home", inclusive = false)
@@ -125,7 +254,12 @@ fun KStreamAppContent() {
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                // Disable nav animations on TV to prevent LookaheadScope "placed already" crash
+                enterTransition = { androidx.compose.animation.EnterTransition.None },
+                exitTransition = { androidx.compose.animation.ExitTransition.None },
+                popEnterTransition = { androidx.compose.animation.EnterTransition.None },
+                popExitTransition = { androidx.compose.animation.ExitTransition.None }
             ) {
                 composable("splash") {
                     SplashScreenWithNav(

@@ -16,9 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -72,6 +74,7 @@ private val BgCard       = Color(0xFF141414)
 private val BgRow        = Color(0xFF1A1A1A)
 private val BorderSubtle = Color(0xFF222222)
 private val BorderMid    = Color(0xFF333333)
+private val BorderDark   = Color(0xFF1E1E1E)
 private val BrandRed     = Color(0xFFE50914)
 private val TextPrimary  = Color(0xFFFFFFFF)
 private val TextSecond   = Color(0xFFB3B3B3)
@@ -330,6 +333,35 @@ fun SettingsRoute(
             // ── Display ──────────────────────────────────────────────────────
             SettingsSection("DISPLAY", Icons.Default.Visibility)
             SettingsCard {
+                var liteModeFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (liteModeFocused) BgRow else Color.Transparent)
+                        .onFocusChanged { liteModeFocused = it.hasFocus }
+                        .tvFocusBorder(shape = RoundedCornerShape(0.dp))
+                ) {
+                    SettingsRow(
+                        icon = if (uiState.isLiteMode) Icons.Default.Speed else Icons.Default.AutoAwesome,
+                        title = "Lite Mode",
+                        subtitle = "Optimized for smooth performance",
+                        modifier = Modifier.clickableRow {
+                            viewModel.toggleLiteMode(!uiState.isLiteMode)
+                        }
+                    ) {
+                        Switch(
+                            checked = uiState.isLiteMode,
+                            onCheckedChange = { viewModel.toggleLiteMode(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = BrandRed,
+                                uncheckedThumbColor = TextDim,
+                                uncheckedTrackColor = BorderMid
+                            )
+                        )
+                    }
+                }
+                Divider(color = BorderDark, thickness = 0.5.dp)
                 var carouselFocused by remember { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
