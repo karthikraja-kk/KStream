@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Small circular dot indicator for the hero pager. Selected state uses gold;
+  unselected uses muted white. Alpha is also adjusted from code so the change
+  reads on LOW-tier panels where small color shifts may be imperceptible.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="oval">
+            <solid android:color="@color/accent_gold" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+</selector>

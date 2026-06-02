@@ -18,6 +18,10 @@
     <string name="welcome_error_too_long">Please keep it under 24 characters.</string>
     <string name="welcome_save_failed">Could not save. Please try again.</string>
 
+    <!-- Hero -->
+    <string name="hero_btn_play">▶  Play</string>
+    <string name="hero_btn_more">More Info</string>
+
     <!-- Home placeholder (replaced in P4) -->
     <string name="home_placeholder_label">Home ready · rails arriving in P4</string>
 </resources>

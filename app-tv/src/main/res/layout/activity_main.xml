@@ -1,17 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Post-welcome host. The Leanback BrowseFragment (HomeBrowseFragment) is
-  attached to `main_browse_container` from MainActivity.
+  Post-welcome host. Vertical layout:
+   - Hero (fragment) on top: 60% of screen height, holds backdrop + CTAs.
+   - Rows (RowsSupportFragment) below: fills the rest, scrolls beneath the hero
+     edge so the first rail's "peek" is visible without dominating the screen.
 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/main_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_base">
+    android:background="@color/bg_base"
+    android:orientation="vertical">
 
     <FrameLayout
-        android:id="@+id/main_browse_container"
+        android:id="@+id/hero_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="0dp"
+        android:layout_weight="6" />
 
-</FrameLayout>
+    <FrameLayout
+        android:id="@+id/rows_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="4"
+        android:descendantFocusability="afterDescendants" />
+
+</LinearLayout>
