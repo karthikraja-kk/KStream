@@ -53,5 +53,36 @@
             android:screenOrientation="landscape"
             android:theme="@style/Theme.KStreamTv" />
 
+        <activity
+            android:name=".ui.details.DetailsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KStreamTv" />
+
+        <activity
+            android:name=".ui.player.PlayerActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|screenLayout|smallestScreenSize|uiMode"
+            android:theme="@style/Theme.KStreamTv" />
+
+        <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KStreamTv" />
+
+        <activity
+            android:name=".ui.browse.BrowseAllActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KStreamTv" />
+
+        <activity
+            android:name=".ui.settings.SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KStreamTv" />
+
     </application>
 </manifest>

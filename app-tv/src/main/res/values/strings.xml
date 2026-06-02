@@ -24,5 +24,27 @@
 
     <!-- Home placeholder (replaced in P4) -->
     <string name="home_placeholder_label">Home ready · rails arriving in P4</string>
+
+    <!-- Details (P7) -->
+    <string name="details_play">▶  Play</string>
+    <string name="details_resume">Resume</string>
+    <string name="details_download">Download</string>
+    <string name="details_like">♡ Like</string>
+    <string name="details_liked">♥ Liked</string>
+    <string name="details_retry">Retry</string>
+    <string name="details_quality">Available Quality</string>
+    <string name="details_cast">Cast</string>
+
+    <!-- Player (P8/P9) -->
+    <string name="player_loading">Loading…</string>
+    <string name="player_link_refresh_title">Refreshing your stream</string>
+    <string name="player_link_refresh_subtitle">Hang tight — fetching a fresh playback link.</string>
+
+    <!-- Search / Browse / Settings (P10–P12) -->
+    <string name="search_hint">Search movies and shows…</string>
+    <string name="search_no_results">No results.</string>
+    <string name="browse_title">Browse</string>
+    <string name="settings_title">Settings</string>
 </resources>
+
 

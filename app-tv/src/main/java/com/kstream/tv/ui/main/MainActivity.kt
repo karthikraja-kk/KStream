@@ -43,14 +43,23 @@ class MainActivity : AppCompatActivity() {
             rowsFragment = supportFragmentManager.findFragmentByTag(TAG_ROWS) as? HomeRowsFragment
         }
 
-        heroFragment?.setOnPlayClicked { _: Movie ->
-            // P8 wires PlayerActivity. No-op for now.
+        heroFragment?.setOnPlayClicked { movie: Movie ->
+            val mediaQuality = "1080p"
+            startActivity(
+                com.kstream.tv.ui.player.PlayerActivity.newIntent(
+                    this,
+                    movieId = movie.id,
+                    title = movie.movieName,
+                    streamUrl = "",
+                    quality = mediaQuality
+                )
+            )
         }
-        heroFragment?.setOnMoreInfoClicked { _: Movie ->
-            // P7 wires DetailsActivity.
+        heroFragment?.setOnMoreInfoClicked { movie: Movie ->
+            startActivity(com.kstream.tv.ui.details.DetailsActivity.newIntent(this, movie))
         }
-        rowsFragment?.setOnMovieClicked { _: Movie ->
-            // P7 wires DetailsActivity.
+        rowsFragment?.setOnMovieClicked { movie: Movie ->
+            startActivity(com.kstream.tv.ui.details.DetailsActivity.newIntent(this, movie))
         }
     }
 

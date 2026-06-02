@@ -30,4 +30,8 @@
 
     <!-- Launcher adaptive icon background -->
     <color name="ic_launcher_background">#FF08090C</color>
+
+    <!-- Aliases used by P7+ layouts -->
+    <color name="bg_primary">@color/bg_base</color>
+    <color name="gold_focus">@color/accent_gold</color>
 </resources>

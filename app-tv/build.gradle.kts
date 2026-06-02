@@ -75,6 +75,11 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:enrichment"))
     implementation(project(":feature:home"))
+    implementation(project(":feature:details"))
+    implementation(project(":feature:player"))
+    implementation(project(":feature:search"))
+    implementation(project(":feature:downloads"))
+    implementation(project(":feature:settings"))
 
     // AndroidX foundation
     implementation(libs.androidx.core.ktx)
