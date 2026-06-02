@@ -20,39 +20,24 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-    buildFeatures {
-        compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
 }
 
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
-    implementation(project(":core:ui"))
     implementation(project(":feature:downloads"))
-    
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
-    
-    implementation(libs.androidx.tv.foundation)
-    implementation(libs.androidx.tv.material)
+    implementation(libs.kotlinx.coroutines.android)
+
+    // Coil base library is referenced by SettingsViewModel for image cache clearing.
+    // (No Compose binding needed on TV — :app-tv uses Glide for images.)
+    implementation(libs.coil)
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
-    implementation(libs.coil.compose)
-    
+
     testImplementation(libs.junit)
 }

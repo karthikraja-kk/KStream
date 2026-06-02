@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KStream</string>
+    <string name="brand_wordmark">KStream</string>
+    <string name="p0_tagline">TV Edition</string>
+
+    <!-- Splash -->
+    <string name="splash_tagline">Cinematic streaming</string>
+
+    <!-- Welcome -->
+    <string name="welcome_headline">Welcome to KStream</string>
+    <string name="welcome_subtitle">Personalize your experience. Enter a display name so we can greet you when you come back.</string>
+    <string name="welcome_label_name">Your name</string>
+    <string name="welcome_name_hint">Type your name…</string>
+    <string name="welcome_continue">Continue</string>
+    <string name="welcome_skip">Skip for now</string>
+    <string name="welcome_error_too_short">Please enter at least 2 characters.</string>
+    <string name="welcome_error_too_long">Please keep it under 24 characters.</string>
+    <string name="welcome_save_failed">Could not save. Please try again.</string>
+
+    <!-- Home placeholder (replaced in P4) -->
+    <string name="home_placeholder_label">Home ready · rails arriving in P4</string>
+</resources>
+

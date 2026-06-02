@@ -20,14 +20,14 @@ android {
     kotlinOptions {
         jvmTarget = "17"
         freeCompilerArgs += listOf(
-            "-opt-in=androidx.media3.common.util.UnstableApi"
+            "-opt-in=androidx.media3.common.util.UnstableApi",
         )
     }
-    buildFeatures {
-        compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions {
+        freeCompilerArgs += listOf("-opt-in=androidx.media3.common.util.UnstableApi")
     }
 }
 
@@ -35,34 +35,22 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
-    implementation(project(":core:ui"))
     implementation(project(":feature:downloads"))
-    
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    
-    implementation(libs.androidx.tv.foundation)
-    implementation(libs.androidx.tv.material)
-    
+    implementation(libs.kotlinx.coroutines.android)
+
     implementation(libs.media3.exoplayer)
-    implementation(libs.media3.ui)
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.exoplayer.dash)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.datasource.okhttp)
+    implementation(libs.media3.session)
     implementation(libs.media3.common)
-
-    implementation(libs.androidx.material.icons.extended)
-    implementation(libs.coil.compose)
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
-    
+
     testImplementation(libs.junit)
 }

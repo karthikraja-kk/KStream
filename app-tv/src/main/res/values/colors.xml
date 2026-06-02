@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cinematic Dark Premium color tokens (see docs/TV_LEANBACK_REWRITE_PLAN.md §4.2).
+  Tier-specific overlays are applied at runtime via DeviceTier (P2).
+-->
+<resources>
+    <!-- Backgrounds -->
+    <color name="bg_base">#FF08090C</color>
+    <color name="bg_surface">#FF12141A</color>
+    <color name="bg_overlay">#B3000000</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB8BCC8</color>
+    <color name="text_tertiary">#FF6B7280</color>
+
+    <!-- Brand accent — focus glow, calls-to-action -->
+    <color name="accent_gold">#FFE8C36A</color>
+    <color name="accent_gold_muted">#FFB89548</color>
+
+    <!-- States -->
+    <color name="state_error">#FFFF5C5C</color>
+    <color name="state_success">#FF4ADE80</color>
+
+    <!-- Banner -->
+    <color name="banner_bg">#FF08090C</color>
+
+    <!-- Subtle 1dp idle divider used by unfocused focus rings -->
+    <color name="divider_dim">#1FFFFFFF</color>
+
+    <!-- Launcher adaptive icon background -->
+    <color name="ic_launcher_background">#FF08090C</color>
+</resources>

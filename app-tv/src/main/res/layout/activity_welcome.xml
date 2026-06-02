@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Premium welcome layout for Android TV:
+   - Left column (60%): big greeting + supporting copy
+   - Right column (40%): input field, error text, primary & secondary buttons
+  Designed to fit comfortably inside overscan-safe bounds on 1080p panels.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_base"
+    android:paddingHorizontal="@dimen/tv_overscan_horizontal"
+    android:paddingVertical="@dimen/tv_overscan_vertical"
+    tools:ignore="UnusedAttribute">
+
+    <!-- ===== Left column: brand + headline ===== -->
+    <LinearLayout
+        android:id="@+id/welcome_left_col"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/welcome_right_col"
+        app:layout_constraintHorizontal_weight="3"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.45">
+
+        <ImageView
+            android:layout_width="180dp"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/kstream_logo" />
+
+        <View
+            android:layout_width="80dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="@dimen/space_md"
+            android:background="@color/accent_gold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xl"
+            android:text="@string/welcome_headline"
+            android:textAppearance="@style/TextAppearance.KStream.Display" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:maxWidth="520dp"
+            android:text="@string/welcome_subtitle"
+            android:textAppearance="@style/TextAppearance.KStream.Body" />
+
+    </LinearLayout>
+
+    <!-- ===== Right column: input + actions ===== -->
+    <LinearLayout
+        android:id="@+id/welcome_right_col"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_weight="2"
+        app:layout_constraintStart_toEndOf="@+id/welcome_left_col"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.5">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/welcome_label_name"
+            android:textAllCaps="true"
+            android:textAppearance="@style/TextAppearance.KStream.Meta" />
+
+        <EditText
+            android:id="@+id/welcome_name_field"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="@dimen/space_sm"
+            android:autofillHints="username"
+            android:background="@drawable/focus_ring_low"
+            android:hint="@string/welcome_name_hint"
+            android:imeOptions="actionDone"
+            android:importantForAutofill="yes"
+            android:inputType="textPersonName|textCapWords"
+            android:maxLength="24"
+            android:nextFocusDown="@+id/welcome_continue_btn"
+            android:nextFocusForward="@+id/welcome_continue_btn"
+            android:paddingHorizontal="@dimen/space_md"
+            android:singleLine="true"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_tertiary"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/welcome_error_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xs"
+            android:textColor="@color/state_error"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/welcome_continue_btn"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="@dimen/space_lg"
+            android:background="@drawable/focus_ring_glow"
+            android:nextFocusUp="@id/welcome_name_field"
+            android:nextFocusDown="@+id/welcome_skip_btn"
+            android:text="@string/welcome_continue"
+            android:textAllCaps="true"
+            android:textColor="@color/accent_gold"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/welcome_skip_btn"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="@dimen/space_sm"
+            android:background="@android:color/transparent"
+            android:nextFocusUp="@id/welcome_continue_btn"
+            android:text="@string/welcome_skip"
+            android:textAllCaps="true"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

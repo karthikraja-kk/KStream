@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ===== Spacing (8dp grid) ===== -->
+    <dimen name="space_xxs">2dp</dimen>
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_sm">8dp</dimen>
+    <dimen name="space_md">16dp</dimen>
+    <dimen name="space_lg">24dp</dimen>
+    <dimen name="space_xl">32dp</dimen>
+    <dimen name="space_xxl">48dp</dimen>
+    <dimen name="space_xxxl">64dp</dimen>
+
+    <!-- ===== TV overscan-safe padding ===== -->
+    <dimen name="tv_overscan_horizontal">48dp</dimen>
+    <dimen name="tv_overscan_vertical">27dp</dimen>
+
+    <!-- ===== Card dimensions (poster aspect 2:3) ===== -->
+    <dimen name="card_poster_width">128dp</dimen>
+    <dimen name="card_poster_height">192dp</dimen>
+    <dimen name="card_poster_corner">8dp</dimen>
+    <dimen name="card_poster_spacing">12dp</dimen>
+
+    <!-- ===== Hero ===== -->
+    <dimen name="hero_height">540dp</dimen>
+    <dimen name="hero_logo_max_height">120dp</dimen>
+    <dimen name="hero_logo_max_width">320dp</dimen>
+
+    <!-- ===== Section header ===== -->
+    <dimen name="rail_header_padding_top">28dp</dimen>
+    <dimen name="rail_header_padding_bottom">12dp</dimen>
+
+    <!-- ===== Focus ring ===== -->
+    <dimen name="focus_ring_stroke">3dp</dimen>
+    <dimen name="focus_ring_corner">8dp</dimen>
+
+    <!-- ===== Details screen ===== -->
+    <dimen name="details_poster_width">220dp</dimen>
+    <dimen name="details_poster_height">330dp</dimen>
+    <dimen name="details_backdrop_height">420dp</dimen>
+
+    <!-- ===== Cast row ===== -->
+    <dimen name="cast_avatar_size">96dp</dimen>
+    <dimen name="cast_avatar_spacing">16dp</dimen>
+</resources>

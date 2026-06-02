@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Splash layout: brand wordmark centered on the dark base with a subtle
+  gold underline. Intentionally simple — splash is shown for ~1.4s so any
+  heavy art would tear on LOW tier first-paint.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_base">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/kstream_logo" />
+
+        <View
+            android:layout_width="120dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="@dimen/space_md"
+            android:background="@color/accent_gold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_lg"
+            android:letterSpacing="0.30"
+            android:text="@string/splash_tagline"
+            android:textAllCaps="true"
+            android:textAppearance="@style/TextAppearance.KStream.Meta" />
+
+    </LinearLayout>
+
+</FrameLayout>
