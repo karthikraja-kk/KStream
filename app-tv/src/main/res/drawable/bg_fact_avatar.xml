@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand-gradient circle backing the "K" avatar in the home preview fact
+  bubble. Same warm → magenta → cool gradient used elsewhere for accent
+  surfaces.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:type="linear"
+        android:angle="135"
+        android:startColor="#FFFF6B1A"
+        android:centerColor="#FFE91E63"
+        android:endColor="#FF6A1A9A" />
+</shape>

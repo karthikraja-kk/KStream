@@ -14,20 +14,28 @@
     <dimen name="tv_overscan_horizontal">48dp</dimen>
     <dimen name="tv_overscan_vertical">27dp</dimen>
 
-    <!-- ===== Card dimensions (poster aspect 2:3) ===== -->
-    <dimen name="card_poster_width">128dp</dimen>
-    <dimen name="card_poster_height">192dp</dimen>
-    <dimen name="card_poster_corner">8dp</dimen>
-    <dimen name="card_poster_spacing">12dp</dimen>
-
-    <!-- ===== Hero ===== -->
-    <dimen name="hero_height">540dp</dimen>
-    <dimen name="hero_logo_max_height">120dp</dimen>
-    <dimen name="hero_logo_max_width">320dp</dimen>
+    <!-- ===== Card dimensions =====
+         Spotlight pattern: each card morphs between portrait (resting) and
+         landscape (when focused). Sibling tiles stay at the portrait width;
+         the focused one expands to spotlight_width × spotlight_height.
+    -->
+    <dimen name="card_poster_width">120dp</dimen>
+    <dimen name="card_poster_height">180dp</dimen>
+    <dimen name="card_root_width">120dp</dimen>
+    <!-- Padding around each card root that hosts the focus ring foreground.
+         The ring is painted at this padded edge, so it sits this many dp
+         outside the visible poster artwork. -->
+    <dimen name="card_focus_padding">8dp</dimen>
+    <dimen name="card_root_focused_width">400dp</dimen>
+    <dimen name="spotlight_width">400dp</dimen>
+    <dimen name="spotlight_height">225dp</dimen>
+    <dimen name="card_focused_poster_width">280dp</dimen>
+    <dimen name="card_poster_corner">16dp</dimen>
+    <dimen name="card_poster_spacing">32dp</dimen>
 
     <!-- ===== Section header ===== -->
-    <dimen name="rail_header_padding_top">28dp</dimen>
-    <dimen name="rail_header_padding_bottom">12dp</dimen>
+    <dimen name="rail_header_padding_top">36dp</dimen>
+    <dimen name="rail_header_padding_bottom">16dp</dimen>
 
     <!-- ===== Focus ring ===== -->
     <dimen name="focus_ring_stroke">3dp</dimen>

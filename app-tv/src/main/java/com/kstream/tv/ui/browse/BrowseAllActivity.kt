@@ -3,7 +3,7 @@ package com.kstream.tv.ui.browse
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import com.kstream.core.common.AppState
 import com.kstream.tv.ui.search.SearchActivity
 
@@ -11,7 +11,7 @@ import com.kstream.tv.ui.search.SearchActivity
  * Browse All — delegated to [SearchActivity] with a reserved-prefix query.
  * The user filters/sorts the full catalog via the same UI as ordinary search.
  */
-class BrowseAllActivity : AppCompatActivity() {
+class BrowseAllActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

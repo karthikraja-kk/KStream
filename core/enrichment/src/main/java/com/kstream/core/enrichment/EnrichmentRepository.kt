@@ -6,6 +6,7 @@ import com.kstream.core.enrichment.match.MovieMatcher
 import com.kstream.core.enrichment.model.EnrichedCast
 import com.kstream.core.enrichment.model.EnrichedReview
 import com.kstream.core.enrichment.model.MovieEnrichment
+import com.kstream.core.enrichment.model.SimilarHint
 import com.kstream.core.enrichment.tmdb.TmdbClient
 import com.kstream.core.enrichment.tmdb.TmdbMovieDetail
 import com.kstream.core.model.Movie
@@ -48,6 +49,24 @@ class EnrichmentRepository @Inject internal constructor(
         return dao.get(key)?.toDomain(json)
     }
 
+    /**
+     * Batched cache lookup. Returns a map keyed by [Movie.id] so callers can
+     * seed an in-memory map by movie id without having to recompute the
+     * canonical enrichment key.
+     */
+    suspend fun getMany(movies: List<Movie>): Map<String, MovieEnrichment> {
+        if (movies.isEmpty()) return emptyMap()
+        val keyToMovieId = HashMap<String, String>(movies.size)
+        movies.forEach { keyToMovieId[keyFor(it)] = it.id }
+        val rows = dao.getAll(keyToMovieId.keys.toList())
+        val out = HashMap<String, MovieEnrichment>(rows.size)
+        rows.forEach { row ->
+            val movieId = keyToMovieId[row.movieKey] ?: return@forEach
+            out[movieId] = row.toDomain(json)
+        }
+        return out
+    }
+
     /** Idempotent: does nothing if a cached row exists. */
     suspend fun ensureCached(movie: Movie): MovieEnrichment? {
         val key = keyFor(movie)
@@ -64,7 +83,8 @@ class EnrichmentRepository @Inject internal constructor(
         val (hit, confidence) = best
         if (confidence < MovieMatcher.AUTO_CACHE_THRESHOLD) return null
         val detail = client.fetchDetail(hit.id) ?: return null
-        val entity = toEntity(key, confidence, detail)
+        val posterUrl = hit.posterPath?.let { "${IMAGE_BASE}w342$it" }
+        val entity = toEntity(key, confidence, detail, posterUrl)
         dao.upsert(entity)
         return entity.toDomain(json)
     }
@@ -75,11 +95,35 @@ class EnrichmentRepository @Inject internal constructor(
         return "$t|$y"
     }
 
-    private fun toEntity(key: String, confidence: Int, d: TmdbMovieDetail): MovieEnrichmentEntity {
+    /**
+     * Fetches the TMDb /similar list for a given TMDb id. Returns lightweight
+     * hints (title + year) so callers can intersect with their own catalog.
+     * Returns an empty list on any failure or if TMDb is not configured.
+     */
+    suspend fun fetchSimilarHints(tmdbId: Int, limit: Int = 20): List<SimilarHint> {
+        val resp = client.fetchSimilar(tmdbId) ?: return emptyList()
+        return resp.results
+            .asSequence()
+            .filter { it.title.isNotBlank() }
+            .take(limit)
+            .map { hit ->
+                val y = hit.releaseDate?.take(4)?.toIntOrNull() ?: 0
+                SimilarHint(tmdbId = hit.id, title = hit.title, year = y)
+            }
+            .toList()
+    }
+
+    private fun toEntity(key: String, confidence: Int, d: TmdbMovieDetail, posterUrl: String?): MovieEnrichmentEntity {
         val backdrops = buildBackdropUrls(d)
         val cast = buildCast(d)
         val logo = pickLogoUrl(d)
         val certification = pickUsCertification(d)
+        val keywordsCsv = d.keywords?.keywords
+            ?.asSequence()
+            ?.mapNotNull { it.name.takeIf { n -> n.isNotBlank() } }
+            ?.take(KEYWORDS_LIMIT)
+            ?.joinToString("|")
+            ?.takeIf { it.isNotBlank() }
         return MovieEnrichmentEntity(
             movieKey = key,
             tmdbId = d.id,
@@ -87,6 +131,7 @@ class EnrichmentRepository @Inject internal constructor(
             tagline = d.tagline?.takeIf { it.isNotBlank() },
             overview = d.overview?.takeIf { it.isNotBlank() },
             logoUrl = logo,
+            posterUrl = posterUrl,
             tmdbRating = d.voteAverage.takeIf { it > 0.0 },
             certification = certification,
             backdropsCsv = backdrops.joinToString("|").takeIf { it.isNotBlank() },
@@ -95,6 +140,10 @@ class EnrichmentRepository @Inject internal constructor(
                 cast
             ),
             reviewsJson = buildReviewsJson(d),
+            collectionName = d.belongsToCollection?.name?.takeIf { it.isNotBlank() },
+            budget = d.budget.takeIf { it > 0L },
+            revenue = d.revenue.takeIf { it > 0L },
+            keywordsCsv = keywordsCsv,
             fetchedAtEpochMs = System.currentTimeMillis()
         )
     }
@@ -165,6 +214,7 @@ class EnrichmentRepository @Inject internal constructor(
         private const val IMAGE_BASE = BuildConfig.TMDB_IMAGE_BASE_URL
         private const val CAST_LIMIT = 12
         private const val REVIEW_LIMIT = 5
+        private const val KEYWORDS_LIMIT = 6
     }
 }
 
@@ -186,11 +236,16 @@ private fun MovieEnrichmentEntity.toDomain(json: Json): MovieEnrichment {
         tagline = tagline,
         overview = overview,
         logoUrl = logoUrl,
+        posterUrl = posterUrl,
         tmdbRating = tmdbRating,
         certification = certification,
         backdrops = backdrops,
         cast = cast,
         reviews = reviews,
+        collectionName = collectionName,
+        budget = budget,
+        revenue = revenue,
+        keywords = keywordsCsv?.split('|')?.filter { it.isNotBlank() }.orEmpty(),
         fetchedAtEpochMs = fetchedAtEpochMs
     )
 }

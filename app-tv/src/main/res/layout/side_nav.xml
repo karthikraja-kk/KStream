@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Collapsible side nav. Root LinearLayout width is mutated programmatically
+  between NAV_COLLAPSED_WIDTH (56dp) and NAV_EXPANDED_WIDTH (220dp).
+
+  Labels and horizontal logo are hidden in collapsed state; revealed via
+  alpha animation when expanding. Square logo crossfades to wordmark.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/side_nav_root"
+    android:layout_width="56dp"
+    android:layout_height="match_parent"
+    android:background="@drawable/nav_scrim_collapsed"
+    android:orientation="vertical"
+    android:paddingTop="24dp"
+    android:paddingBottom="24dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    tools:ignore="HardcodedText">
+
+    <!-- Logo area: square shown collapsed, horizontal shown expanded (crossfade). -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginBottom="24dp"
+        android:clipChildren="false">
+
+        <ImageView
+            android:id="@+id/nav_logo_square"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_gravity="center"
+            android:src="@drawable/kstream_logo"
+            android:scaleType="fitCenter"
+            android:importantForAccessibility="no"
+            tools:ignore="ContentDescription" />
+
+        <ImageView
+            android:id="@+id/nav_logo_wordmark"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:layout_gravity="center"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:adjustViewBounds="true"
+            android:src="@drawable/kstream_logo_horizontal"
+            android:scaleType="fitCenter"
+            android:alpha="0"
+            android:importantForAccessibility="no"
+            tools:ignore="ContentDescription" />
+    </FrameLayout>
+
+    <!-- Home item -->
+    <LinearLayout
+        android:id="@+id/nav_item_home"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:focusable="true"
+        android:focusableInTouchMode="false"
+        android:background="@drawable/nav_item_glow"
+        android:nextFocusDown="@+id/nav_item_search">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_nav_home"
+            android:importantForAccessibility="no"
+            tools:ignore="ContentDescription" />
+
+        <TextView
+            android:id="@+id/nav_label_home"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="20dp"
+            android:text="Home"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:alpha="0" />
+    </LinearLayout>
+
+    <!-- Search item -->
+    <LinearLayout
+        android:id="@+id/nav_item_search"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:focusable="true"
+        android:focusableInTouchMode="false"
+        android:background="@drawable/nav_item_glow"
+        android:nextFocusUp="@id/nav_item_home"
+        android:nextFocusDown="@+id/nav_item_settings">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_nav_search"
+            android:importantForAccessibility="no"
+            tools:ignore="ContentDescription" />
+
+        <TextView
+            android:id="@+id/nav_label_search"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="20dp"
+            android:text="Search"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:alpha="0" />
+    </LinearLayout>
+
+    <!-- Settings item -->
+    <LinearLayout
+        android:id="@+id/nav_item_settings"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:focusable="true"
+        android:focusableInTouchMode="false"
+        android:background="@drawable/nav_item_glow"
+        android:nextFocusUp="@id/nav_item_search">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_nav_settings"
+            android:importantForAccessibility="no"
+            tools:ignore="ContentDescription" />
+
+        <TextView
+            android:id="@+id/nav_label_settings"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="20dp"
+            android:text="Settings"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:alpha="0" />
+    </LinearLayout>
+</LinearLayout>

@@ -30,10 +30,31 @@ internal data class TmdbMovieDetail(
     val overview: String? = null,
     @SerialName("vote_average") val voteAverage: Double = 0.0,
     @SerialName("backdrop_path") val backdropPath: String? = null,
+    val budget: Long = 0L,
+    val revenue: Long = 0L,
+    @SerialName("belongs_to_collection") val belongsToCollection: TmdbCollection? = null,
+    val keywords: TmdbKeywordsPage? = null,
     val credits: TmdbCredits? = null,
     val images: TmdbImages? = null,
     val reviews: TmdbReviewsPage? = null,
     @SerialName("release_dates") val releaseDates: TmdbReleaseDatesPage? = null
+)
+
+@Serializable
+internal data class TmdbCollection(
+    val id: Int = 0,
+    val name: String = ""
+)
+
+@Serializable
+internal data class TmdbKeywordsPage(
+    val keywords: List<TmdbKeyword> = emptyList()
+)
+
+@Serializable
+internal data class TmdbKeyword(
+    val id: Int = 0,
+    val name: String = ""
 )
 
 @Serializable

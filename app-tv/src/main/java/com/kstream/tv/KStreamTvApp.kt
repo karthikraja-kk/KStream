@@ -1,6 +1,8 @@
 package com.kstream.tv
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.bumptech.glide.Glide
 import com.kstream.core.common.MemoryGuardian
@@ -45,20 +47,23 @@ class KStreamTvApp : Application() {
 
         // 3. Memory guardian — clears Glide caches under pressure.
         memoryGuardian = MemoryGuardian.getInstance(this)
+        val mainHandler = Handler(Looper.getMainLooper())
         memoryGuardian.onClearCaches = {
-            try {
-                val glide = Glide.get(this)
-                glide.clearMemory()
-                Thread {
-                    try {
-                        glide.clearDiskCache()
-                    } catch (t: Throwable) {
-                        Log.w(TAG, "Glide disk-cache clear failed: ${t.message}")
-                    }
-                }.start()
-                Log.d(TAG, "Cleared Glide caches under memory pressure")
-            } catch (t: Throwable) {
-                Log.w(TAG, "Glide cache clear failed: ${t.message}")
+            mainHandler.post {
+                try {
+                    val glide = Glide.get(this)
+                    glide.clearMemory() // must run on main thread
+                    Thread {
+                        try {
+                            glide.clearDiskCache() // must NOT run on main thread
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "Glide disk-cache clear failed: ${t.message}")
+                        }
+                    }.start()
+                    Log.d(TAG, "Cleared Glide caches under memory pressure")
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Glide cache clear failed: ${t.message}")
+                }
             }
         }
         memoryGuardian.start()
@@ -66,9 +71,11 @@ class KStreamTvApp : Application() {
 
     override fun onLowMemory() {
         super.onLowMemory()
-        try {
-            Glide.get(this).clearMemory()
-        } catch (_: Throwable) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                Glide.get(this).clearMemory()
+            } catch (_: Throwable) {
+            }
         }
     }
 

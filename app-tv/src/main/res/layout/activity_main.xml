@@ -1,28 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Post-welcome host. Vertical layout:
-   - Hero (fragment) on top: 60% of screen height, holds backdrop + CTAs.
-   - Rows (RowsSupportFragment) below: fills the rest, scrolls beneath the hero
-     edge so the first rail's "peek" is visible without dominating the screen.
+  Premium home (post-mockup): sticky preview pane on top mirrors the
+  currently focused rail tile, vertically-scrolling rails below.
+
+  Layout: ConstraintLayout with a horizontal guideline at 60% of the
+  screen height so the preview pane / rails split adapts to any TV
+  resolution (720p / 1080p / 4K) without hard-coding dp values.
+
+    home_preview    : from parent.top to preview_bottom guideline (60%).
+    rows_container  : from preview_bottom guideline to parent.bottom (40%).
+                       At 540dp screen: ~216dp → first rail fully visible
+                       (~180dp poster + header) + second rail header peeks.
+    side_nav        : overlay on the start edge, on top of both above so
+                       it can expand without affecting layout sizes.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_base"
-    android:orientation="vertical">
+    android:background="@color/bg_base">
+
+    <!-- Horizontal guideline at 60% of screen height. Splits preview /
+         rails so both areas scale proportionally with the display.
+         Card sizes are computed at runtime (MovieCardPresenter) so the
+         first rail + peek fit the remaining 40% on any screen. -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/preview_bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.60" />
 
     <FrameLayout
-        android:id="@+id/hero_container"
+        android:id="@+id/home_preview"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="6" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/preview_bottom"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <include layout="@layout/view_home_preview" />
+
+    </FrameLayout>
+
+    <!-- Sticky section name label. Displays the title of whichever rail
+         currently has D-pad focus (Hotstar-style). Rails themselves no
+         longer render per-row headers, so all "where am I" cues collapse
+         into this single fixed strip.
+
+         Positioned at the BOTTOM of the preview area (overlapping the
+         preview's bottom black fade) so the rails area keeps its full
+         40% for posters + peek. -->
+    <TextView
+        android:id="@+id/section_title_label"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:gravity="center_vertical"
+        android:paddingStart="80dp"
+        android:paddingEnd="24dp"
+        android:textColor="@color/text_primary"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textAllCaps="true"
+        android:letterSpacing="0.06"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:background="@android:color/transparent"
+        app:layout_constraintBottom_toTopOf="@id/preview_bottom"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <FrameLayout
         android:id="@+id/rows_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="4"
-        android:descendantFocusability="afterDescendants" />
+        android:background="@android:color/black"
+        android:paddingStart="56dp"
+        android:paddingTop="0dp"
+        android:descendantFocusability="afterDescendants"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        app:layout_constraintTop_toTopOf="@id/preview_bottom"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-</LinearLayout>
+    <include
+        layout="@layout/side_nav"
+        android:layout_width="56dp"
+        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

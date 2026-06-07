@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sticky top bar: greeting (start) + HD-only filter pill + refresh icon (end).
+  Lives at the very top of activity_main, above the rails container.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="80dp"
+    android:background="@color/bg_base"
+    android:elevation="12dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="72dp"
+    android:paddingEnd="56dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <TextView
+        android:id="@+id/topbar_greeting"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:shadowColor="#CC000000"
+        android:shadowDx="0"
+        android:shadowDy="2"
+        android:shadowRadius="6"
+        tools:text="Good evening, Karthik" />
+
+    <TextView
+        android:id="@+id/topbar_hd_toggle"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:minWidth="56dp"
+        android:background="@drawable/btn_hd_toggle_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:paddingHorizontal="16dp"
+        android:text="@string/topbar_hd_label"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:nextFocusDown="@+id/rows_container" />
+
+    <ImageButton
+        android:id="@+id/topbar_refresh"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="16dp"
+        android:background="@drawable/btn_topbar_circle_bg"
+        android:contentDescription="@string/topbar_refresh_label"
+        android:focusable="true"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_refresh"
+        android:nextFocusDown="@+id/rows_container" />
+
+</LinearLayout>

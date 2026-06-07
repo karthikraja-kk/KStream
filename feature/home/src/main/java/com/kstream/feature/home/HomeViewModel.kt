@@ -14,6 +14,7 @@ import com.kstream.core.model.Movie
 import com.kstream.core.model.WatchProgress
 import com.kstream.core.domain.repository.LikedMovieRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -119,7 +120,7 @@ class HomeViewModel @Inject constructor(
                     hdOnly = hdOnly
                 )
             }
-        }.launchIn(viewModelScope)
+        }.flowOn(Dispatchers.Default).launchIn(viewModelScope)
     }
 
     fun refreshContent() {
@@ -218,22 +219,22 @@ class HomeViewModel @Inject constructor(
     ): List<MovieRail> {
         val rails = mutableListOf<MovieRail>()
         
+        // New Releases — sorted by last_updated (latest first)
+        if (movies.isNotEmpty()) {
+            rails.add(MovieRail("New Releases", movies.sortedByLastUpdated().take(10), seeMoreQuery = "all:*"))
+        }
+
         // Continue Watching — sorted by user's watch recency, NOT lastUpdated
         val allContinueWatchingMovies = progress
             .filter { it.completionPercent < 95f }
             .sortedByDescending { it.lastUpdated }
             .mapNotNull { p -> movies.find { it.id == p.movieId } }
-        
+
         val continueWatchingMovies = allContinueWatchingMovies.take(10)
         val totalContinueWatching = allContinueWatchingMovies.size
-        
+
         if (continueWatchingMovies.isNotEmpty()) {
             rails.add(MovieRail("Continue Watching", continueWatchingMovies, totalContinueWatching, seeMoreQuery = "history:*"))
-        }
-
-        // New Releases — sorted by last_updated (latest first)
-        if (movies.isNotEmpty()) {
-            rails.add(MovieRail("New Releases", movies.sortedByLastUpdated().take(10), seeMoreQuery = "all:*"))
         }
 
         // Recommended for You — appears only when user has activity

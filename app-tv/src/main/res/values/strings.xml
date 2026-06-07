@@ -4,6 +4,10 @@
     <string name="brand_wordmark">KStream</string>
     <string name="p0_tagline">TV Edition</string>
 
+    <!-- Home top bar -->
+    <string name="topbar_hd_label">HD</string>
+    <string name="topbar_refresh_label">Refresh content</string>
+
     <!-- Splash -->
     <string name="splash_tagline">Cinematic streaming</string>
 
@@ -13,32 +17,51 @@
     <string name="welcome_label_name">Your name</string>
     <string name="welcome_name_hint">Type your name…</string>
     <string name="welcome_continue">Continue</string>
-    <string name="welcome_skip">Skip for now</string>
-    <string name="welcome_error_too_short">Please enter at least 2 characters.</string>
+    <string name="welcome_default_name">Guest</string>
+    <string name="welcome_accept_prefix">I accept </string>
+    <string name="welcome_accept_link">Terms &amp; Conditions</string>
     <string name="welcome_error_too_long">Please keep it under 24 characters.</string>
     <string name="welcome_save_failed">Could not save. Please try again.</string>
-
-    <!-- Hero -->
-    <string name="hero_btn_play">▶  Play</string>
-    <string name="hero_btn_more">More Info</string>
 
     <!-- Home placeholder (replaced in P4) -->
     <string name="home_placeholder_label">Home ready · rails arriving in P4</string>
 
     <!-- Details (P7) -->
     <string name="details_play">▶  Play</string>
-    <string name="details_resume">Resume</string>
+    <string name="details_resume">▶  Resume</string>
+    <string name="details_start_over">Start over</string>
+    <string name="details_more_options">More options</string>
     <string name="details_download">Download</string>
     <string name="details_like">♡ Like</string>
     <string name="details_liked">♥ Liked</string>
     <string name="details_retry">Retry</string>
     <string name="details_quality">Available Quality</string>
     <string name="details_cast">Cast</string>
+    <string name="details_similar">More like this</string>
+    <string name="badge_new">NEW</string>
+    <string name="see_more">See more</string>
+    <string name="see_more_arrow">See more →</string>
+    <string name="details_more">▾ More</string>
+    <string name="details_less">▴ Less</string>
+    <string name="details_directed_by">Directed by %1$s</string>
+    <string name="details_progress_watched">%1$d%% watched</string>
+
+    <!-- Exit confirmation (Home back press) -->
+    <string name="exit_dialog_title">Exit KStream?</string>
+    <string name="exit_dialog_message">Are you sure you want to exit?</string>
+    <string name="exit_dialog_positive">Exit</string>
+    <string name="exit_dialog_negative">Cancel</string>
 
     <!-- Player (P8/P9) -->
     <string name="player_loading">Loading…</string>
     <string name="player_link_refresh_title">Refreshing your stream</string>
     <string name="player_link_refresh_subtitle">Hang tight — fetching a fresh playback link.</string>
+    <string name="player_back_to_exit">Press back again to exit</string>
+    <string name="player_quality_label">Quality</string>
+    <string name="player_seek_fwd">+%1$ds  »</string>
+    <string name="player_seek_back">«  -%1$ds</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
 
     <!-- Search / Browse / Settings (P10–P12) -->
     <string name="search_hint">Search movies and shows…</string>

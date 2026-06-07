@@ -53,7 +53,7 @@ internal class TmdbClient(
             if (apiKey.isBlank()) return@withContext null
             val url = (baseUrl + "movie/$movieId").toHttpUrl().newBuilder()
                 .addQueryParameter("api_key", apiKey)
-                .addQueryParameter("append_to_response", "credits,images,reviews,release_dates")
+                .addQueryParameter("append_to_response", "credits,images,reviews,release_dates,keywords")
                 .addQueryParameter("include_image_language", "en,null")
                 .build()
             val req = Request.Builder().url(url).get().build()
@@ -62,6 +62,24 @@ internal class TmdbClient(
                     if (!res.isSuccessful) return@use null
                     val body = res.body?.string() ?: return@use null
                     json.decodeFromString(TmdbMovieDetail.serializer(), body)
+                }
+            }.getOrNull()
+        }
+
+    /** TMDb "similar movies" endpoint — returns page 1 of similar hits. */
+    suspend fun fetchSimilar(movieId: Int): TmdbSearchResponse? =
+        withContext(Dispatchers.IO) {
+            if (apiKey.isBlank()) return@withContext null
+            val url = (baseUrl + "movie/$movieId/similar").toHttpUrl().newBuilder()
+                .addQueryParameter("api_key", apiKey)
+                .addQueryParameter("page", "1")
+                .build()
+            val req = Request.Builder().url(url).get().build()
+            return@withContext runCatching {
+                client.newCall(req).execute().use { res ->
+                    if (!res.isSuccessful) return@use null
+                    val body = res.body?.string() ?: return@use null
+                    json.decodeFromString(TmdbSearchResponse.serializer(), body)
                 }
             }.getOrNull()
         }

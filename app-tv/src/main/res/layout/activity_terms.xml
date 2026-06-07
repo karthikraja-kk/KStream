@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Full-screen Terms & Conditions reader.
+   - D-pad UP/DOWN scrolls the body.
+   - BACK closes (no explicit confirm button).
+-->
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/terms_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_base"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:paddingHorizontal="@dimen/tv_overscan_horizontal"
+    android:paddingVertical="@dimen/tv_overscan_vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/terms_title"
+            android:textAppearance="@style/TextAppearance.KStream.Display" />
+
+        <View
+            android:layout_width="80dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="@dimen/space_md"
+            android:background="@color/accent_gold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_sm"
+            android:text="@string/terms_last_updated"
+            android:textColor="@color/text_tertiary"
+            android:textSize="14sp" />
+
+        <!-- 1 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s1_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s1_body" />
+        <!-- 2 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s2_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s2_body" />
+        <!-- 3 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s3_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s3_body" />
+        <!-- 4 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s4_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s4_body" />
+        <!-- 5 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s5_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s5_body" />
+        <!-- 6 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s6_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s6_body" />
+        <!-- 7 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s7_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s7_body" />
+        <!-- 8 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s8_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s8_body" />
+        <!-- 9 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s9_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s9_body" />
+        <!-- 10 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s10_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s10_body" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xl"
+            android:layout_marginBottom="@dimen/space_xl"
+            android:gravity="center"
+            android:text="@string/terms_footer"
+            android:textColor="@color/accent_gold"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

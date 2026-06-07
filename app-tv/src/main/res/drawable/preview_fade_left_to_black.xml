@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Horizontal gradient: opaque black on the left, fading to transparent on
+  the right. Painted as an overlay on top of the preview backdrop so the
+  text panel reads against a guaranteed-black plate while the right edge
+  of the backdrop stays untouched.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:startColor="#FF000000"
+        android:endColor="#00000000"
+        android:type="linear" />
+</shape>

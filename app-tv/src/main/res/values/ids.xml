@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tag key used by MovieCardPresenter to attach the running width ValueAnimator
+         to a card's root view (so it can be cancelled on focus toggle / recycle). -->
+    <item name="card_width_animator_key" type="id" />
+    <!-- Tag key used by SpotlightCardPresenter to store whether the spotlight
+         image needed a blurred side-fill (portrait fallback case), so that
+         the focus morph animator knows whether to fade the blur layer in. -->
+    <item name="card_needs_blur_key" type="id" />
+    <!-- Tag key used by HomeRowsFragment to mark a HorizontalGridView as
+         already having had setItemSpacing applied, so we don't re-set it
+         (and trigger a redundant requestLayout) on every child attach. -->
+    <item name="card_poster_spacing_applied" type="id" />
+    <!-- Tag key for the pending "settle then spotlight" Runnable. Lets us
+         cancel the morph if focus leaves before the debounce fires, so
+         arrow-key flyovers don't trigger spotlight reflow. -->
+    <item name="card_focus_settle_runnable" type="id" />
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Background for the home preview "fact" chat bubble. Mostly-opaque dark
+  surface so the text remains legible on bright posters/backdrops, with a
+  soft top-left tail (smaller radius) so it reads as a speech bubble
+  anchored to the avatar on its left.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#CC0E1018" />
+    <stroke
+        android:width="1dp"
+        android:color="#33FFFFFF" />
+    <corners
+        android:topLeftRadius="4dp"
+        android:topRightRadius="14dp"
+        android:bottomLeftRadius="14dp"
+        android:bottomRightRadius="14dp" />
+</shape>

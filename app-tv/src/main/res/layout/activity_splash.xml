@@ -1,42 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Splash layout: brand wordmark centered on the dark base with a subtle
-  gold underline. Intentionally simple — splash is shown for ~1.4s so any
-  heavy art would tear on LOW tier first-paint.
+  Cinematic splash. Full-bleed Lottie animation loaded from
+  assets/kstream_splash.json. The animation runs once; SplashActivity routes
+  to Welcome / Main as soon as it ends.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_base">
+    android:background="@android:color/black">
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:orientation="vertical">
-
-        <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:contentDescription="@string/app_name"
-            android:src="@drawable/kstream_logo" />
-
-        <View
-            android:layout_width="120dp"
-            android:layout_height="3dp"
-            android:layout_marginTop="@dimen/space_md"
-            android:background="@color/accent_gold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_lg"
-            android:letterSpacing="0.30"
-            android:text="@string/splash_tagline"
-            android:textAllCaps="true"
-            android:textAppearance="@style/TextAppearance.KStream.Meta" />
-
-    </LinearLayout>
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/splash_lottie"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layerType="hardware"
+        android:scaleType="fitCenter"
+        app:lottie_autoPlay="true"
+        app:lottie_fileName="kstream_splash.json"
+        app:lottie_loop="false"
+        app:lottie_renderMode="hardware" />
 
 </FrameLayout>

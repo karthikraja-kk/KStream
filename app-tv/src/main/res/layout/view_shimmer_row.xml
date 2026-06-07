@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A single shimmering rail: row of portrait placeholders only.
+  The section title placeholder lives once in view_home_shimmer.xml
+  (sticky strip above the rails), matching the production UI which
+  has one sticky label, not per-rail titles.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+
+    <include layout="@layout/view_shimmer_card" />
+    <include layout="@layout/view_shimmer_card" />
+    <include layout="@layout/view_shimmer_card" />
+    <include layout="@layout/view_shimmer_card" />
+    <include layout="@layout/view_shimmer_card" />
+    <include layout="@layout/view_shimmer_card" />
+    <include layout="@layout/view_shimmer_card" />
+</LinearLayout>

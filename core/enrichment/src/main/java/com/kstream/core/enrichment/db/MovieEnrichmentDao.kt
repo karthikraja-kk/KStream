@@ -12,6 +12,9 @@ interface MovieEnrichmentDao {
     @Query("SELECT * FROM movie_enrichment WHERE movie_key = :key LIMIT 1")
     suspend fun get(key: String): MovieEnrichmentEntity?
 
+    @Query("SELECT * FROM movie_enrichment WHERE movie_key IN (:keys)")
+    suspend fun getAll(keys: List<String>): List<MovieEnrichmentEntity>
+
     @Query("SELECT * FROM movie_enrichment WHERE movie_key = :key LIMIT 1")
     fun observe(key: String): Flow<MovieEnrichmentEntity?>
 

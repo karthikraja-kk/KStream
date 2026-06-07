@@ -2,24 +2,169 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black"
-    android:focusable="true"
-    android:focusableInTouchMode="true">
+    android:background="@android:color/black">
 
+    <!-- Bare video surface — no built-in controller. -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:keepScreenOn="true" />
+        android:keepScreenOn="true"
+        app:use_controller="false"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
 
-    <!-- Loading -->
+    <!-- Center buffering spinner (always available, no scrim). -->
+    <ProgressBar
+        android:id="@+id/buffering_spinner"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/accent_gold"
+        android:visibility="gone" />
+
+    <!-- Seek indicators (shown only while seeking with controls hidden). -->
+    <TextView
+        android:id="@+id/seek_indicator_left"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|start"
+        android:layout_marginStart="48dp"
+        android:paddingHorizontal="22dp"
+        android:paddingVertical="14dp"
+        android:background="@drawable/seek_indicator_bg"
+        android:textColor="@color/accent_gold"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/seek_indicator_right"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="48dp"
+        android:paddingHorizontal="22dp"
+        android:paddingVertical="14dp"
+        android:background="@drawable/seek_indicator_bg"
+        android:textColor="@color/accent_gold"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Controls overlay (custom — top title + quality, center play/pause, bottom seekbar). -->
+    <FrameLayout
+        android:id="@+id/controls_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/controls_scrim"
+        android:visibility="gone">
+
+        <!-- Top row: title + quality dropdown. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:orientation="vertical"
+            android:paddingHorizontal="48dp"
+            android:paddingTop="32dp">
+
+            <TextView
+                android:id="@+id/player_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/text_primary"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_quality"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="8dp"
+                android:background="@drawable/quality_dropdown_bg"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textAllCaps="false"
+                android:focusable="true"
+                android:nextFocusDown="@+id/btn_play_pause"
+                tools:ignore="ButtonStyle"
+                xmlns:tools="http://schemas.android.com/tools" />
+        </LinearLayout>
+
+        <!-- Center play/pause button. -->
+        <ImageButton
+            android:id="@+id/btn_play_pause"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center"
+            android:background="@drawable/play_button_bg"
+            android:src="@drawable/ic_pause"
+            android:scaleType="center"
+            android:contentDescription="@string/player_pause"
+            android:focusable="true"
+            android:nextFocusUp="@+id/btn_quality"
+            android:nextFocusDown="@+id/player_seekbar" />
+
+        <!-- Bottom row: position / seekbar / duration. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="48dp"
+            android:paddingBottom="40dp">
+
+            <TextView
+                android:id="@+id/player_position"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="64dp"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:text="0:00" />
+
+            <SeekBar
+                android:id="@+id/player_seekbar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="14dp"
+                android:max="1000"
+                android:progressTint="@color/accent_gold"
+                android:secondaryProgressTint="#66E91E63"
+                android:thumbTint="@color/accent_gold"
+                android:focusable="true"
+                android:nextFocusUp="@+id/btn_play_pause" />
+
+            <TextView
+                android:id="@+id/player_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="64dp"
+                android:gravity="end"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:text="0:00" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Initial load overlay (covers everything while first loading). -->
     <LinearLayout
         android:id="@+id/loading_overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="#80000000"
+        android:background="#CC000000"
         android:visibility="gone">
 
         <ProgressBar
@@ -28,7 +173,6 @@
             android:indeterminateTint="@color/accent_gold" />
 
         <TextView
-            android:id="@+id/loading_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"

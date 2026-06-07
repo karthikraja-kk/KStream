@@ -22,6 +22,7 @@
         android:icon="@mipmap/ic_launcher"
         android:isGame="false"
         android:label="@string/app_name"
+        android:largeHeap="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.KStreamTv"
@@ -33,7 +34,7 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
-            android:theme="@style/Theme.KStreamTv">
+            android:theme="@style/Theme.KStreamTv.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -42,6 +43,12 @@
 
         <activity
             android:name=".ui.welcome.WelcomeActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KStreamTv" />
+
+        <activity
+            android:name=".ui.terms.TermsActivity"
             android:exported="false"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.KStreamTv" />

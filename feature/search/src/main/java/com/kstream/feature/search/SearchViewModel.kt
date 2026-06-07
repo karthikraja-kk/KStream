@@ -217,6 +217,19 @@ class SearchViewModel @Inject constructor(
                 query.trim() == "recommended:*" -> {
                     getRecommendationsUseCase().first()
                 }
+                query.trim().startsWith("genre:", ignoreCase = true) -> {
+                    val genre = query.trim().substringAfter(":").trim()
+                    movieRepository.searchMovies("*").filter { m ->
+                        m.genres.any { it.equals(genre, ignoreCase = true) }
+                    }.sortedWith(compareByDescending<Movie> { parseLastUpdated(it.lastUpdated) })
+                }
+                query.trim().startsWith("year:", ignoreCase = true) -> {
+                    val year = query.trim().substringAfter(":").trim().toIntOrNull()
+                    if (year == null) emptyList()
+                    else movieRepository.searchMovies("*")
+                        .filter { it.year == year }
+                        .sortedWith(compareByDescending { parseLastUpdated(it.lastUpdated) })
+                }
                 else -> null // handled below with fuzzy search
             }
 

@@ -48,6 +48,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "17"
@@ -117,9 +118,19 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.profileinstaller)
 
+    // Lottie — splash animation.
+    implementation(libs.lottie)
+
+    // Shimmer — placeholder loader for the home screen while rails + TMDb
+    // enrichment are being warmed.
+    implementation("com.facebook.shimmer:shimmer:0.5.0")
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // Core library desugaring — required for java.time.* on API < 26 (Fire TV / older Android).
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

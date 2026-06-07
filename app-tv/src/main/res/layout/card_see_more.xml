@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/see_more_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:padding="@dimen/card_focus_padding"
+    android:clickable="true"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:focusable="true"
+    android:focusableInTouchMode="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:duplicateParentState="true"
+        android:paddingHorizontal="2dp"
+        android:paddingVertical="2dp">
+
+        <FrameLayout
+            android:id="@+id/see_more_tile"
+            android:layout_width="@dimen/card_poster_width"
+            android:layout_height="@dimen/card_poster_height"
+            android:background="@drawable/see_more_card_bg"
+            android:duplicateParentState="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:text="@string/see_more_arrow"
+                android:textColor="@color/accent_gold"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp" />
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

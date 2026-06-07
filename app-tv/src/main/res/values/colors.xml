@@ -14,9 +14,15 @@
     <color name="text_secondary">#FFB8BCC8</color>
     <color name="text_tertiary">#FF6B7280</color>
 
-    <!-- Brand accent — focus glow, calls-to-action -->
-    <color name="accent_gold">#FFE8C36A</color>
-    <color name="accent_gold_muted">#FFB89548</color>
+    <!-- Brand accent — logo gradient palette (orange → magenta → purple).
+         Token historically named "gold" / "magenta"; now mapped to the brand
+         magenta-pink (primary). Use accent_warm / accent_cool for the warm
+         and cool stops of the logo gradient. -->
+    <color name="accent_gold">#FFE91E63</color>
+    <color name="accent_gold_muted">#FF6A1A9A</color>
+    <color name="accent_warm">#FFFF6B1A</color>
+    <color name="accent_cool">#FF6A1A9A</color>
+    <color name="accent_primary">#FFE91E63</color>
 
     <!-- States -->
     <color name="state_error">#FFFF5C5C</color>

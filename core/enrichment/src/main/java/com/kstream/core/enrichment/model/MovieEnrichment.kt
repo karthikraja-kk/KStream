@@ -13,11 +13,16 @@ data class MovieEnrichment(
     val tagline: String?,
     val overview: String?,
     val logoUrl: String?,
+    val posterUrl: String?,
     val tmdbRating: Double?,
     val certification: String?,
     val backdrops: List<String>,
     val cast: List<EnrichedCast>,
     val reviews: List<EnrichedReview>,
+    val collectionName: String? = null,
+    val budget: Long? = null,
+    val revenue: Long? = null,
+    val keywords: List<String> = emptyList(),
     val fetchedAtEpochMs: Long
 )
 

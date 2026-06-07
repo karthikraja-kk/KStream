@@ -31,6 +31,7 @@ data class DetailsUiState(
     val error: String? = null,
     val isOnline: Boolean = true,
     val hasWatchProgress: Boolean = false,
+    val watchProgressPercent: Float = 0f,
     val isRefreshingLinks: Boolean = false,
     val refreshError: String? = null,
     val isLiked: Boolean = false
@@ -78,8 +79,12 @@ class DetailsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val progress = watchProgressRepository.getProgress(movieId)
-                _uiState.update { 
-                    it.copy(hasWatchProgress = progress != null && progress.lastPosition > 0 && progress.completionPercent < 95f) 
+                val hasProg = progress != null && progress.lastPosition > 0 && progress.completionPercent < 95f
+                _uiState.update {
+                    it.copy(
+                        hasWatchProgress = hasProg,
+                        watchProgressPercent = if (hasProg) progress!!.completionPercent.coerceIn(0f, 100f) else 0f
+                    )
                 }
             } catch (_: Exception) { }
         }
@@ -180,7 +185,7 @@ class DetailsViewModel @Inject constructor(
                 if (existing != null) {
                     watchProgressRepository.saveProgress(movieId, 0L, existing.duration, existing.quality)
                 }
-                _uiState.update { it.copy(hasWatchProgress = false) }
+                _uiState.update { it.copy(hasWatchProgress = false, watchProgressPercent = 0f) }
             } catch (_: Exception) { }
         }
     }

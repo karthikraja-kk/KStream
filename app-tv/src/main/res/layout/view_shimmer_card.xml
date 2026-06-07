@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A single shimmering portrait placeholder. The static @dimen sizes are
+  just defaults; ShimmerOverlay resizes every card tagged
+  "shimmer_card" to match RailCardSizing.computePosterSize() so the
+  shimmer footprint == the real adaptive poster footprint.
+-->
+<View xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/card_poster_width"
+    android:layout_height="@dimen/card_poster_height"
+    android:layout_marginEnd="@dimen/card_poster_spacing"
+    android:background="@drawable/shimmer_card_bg"
+    android:tag="shimmer_card" />

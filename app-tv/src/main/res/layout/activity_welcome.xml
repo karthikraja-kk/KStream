@@ -30,10 +30,11 @@
         app:layout_constraintVertical_bias="0.45">
 
         <ImageView
-            android:layout_width="180dp"
+            android:layout_width="280dp"
             android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
             android:contentDescription="@string/app_name"
-            android:src="@drawable/kstream_logo" />
+            android:src="@drawable/kstream_logo_with_name" />
 
         <View
             android:layout_width="80dp"
@@ -42,19 +43,29 @@
             android:background="@color/accent_gold" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_xl"
+            android:maxLines="2"
             android:text="@string/welcome_headline"
-            android:textAppearance="@style/TextAppearance.KStream.Display" />
+            android:textAppearance="@style/TextAppearance.KStream.Display"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="28sp"
+            android:autoSizeMaxTextSize="56sp"
+            android:autoSizeStepGranularity="2sp" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_md"
             android:maxWidth="520dp"
+            android:maxLines="3"
             android:text="@string/welcome_subtitle"
-            android:textAppearance="@style/TextAppearance.KStream.Body" />
+            android:textAppearance="@style/TextAppearance.KStream.Body"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="13sp"
+            android:autoSizeMaxTextSize="18sp"
+            android:autoSizeStepGranularity="1sp" />
 
     </LinearLayout>
 
@@ -95,6 +106,7 @@
             android:nextFocusForward="@+id/welcome_continue_btn"
             android:paddingHorizontal="@dimen/space_md"
             android:singleLine="true"
+            android:text="@string/welcome_default_name"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_tertiary"
             android:textSize="18sp" />
@@ -114,26 +126,50 @@
             android:layout_height="56dp"
             android:layout_marginTop="@dimen/space_lg"
             android:background="@drawable/focus_ring_glow"
+            android:enabled="false"
             android:nextFocusUp="@id/welcome_name_field"
-            android:nextFocusDown="@+id/welcome_skip_btn"
+            android:nextFocusDown="@+id/welcome_terms_row"
             android:text="@string/welcome_continue"
             android:textAllCaps="true"
             android:textColor="@color/accent_gold"
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/welcome_skip_btn"
+        <LinearLayout
+            android:id="@+id/welcome_terms_row"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="@dimen/space_sm"
-            android:background="@android:color/transparent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:gravity="center_vertical"
             android:nextFocusUp="@id/welcome_continue_btn"
-            android:text="@string/welcome_skip"
-            android:textAllCaps="true"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            android:orientation="horizontal">
+
+            <CheckBox
+                android:id="@+id/welcome_terms_check"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:buttonTint="@color/accent_gold"
+                android:focusable="true"
+                android:nextFocusRight="@+id/welcome_terms_text"
+                android:nextFocusUp="@id/welcome_continue_btn" />
+
+            <TextView
+                android:id="@+id/welcome_terms_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_xs"
+                android:background="@drawable/focus_ring_low"
+                android:focusable="true"
+                android:nextFocusLeft="@id/welcome_terms_check"
+                android:nextFocusUp="@id/welcome_continue_btn"
+                android:paddingHorizontal="@dimen/space_xs"
+                android:paddingVertical="2dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
     </LinearLayout>
+
+    <!-- TMDb attribution removed from welcome (shown in Terms & Conditions instead). -->
 
 </androidx.constraintlayout.widget.ConstraintLayout>
