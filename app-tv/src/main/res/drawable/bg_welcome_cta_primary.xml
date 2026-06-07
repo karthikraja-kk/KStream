@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Welcome CTA selector. Enabled → brand gradient; disabled → muted
+  gradient. The focus halo is provided by a layer above via
+  focus_ring_glow set as foreground in WelcomeActivity.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false" android:drawable="@drawable/bg_welcome_cta_fill_disabled" />
+    <item android:drawable="@drawable/bg_welcome_cta_fill" />
+</selector>

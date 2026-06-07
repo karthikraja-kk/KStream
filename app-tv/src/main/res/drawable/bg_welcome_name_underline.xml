@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Welcome name-field underline selector. Focused → 2dp magenta;
+  otherwise → 1dp tertiary grey. Replaces the boxy focus_ring_low
+  treatment from the old design.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:drawable="@drawable/bg_welcome_name_underline_focused" />
+    <item android:drawable="@drawable/bg_welcome_name_underline_idle" />
+</selector>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Welcome CTA — brand-gradient pill. Orange → magenta → purple
+  (horizontal). 28dp radius so a 56dp tall button is fully pilled.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:startColor="@color/accent_warm"
+        android:centerColor="@color/accent_primary"
+        android:endColor="@color/accent_cool"
+        android:type="linear" />
+    <corners android:radius="28dp" />
+</shape>

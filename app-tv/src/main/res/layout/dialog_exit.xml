@@ -9,8 +9,9 @@
 
     <ImageView
         android:id="@+id/exit_logo"
-        android:layout_width="160dp"
-        android:layout_height="48dp"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:adjustViewBounds="true"
         android:src="@drawable/kstream_logo_horizontal"
         android:scaleType="fitCenter"
         android:contentDescription="@string/app_name" />

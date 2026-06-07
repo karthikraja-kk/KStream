@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Welcome CTA — same brand gradient but muted (~30% alpha). Shown
+  when the button is disabled (terms unchecked / empty name).
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:startColor="#4DFF6B1A"
+        android:centerColor="#4DE91E63"
+        android:endColor="#4D6A1A9A"
+        android:type="linear" />
+    <corners android:radius="28dp" />
+</shape>

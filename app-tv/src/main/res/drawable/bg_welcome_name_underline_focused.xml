@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  EditText underline for the welcome name field. Layer-list with a
+  transparent body and a single bottom rule. Color flips between
+  text_tertiary (idle) and accent_primary (focused) via the selector
+  in `bg_welcome_name_underline.xml`.
+
+  This file is the "focused" 2dp magenta variant.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item android:gravity="bottom" android:height="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/accent_primary" />
+        </shape>
+    </item>
+</layer-list>

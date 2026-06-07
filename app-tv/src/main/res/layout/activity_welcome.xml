@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Premium welcome layout for Android TV:
-   - Left column (60%): big greeting + supporting copy
-   - Right column (40%): input field, error text, primary & secondary buttons
-  Designed to fit comfortably inside overscan-safe bounds on 1080p panels.
+  Premium welcome screen (redesign).
+
+  Adaptive 55/45 two-pane via percent guideline so the layout scales
+  on 720p / 1080p / 4K without hard-coded widths.
+
+   - Left brand pane  : logo-with-name image + 4dp brand-gradient stripe
+                        + autosizing headline + autosizing subtitle.
+                        Vertically centered (bias 0.5).
+   - Right action card: glass card (bg_welcome_card) holding eyebrow,
+                        card title, name input (underline lights magenta
+                        on focus), gradient pill CTA, and the existing
+                        terms-checkbox row. Card width = match_parent
+                        capped at maxWidth 480dp; centered vertically.
+
+  All entry animations + adaptive logo width are wired in
+  WelcomeActivity.onCreate.
 -->
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -16,20 +28,32 @@
     android:paddingVertical="@dimen/tv_overscan_vertical"
     tools:ignore="UnusedAttribute">
 
-    <!-- ===== Left column: brand + headline ===== -->
+    <!-- 55/45 split. Right pane starts at 55% so the brand pane
+         (logo + headline) gets the more generous half. -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/welcome_split"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.55" />
+
+    <!-- ============ LEFT BRAND PANE ============ -->
     <LinearLayout
         android:id="@+id/welcome_left_col"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:paddingEnd="@dimen/space_xxl"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@+id/welcome_right_col"
-        app:layout_constraintHorizontal_weight="3"
+        app:layout_constraintEnd_toStartOf="@id/welcome_split"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.45">
+        app:layout_constraintVertical_bias="0.5">
 
+        <!-- Logo with name. Width is adjusted at runtime to
+             min(40% pane width, 360dp) so 4K panels get a larger mark. -->
         <ImageView
+            android:id="@+id/welcome_logo"
             android:layout_width="280dp"
             android:layout_height="wrap_content"
             android:adjustViewBounds="true"
@@ -37,12 +61,14 @@
             android:src="@drawable/kstream_logo_with_name" />
 
         <View
-            android:layout_width="80dp"
-            android:layout_height="3dp"
-            android:layout_marginTop="@dimen/space_md"
-            android:background="@color/accent_gold" />
+            android:id="@+id/welcome_stripe"
+            android:layout_width="120dp"
+            android:layout_height="4dp"
+            android:layout_marginTop="@dimen/space_lg"
+            android:background="@drawable/accent_gradient" />
 
         <TextView
+            android:id="@+id/welcome_headline"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_xl"
@@ -55,48 +81,63 @@
             android:autoSizeStepGranularity="2sp" />
 
         <TextView
+            android:id="@+id/welcome_subtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_md"
             android:maxWidth="520dp"
-            android:maxLines="3"
+            android:maxLines="2"
             android:text="@string/welcome_subtitle"
             android:textAppearance="@style/TextAppearance.KStream.Body"
             android:autoSizeTextType="uniform"
-            android:autoSizeMinTextSize="13sp"
-            android:autoSizeMaxTextSize="18sp"
+            android:autoSizeMinTextSize="14sp"
+            android:autoSizeMaxTextSize="20sp"
             android:autoSizeStepGranularity="1sp" />
 
     </LinearLayout>
 
-    <!-- ===== Right column: input + actions ===== -->
+    <!-- ============ RIGHT ACTION CARD ============ -->
     <LinearLayout
         android:id="@+id/welcome_right_col"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="end"
+        android:background="@drawable/bg_welcome_card"
         android:orientation="vertical"
+        android:paddingHorizontal="@dimen/space_xl"
+        android:paddingVertical="36dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_weight="2"
-        app:layout_constraintStart_toEndOf="@+id/welcome_left_col"
+        app:layout_constraintStart_toEndOf="@id/welcome_split"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.5">
+        app:layout_constraintVertical_bias="0.5"
+        app:layout_constraintWidth_max="480dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/welcome_label_name"
+            android:text="@string/welcome_eyebrow"
             android:textAllCaps="true"
-            android:textAppearance="@style/TextAppearance.KStream.Meta" />
+            android:textColor="@color/accent_primary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.18" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:text="@string/welcome_card_title"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
 
         <EditText
             android:id="@+id/welcome_name_field"
             android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:layout_marginTop="@dimen/space_sm"
+            android:layout_height="56dp"
+            android:layout_marginTop="@dimen/space_lg"
             android:autofillHints="username"
-            android:background="@drawable/focus_ring_low"
+            android:background="@drawable/bg_welcome_name_underline"
             android:hint="@string/welcome_name_hint"
             android:imeOptions="actionDone"
             android:importantForAutofill="yes"
@@ -104,12 +145,12 @@
             android:maxLength="24"
             android:nextFocusDown="@+id/welcome_continue_btn"
             android:nextFocusForward="@+id/welcome_continue_btn"
-            android:paddingHorizontal="@dimen/space_md"
+            android:paddingHorizontal="2dp"
             android:singleLine="true"
             android:text="@string/welcome_default_name"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_tertiary"
-            android:textSize="18sp" />
+            android:textSize="20sp" />
 
         <TextView
             android:id="@+id/welcome_error_text"
@@ -124,14 +165,16 @@
             android:id="@+id/welcome_continue_btn"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_marginTop="@dimen/space_lg"
-            android:background="@drawable/focus_ring_glow"
+            android:layout_marginTop="@dimen/space_xl"
+            android:background="@drawable/bg_welcome_cta_primary"
+            android:foreground="@drawable/focus_ring_glow"
             android:enabled="false"
             android:nextFocusUp="@id/welcome_name_field"
             android:nextFocusDown="@+id/welcome_terms_row"
+            android:stateListAnimator="@null"
             android:text="@string/welcome_continue"
             android:textAllCaps="true"
-            android:textColor="@color/accent_gold"
+            android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -139,7 +182,7 @@
             android:id="@+id/welcome_terms_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
+            android:layout_marginTop="@dimen/space_lg"
             android:gravity="center_vertical"
             android:nextFocusUp="@id/welcome_continue_btn"
             android:orientation="horizontal">
@@ -148,7 +191,7 @@
                 android:id="@+id/welcome_terms_check"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:buttonTint="@color/accent_gold"
+                android:buttonTint="@color/accent_primary"
                 android:focusable="true"
                 android:nextFocusRight="@+id/welcome_terms_text"
                 android:nextFocusUp="@id/welcome_continue_btn" />
@@ -169,7 +212,5 @@
         </LinearLayout>
 
     </LinearLayout>
-
-    <!-- TMDb attribution removed from welcome (shown in Terms & Conditions instead). -->
 
 </androidx.constraintlayout.widget.ConstraintLayout>
