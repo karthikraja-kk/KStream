@@ -221,11 +221,11 @@ class PlayerTvFragment : Fragment() {
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_LEFT,
                     KeyEvent.KEYCODE_SYSTEM_NAVIGATION_LEFT -> {
-                        addSeek(-SEEK_STEP_MS); return true
+                        addSeek(-SEEK_STEP_COARSE_MS); return true
                     }
                     KeyEvent.KEYCODE_DPAD_RIGHT,
                     KeyEvent.KEYCODE_SYSTEM_NAVIGATION_RIGHT -> {
-                        addSeek(SEEK_STEP_MS); return true
+                        addSeek(SEEK_STEP_COARSE_MS); return true
                     }
                 }
             }
@@ -234,11 +234,11 @@ class PlayerTvFragment : Fragment() {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT,
                 KeyEvent.KEYCODE_SYSTEM_NAVIGATION_LEFT -> {
-                    addSeek(-SEEK_STEP_MS); true
+                    addSeek(-SEEK_STEP_FINE_MS); true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT,
                 KeyEvent.KEYCODE_SYSTEM_NAVIGATION_RIGHT -> {
-                    addSeek(SEEK_STEP_MS); true
+                    addSeek(SEEK_STEP_FINE_MS); true
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER,
@@ -289,13 +289,21 @@ class PlayerTvFragment : Fragment() {
     }
 
     private fun showSeekIndicator(totalMs: Long) {
-        val seconds = (totalMs / 1000L).toInt()
-        if (seconds >= 0) {
-            seekIndicatorRight.text = getString(R.string.player_seek_fwd, seconds.coerceAtLeast(0))
+        val absMs = kotlin.math.abs(totalMs)
+        // Show minutes for coarse scrubs (≥ 60 s), seconds otherwise.
+        val (value, useMinutes) = if (absMs >= 60_000L) {
+            (totalMs / 60_000L).toInt() to true
+        } else {
+            (totalMs / 1000L).toInt() to false
+        }
+        if (value >= 0) {
+            val res = if (useMinutes) R.string.player_seek_fwd_min else R.string.player_seek_fwd_sec
+            seekIndicatorRight.text = getString(res, value.coerceAtLeast(0))
             seekIndicatorRight.visibility = View.VISIBLE
             seekIndicatorLeft.visibility = View.GONE
         } else {
-            seekIndicatorLeft.text = getString(R.string.player_seek_back, (-seconds))
+            val res = if (useMinutes) R.string.player_seek_back_min else R.string.player_seek_back_sec
+            seekIndicatorLeft.text = getString(res, (-value))
             seekIndicatorLeft.visibility = View.VISIBLE
             seekIndicatorRight.visibility = View.GONE
         }
@@ -445,7 +453,13 @@ class PlayerTvFragment : Fragment() {
     }
 
     companion object {
-        private const val SEEK_STEP_MS = 10_000L
+        // Coarse: when the seekbar itself is focused — D-pad LEFT/RIGHT
+        // each accumulate 5 min so the user can scrub a long film fast.
+        private const val SEEK_STEP_COARSE_MS = 5 * 60_000L
+        // Fine: when controls are hidden (or focus is on a non-seekbar
+        // control) — D-pad LEFT/RIGHT each accumulate 10 s for precise
+        // nudges. Both paths share the same debounced commit.
+        private const val SEEK_STEP_FINE_MS = 10_000L
         private const val SEEK_DEBOUNCE_MS = 700L
         private const val AUTO_HIDE_MS = 5_000L
     }

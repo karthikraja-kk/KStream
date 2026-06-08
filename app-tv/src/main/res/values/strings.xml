@@ -62,8 +62,10 @@
     <string name="player_link_refresh_subtitle">Hang tight — fetching a fresh playback link.</string>
     <string name="player_back_to_exit">Press back again to exit</string>
     <string name="player_quality_label">Quality</string>
-    <string name="player_seek_fwd">+%1$ds  »</string>
-    <string name="player_seek_back">«  -%1$ds</string>
+    <string name="player_seek_fwd_min">+%1$dm  »</string>
+    <string name="player_seek_back_min">«  -%1$dm</string>
+    <string name="player_seek_fwd_sec">+%1$ds  »</string>
+    <string name="player_seek_back_sec">«  -%1$ds</string>
     <string name="player_play">Play</string>
     <string name="player_pause">Pause</string>
 

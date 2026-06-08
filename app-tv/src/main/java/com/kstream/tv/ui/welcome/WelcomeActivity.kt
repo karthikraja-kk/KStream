@@ -19,6 +19,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -81,14 +82,24 @@ class WelcomeActivity : FragmentActivity() {
                 actionId == EditorInfo.IME_ACTION_GO ||
                 event?.keyCode == KeyEvent.KEYCODE_ENTER
             if (isDone) {
-                // Keyboard "Next" / "Done" / Enter shouldn't bypass the
-                // empty-name guard. If the field is empty, surface the
-                // error and stay put; otherwise behave as a Continue tap.
+                // ALWAYS dismiss the keyboard when the user taps the IME
+                // confirm key (tick). Then either advance (if Continue is
+                // enabled) or move focus back to the field to surface the
+                // empty-name guard.
+                hideKeyboard()
                 if (continueBtn.isEnabled) {
+                    continueBtn.requestFocus()
                     continueBtn.performClick()
                 } else {
                     updateContinueEnabled()
-                    nameField.requestFocus()
+                    // Park focus on the Continue row (or terms row) so the
+                    // EditText doesn't re-pop the keyboard via focus. The
+                    // user can press DPAD_UP to return to the field.
+                    if (!termsCheck.isChecked) {
+                        termsCheck.requestFocus()
+                    } else {
+                        continueBtn.requestFocus()
+                    }
                 }
                 true
             } else false
@@ -105,9 +116,45 @@ class WelcomeActivity : FragmentActivity() {
 
         continueBtn.setOnClickListener { onContinue() }
 
+        // On TV, EditText receiving focus via D-pad navigation would normally
+        // pop the IME open immediately. Suppress that — the IME should only
+        // appear when the user EXPLICITLY taps the field (DPAD_CENTER / click).
+        nameField.showSoftInputOnFocus = false
+        nameField.setOnClickListener { showKeyboardFor(nameField) }
+        nameField.setOnKeyListener { _, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN &&
+                (keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                    keyCode == KeyEvent.KEYCODE_ENTER ||
+                    keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)
+            ) {
+                // Only open the IME if it's not already showing; otherwise
+                // let the IME's own confirm-key path (onEditorAction) handle
+                // the press so the tick dismisses the keyboard.
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+                val imeShown = imm?.isAcceptingText == true
+                if (!imeShown) {
+                    showKeyboardFor(nameField)
+                    return@setOnKeyListener true
+                }
+            }
+            false
+        }
+
         nameField.setSelection(nameField.text?.length ?: 0)
         nameField.requestFocus()
         updateContinueEnabled()
+    }
+
+    private fun showKeyboardFor(view: EditText) {
+        view.requestFocus()
+        view.setSelection(view.text?.length ?: 0)
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(nameField.windowToken, 0)
     }
 
     /**
