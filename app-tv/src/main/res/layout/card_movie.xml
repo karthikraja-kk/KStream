@@ -95,11 +95,13 @@
             android:id="@+id/card_title"
             android:layout_width="@dimen/card_poster_width"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_xs"
+            android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:gravity="center_horizontal"
-            android:maxLines="2"
-            android:textAppearance="@style/TextAppearance.KStream.Card"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
             tools:text="A Very Long Movie Title" />
 
     </LinearLayout>

@@ -105,8 +105,8 @@ class HomeViewModel @Inject constructor(
             ) { hd, carousel -> Pair(hd, carousel) }
         ) { data, prefs ->
             val (hdOnly, carouselEnabled) = prefs
-            val filteredMovies = if (hdOnly) data.movies.filter { it.type.equals("Original HD", ignoreCase = true) } else data.movies
-            val filteredRecs = if (hdOnly) data.recommendations.filter { it.type.equals("Original HD", ignoreCase = true) } else data.recommendations
+            val filteredMovies = if (hdOnly) data.movies.filter { com.kstream.core.common.HdQualityFilter.isHd(it.type) } else data.movies
+            val filteredRecs = if (hdOnly) data.recommendations.filter { com.kstream.core.common.HdQualityFilter.isHd(it.type) } else data.recommendations
             val rails = groupMoviesIntoRails(filteredMovies, data.progress, data.likedIds, filteredRecs)
             val heroMovies = if (carouselEnabled) buildHeroMovies(filteredMovies, filteredRecs) else emptyList()
             _uiState.update {
@@ -226,7 +226,7 @@ class HomeViewModel @Inject constructor(
 
         // Continue Watching — sorted by user's watch recency, NOT lastUpdated
         val allContinueWatchingMovies = progress
-            .filter { it.completionPercent < 95f }
+            .filter { it.completionPercent < 97f }
             .sortedByDescending { it.lastUpdated }
             .mapNotNull { p -> movies.find { it.id == p.movieId } }
 

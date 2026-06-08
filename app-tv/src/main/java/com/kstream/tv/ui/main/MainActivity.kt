@@ -10,9 +10,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import com.kstream.core.common.AppState
+import com.kstream.core.domain.GetMoviesUseCase
+import com.kstream.core.domain.SyncMoviesUseCase
 import com.kstream.core.domain.repository.UserDataRepository
 import com.kstream.core.enrichment.EnrichmentRepository
 import com.kstream.core.model.Movie
@@ -24,6 +28,13 @@ import com.kstream.tv.ui.home.ShimmerOverlay
 import com.kstream.tv.ui.search.SearchActivity
 import com.kstream.tv.ui.settings.SettingsActivity
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 
 /**
@@ -51,6 +62,8 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var focusedRelay: FocusedMovieRelay
     @Inject lateinit var enrichmentRepository: EnrichmentRepository
     @Inject lateinit var userDataRepository: UserDataRepository
+    @Inject lateinit var syncMoviesUseCase: SyncMoviesUseCase
+    @Inject lateinit var getMoviesUseCase: GetMoviesUseCase
 
     private var rowsFragment: HomeRowsFragment? = null
     private lateinit var previewBinder: HomePreviewBinder
@@ -59,9 +72,11 @@ class MainActivity : FragmentActivity() {
     private lateinit var navHome: View
     private lateinit var navSearch: View
     private lateinit var navSettings: View
+    private lateinit var navRefresh: View
     private lateinit var navLabelHome: TextView
     private lateinit var navLabelSearch: TextView
     private lateinit var navLabelSettings: TextView
+    private lateinit var navLabelRefresh: TextView
     private lateinit var navLogoSquare: ImageView
     private lateinit var navLogoWordmark: ImageView
 
@@ -165,15 +180,18 @@ class MainActivity : FragmentActivity() {
         navHome = findViewById(R.id.nav_item_home)
         navSearch = findViewById(R.id.nav_item_search)
         navSettings = findViewById(R.id.nav_item_settings)
+        navRefresh = findViewById(R.id.nav_item_refresh)
         navLabelHome = findViewById(R.id.nav_label_home)
         navLabelSearch = findViewById(R.id.nav_label_search)
         navLabelSettings = findViewById(R.id.nav_label_settings)
+        navLabelRefresh = findViewById(R.id.nav_label_refresh)
         navLogoSquare = findViewById(R.id.nav_logo_square)
         navLogoWordmark = findViewById(R.id.nav_logo_wordmark)
 
         val focusListener = View.OnFocusChangeListener { _, _ ->
             navRoot.post {
-                val anyNavFocused = navHome.isFocused || navSearch.isFocused || navSettings.isFocused
+                val anyNavFocused = navHome.isFocused || navSearch.isFocused ||
+                    navSettings.isFocused || navRefresh.isFocused
                 if (anyNavFocused && !isExpanded) {
                     lastContentFocus = currentFocus
                         ?.takeIf { !isWithinNav(it) }
@@ -187,6 +205,7 @@ class MainActivity : FragmentActivity() {
         navHome.onFocusChangeListener = focusListener
         navSearch.onFocusChangeListener = focusListener
         navSettings.onFocusChangeListener = focusListener
+        navRefresh.onFocusChangeListener = focusListener
 
         navHome.setOnClickListener { collapseAndRestoreFocus() }
         navSearch.setOnClickListener {
@@ -196,6 +215,53 @@ class MainActivity : FragmentActivity() {
         navSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
             collapseAndRestoreFocus()
+        }
+        navRefresh.setOnClickListener { triggerDataRefresh() }
+
+        // Mark Home as the active screen — gold left bar + soft glow.
+        navHome.foreground = androidx.core.content.ContextCompat.getDrawable(
+            this, R.drawable.nav_item_active
+        )
+    }
+
+    @Volatile private var isRefreshInFlight = false
+
+    private fun triggerDataRefresh() {
+        if (isRefreshInFlight) return
+        isRefreshInFlight = true
+        ShimmerOverlay.show(this)
+        Toast.makeText(this, "Refreshing data…", Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            val result = runCatching {
+                // 1) DB refresh — re-pull movie list from server into Room.
+                //    HomeRowsFragment observes the Movies flow and re-renders
+                //    automatically once Room is updated.
+                withContext(Dispatchers.IO) { syncMoviesUseCase() }
+
+                // 2) TMDb force-refresh — for the above-the-fold tiles, hit
+                //    TMDb again (refresh() bypasses the "row exists" guard
+                //    that ensureCached() uses). Bounded + parallel-limited so
+                //    we don't spam the network.
+                val movies = withContext(Dispatchers.IO) {
+                    getMoviesUseCase().first()
+                }.take(REFRESH_TMDB_CAP)
+                if (movies.isNotEmpty()) {
+                    coroutineScope {
+                        val sem = Semaphore(REFRESH_TMDB_PARALLELISM)
+                        movies.forEach { movie: Movie ->
+                            launch(Dispatchers.IO) {
+                                sem.withPermit {
+                                    runCatching { enrichmentRepository.refresh(movie) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            isRefreshInFlight = false
+            ShimmerOverlay.hide(this@MainActivity)
+            val message = if (result.isSuccess) "Data refreshed" else "Refresh failed — try again"
+            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -283,7 +349,7 @@ class MainActivity : FragmentActivity() {
         val labelAlpha = if (expand) 1f else 0f
         val squareAlpha = if (expand) 0f else 1f
         val wordmarkAlpha = if (expand) 1f else 0f
-        listOf(navLabelHome, navLabelSearch, navLabelSettings).forEach {
+        listOf(navLabelHome, navLabelSearch, navLabelSettings, navLabelRefresh).forEach {
             it.animate().alpha(labelAlpha).setDuration(ANIM_MS).start()
         }
         navLogoSquare.animate().alpha(squareAlpha).setDuration(ANIM_MS).start()
@@ -312,5 +378,9 @@ class MainActivity : FragmentActivity() {
         private const val NAV_COLLAPSED_DP = 56
         private const val NAV_EXPANDED_DP = 220
         private const val ANIM_MS = 180L
+        // Match HomePrewarmTask: only force-refresh TMDb for the above-the-fold
+        // tiles. Remaining cards re-fetch lazily via HomeRowsFragment.
+        private const val REFRESH_TMDB_CAP = 12
+        private const val REFRESH_TMDB_PARALLELISM = 4
     }
 }

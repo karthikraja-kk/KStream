@@ -6,5 +6,6 @@ interface LikedMovieRepository {
     fun isLiked(movieId: String): Flow<Boolean>
     fun getAllLikedMovieIds(): Flow<List<String>>
     suspend fun toggleLike(movieId: String)
+    suspend fun unlikeAll(movieIds: Collection<String>)
     suspend fun clearAll()
 }

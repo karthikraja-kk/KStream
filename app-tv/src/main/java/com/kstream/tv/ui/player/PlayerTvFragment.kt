@@ -211,8 +211,24 @@ class PlayerTvFragment : Fragment() {
         }
 
         return if (controlsVisible) {
-            // Reset auto-hide on any key while controls are showing; let key flow normally.
+            // While controls are showing the seekbar / buttons own focus.
+            // SeekBar's built-in D-pad handler only updates the progress
+            // value, it never commits a real seek — so we hijack
+            // LEFT/RIGHT when the seekbar is focused and route through
+            // our debounced addSeek() path (which calls player.seekTo).
             resetAutoHide()
+            if (seekBar.hasFocus()) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_SYSTEM_NAVIGATION_LEFT -> {
+                        addSeek(-SEEK_STEP_MS); return true
+                    }
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_SYSTEM_NAVIGATION_RIGHT -> {
+                        addSeek(SEEK_STEP_MS); return true
+                    }
+                }
+            }
             false
         } else {
             when (event.keyCode) {

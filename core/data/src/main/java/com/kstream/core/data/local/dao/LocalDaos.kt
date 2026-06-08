@@ -108,6 +108,9 @@ interface LikedMovieDao {
     @Query("DELETE FROM liked_movies WHERE movieId = :movieId")
     suspend fun unlike(movieId: String)
 
+    @Query("DELETE FROM liked_movies WHERE movieId IN (:movieIds)")
+    suspend fun unlikeAll(movieIds: List<String>)
+
     @Query("DELETE FROM liked_movies")
     suspend fun clearAll()
 }

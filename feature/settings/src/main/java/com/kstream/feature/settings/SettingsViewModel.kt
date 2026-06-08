@@ -53,10 +53,20 @@ data class WatchHistoryItem(
 
 data class SettingsUiState(
     val username: String = "",
+    val displayName: String = "Friend",
+    val avatarInitials: String = "F",
+    val totalMovies: Int = 0,
+    val totalHours: String = "0",
+    val totalDays: Int = 0,
+    val hasStats: Boolean = false,
+    val isHdOnly: Boolean = false,
+    val cacheSizeText: String = "",
     val scanState: ScanState = ScanState.IDLE,
     val isScanButtonEnabled: Boolean = false,
     val scanStatusText: String = "Status: Checking",
     val lastRefreshText: String = "Last refresh: --",
+    val lastRefreshDateText: String = "--",
+    val relativeRefreshText: String = "",
     val scanDetailText: String = "Checking scan status...",
     val cacheCleared: Boolean = false,
     val watchHistory: List<WatchHistoryItem> = emptyList(),
@@ -97,7 +107,21 @@ class SettingsViewModel @Inject constructor(
     init {
         userDataRepository.username
             .catch { emit("") }
-            .onEach { username -> _uiState.update { it.copy(username = username) } }
+            .onEach { username ->
+                val display = if (username.isBlank()) "Friend" else username.trim()
+                val initials = display.split(Regex("\\s+"))
+                    .filter { it.isNotBlank() }
+                    .take(2)
+                    .joinToString("") { it.first().uppercase() }
+                    .ifBlank { "F" }
+                _uiState.update {
+                    it.copy(
+                        username = username,
+                        displayName = display,
+                        avatarInitials = initials
+                    )
+                }
+            }
             .launchIn(viewModelScope)
 
         userDataRepository.isCarouselEnabled
@@ -110,8 +134,61 @@ class SettingsViewModel @Inject constructor(
             .onEach { enabled -> _uiState.update { it.copy(isLiteMode = enabled) } }
             .launchIn(viewModelScope)
 
+        userDataRepository.isHdOnlyFilter
+            .catch { emit(false) }
+            .onEach { enabled -> _uiState.update { it.copy(isHdOnly = enabled) } }
+            .launchIn(viewModelScope)
+
         startLiveScanMonitor()
         startWatchHistoryMonitor()
+        refreshCacheSize()
+    }
+
+    /** Persist a new username directly. Trims and falls back internally to default. */
+    fun setUsername(newName: String) {
+        viewModelScope.launch {
+            try {
+                userDataRepository.setUsername(newName.trim())
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun setHdOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                userDataRepository.setHdOnlyFilter(enabled)
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun refreshCacheSize() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bytes = runCatching {
+                folderSize(context.cacheDir)
+            }.getOrDefault(0L)
+            val text = formatBytes(bytes)
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(cacheSizeText = text) }
+            }
+        }
+    }
+
+    private fun folderSize(file: File): Long {
+        if (!file.exists()) return 0L
+        if (file.isFile) return file.length()
+        var total = 0L
+        file.listFiles()?.forEach { total += folderSize(it) }
+        return total
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val kb = bytes / 1024.0
+        if (kb < 1024) return String.format(Locale.getDefault(), "%.0f KB", kb)
+        val mb = kb / 1024.0
+        if (mb < 1024) return String.format(Locale.getDefault(), "%.1f MB", mb)
+        val gb = mb / 1024.0
+        return String.format(Locale.getDefault(), "%.2f GB", gb)
     }
 
     fun onUsernameChange(newName: String) {
@@ -156,12 +233,44 @@ class SettingsViewModel @Inject constructor(
                 imageLoader.memoryCache?.clear()
                 imageLoader.diskCache?.clear()
                 movieRepository.clearCache()
+                // Wipe the on-disk cache directory itself. Glide / OkHttp / etc.
+                // store their disk caches under context.cacheDir, and the size
+                // shown to the user is folderSize(context.cacheDir), so clearing
+                // it ensures the displayed value actually drops.
+                withContext(Dispatchers.IO) {
+                    runCatching { wipeFolder(context.cacheDir) }
+                    runCatching { context.externalCacheDir?.let { wipeFolder(it) } }
+                }
                 _uiState.update { it.copy(cacheCleared = true) }
                 showSuccess("Cache cleared successfully")
+                // Refresh size AFTER wipe completes so the new number reflects
+                // reality (running refreshCacheSize() in parallel raced the
+                // delete and reported the stale pre-clear size).
+                refreshCacheSizeBlocking()
                 delay(2000L)
                 _uiState.update { it.copy(cacheCleared = false) }
             } catch (_: Exception) { }
         }
+    }
+
+    /** Recursively delete children of [folder] but keep the folder itself. */
+    private fun wipeFolder(folder: File) {
+        if (!folder.exists() || !folder.isDirectory) return
+        folder.listFiles()?.forEach { child ->
+            if (child.isDirectory) {
+                wipeFolder(child)
+                child.delete()
+            } else {
+                child.delete()
+            }
+        }
+    }
+
+    private suspend fun refreshCacheSizeBlocking() {
+        val bytes = withContext(Dispatchers.IO) {
+            runCatching { folderSize(context.cacheDir) }.getOrDefault(0L)
+        }
+        _uiState.update { it.copy(cacheSizeText = formatBytes(bytes)) }
     }
 
     fun deleteWatchHistory(movieIds: Set<String>) {
@@ -189,7 +298,7 @@ class SettingsViewModel @Inject constructor(
             watchProgressRepository.getAllProgress()
         ) { movies, progressList ->
             val movieMap = movies.associateBy { it.id }
-            progressList
+            val items = progressList
                 .sortedByDescending { it.lastUpdated }
                 .map { p ->
                     val movie = movieMap[p.movieId]
@@ -201,9 +310,33 @@ class SettingsViewModel @Inject constructor(
                         lastWatched = p.lastUpdated
                     )
                 }
+
+            val totalMoviesWatched = progressList.count { it.completionPercent >= 50f }
+            val totalMs = progressList.sumOf { it.lastPosition.coerceAtLeast(0L) }
+            val totalHoursDouble = totalMs / (1000.0 * 60.0 * 60.0)
+            val totalHours = if (totalHoursDouble >= 10.0) {
+                totalHoursDouble.toInt().toString()
+            } else {
+                String.format(java.util.Locale.US, "%.1f", totalHoursDouble)
+            }
+            val totalDays = (totalHoursDouble / 24.0).toInt()
+            val hasStats = progressList.isNotEmpty()
+
+            Triple(items, Triple(totalMoviesWatched, totalHours, totalDays), hasStats)
         }
-            .catch { emit(emptyList()) }
-            .onEach { items -> _uiState.update { it.copy(watchHistory = items, isLoadingHistory = false) } }
+            .catch { emit(Triple(emptyList(), Triple(0, "0", 0), false)) }
+            .onEach { (items, stats, hasStats) ->
+                _uiState.update {
+                    it.copy(
+                        watchHistory = items,
+                        isLoadingHistory = false,
+                        totalMovies = stats.first,
+                        totalHours = stats.second,
+                        totalDays = stats.third,
+                        hasStats = hasStats
+                    )
+                }
+            }
             .launchIn(viewModelScope)
     }
 
@@ -322,6 +455,8 @@ class SettingsViewModel @Inject constructor(
                     isScanButtonEnabled = !isCooldown && !isRunning,
                     scanStatusText = statusLabel,
                     lastRefreshText = "Last refresh: ${formatIsoTimestamp(info.latestRefreshTime)}",
+                    lastRefreshDateText = formatRefreshDate(info.latestRefreshTime),
+                    relativeRefreshText = relativeFromNow(latestCompletedMillis ?: parseIsoMillis(info.latestRefreshTime)),
                     scanDetailText = detailText
                 )
             }
@@ -408,6 +543,29 @@ class SettingsViewModel @Inject constructor(
         return sdf.format(Date(millis))
     }
 
+    /** Premium settings timestamp: dd-MM-yyyy HH:mm in 24-hour, e.g. "08-06-2026 05:18". */
+    private fun formatRefreshDate(value: String?): String {
+        val millis = parseIsoMillis(value) ?: return "--"
+        val sdf = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.getDefault())
+        return sdf.format(Date(millis))
+    }
+
+    private fun relativeFromNow(millis: Long?): String {
+        if (millis == null || millis <= 0L) return ""
+        val deltaMs = System.currentTimeMillis() - millis
+        if (deltaMs < 0L) return "just now"
+        val minutes = deltaMs / 60_000L
+        if (minutes < 1) return "just now"
+        if (minutes < 60) return "${minutes}m ago"
+        val hours = minutes / 60
+        if (hours < 24) return "${hours}h ago"
+        val days = hours / 24
+        if (days < 7) return "${days}d ago"
+        val weeks = days / 7
+        if (weeks < 5) return "${weeks}w ago"
+        return "long ago"
+    }
+
     private fun formatRemaining(millis: Long): String {
         val totalSeconds = (millis / 1000L).coerceAtLeast(0L)
         val minutes = totalSeconds / 60
@@ -449,8 +607,12 @@ class SettingsViewModel @Inject constructor(
                         imageLoader.diskCache?.clear()
                     } catch (e: Exception) { Log.w(tag, "clear coil", e) }
 
-                    // 4) Clear user prefs
+                    // 4) Clear user prefs (DataStore). Explicitly also write
+                    //    isFirstLaunchCompleted = false so the splash screen
+                    //    will route to Welcome on restart even if clear() races
+                    //    or a default value gets re-seeded by some startup code.
                     try { userDataRepository.clearAllData() } catch (e: Exception) { Log.w(tag, "clear prefs", e) }
+                    try { userDataRepository.setFirstLaunchCompleted(false) } catch (e: Exception) { Log.w(tag, "reset first-launch flag", e) }
 
                     // 5) ONE bulk MediaStore delete — wipes all entries this install owns
                     //    under Movies/KStream in a single SQL-like operation.
@@ -490,8 +652,8 @@ class SettingsViewModel @Inject constructor(
                     // 7) App cache
                     try { context.cacheDir.deleteRecursively() } catch (e: Exception) { Log.w(tag, "cache dir", e) }
 
-                    // 8) Give the FS / MediaStore a moment to flush before exit
-                    delay(150)
+                    // 8) Give the FS / MediaStore / DataStore a moment to flush before exit
+                    delay(400)
                 } catch (e: Exception) {
                     Log.e(tag, "resetAllAndRestart fatal", e)
                 }
@@ -500,12 +662,29 @@ class SettingsViewModel @Inject constructor(
                 //    then kill the process. AlarmManager survives our exit and
                 //    the system will launch the activity ~100 ms later.
                 try {
-                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                    if (intent != null) {
-                        intent.addFlags(
+                    // Build an EXPLICIT intent to SplashActivity. Do NOT use
+                    // getLaunchIntentForPackage — on LEANBACK_LAUNCHER-only
+                    // (Fire TV) builds it may return null, and even when it
+                    // resolves it can point at a non-Splash activity, landing
+                    // the user directly on Home and skipping the welcome
+                    // routing entirely.
+                    //
+                    // Also pass EXTRA_FORCE_WELCOME=true so Splash bypasses
+                    // the prefs read and routes unconditionally to Welcome —
+                    // belt-and-suspenders against any DataStore flush race
+                    // across the process kill.
+                    val intent = android.content.Intent().apply {
+                        component = android.content.ComponentName(
+                            context.packageName,
+                            "com.kstream.tv.ui.splash.SplashActivity"
+                        )
+                        putExtra("force_welcome", true)
+                        addFlags(
                             android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                             android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
                         )
+                    }
+                    run {
                         val piFlags = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         } else {
@@ -521,8 +700,6 @@ class SettingsViewModel @Inject constructor(
                             pendingIntent
                         )
                         Log.d(tag, "Restart scheduled via AlarmManager")
-                    } else {
-                        Log.w(tag, "Launch intent is null — cannot schedule restart")
                     }
                 } catch (e: Exception) {
                     Log.e("ResetAndRestart", "AlarmManager restart failed", e)

@@ -11,7 +11,9 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.kstream.core.enrichment.model.EnrichedCast
 import com.kstream.tv.R
 
-class CastCardPresenter : Presenter() {
+class CastCardPresenter(
+    private val onCastClick: ((EnrichedCast) -> Unit)? = null,
+) : Presenter() {
 
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -25,6 +27,7 @@ class CastCardPresenter : Presenter() {
         val cast = item as? EnrichedCast ?: return
         val v = viewHolder.view
         val photo = v.findViewById<ImageView>(R.id.cast_photo)
+        val initials = v.findViewById<TextView>(R.id.cast_initials)
         val name = v.findViewById<TextView>(R.id.cast_name)
         val character = v.findViewById<TextView>(R.id.cast_character)
         name.text = cast.name
@@ -35,6 +38,8 @@ class CastCardPresenter : Presenter() {
             character.text = cast.character
         }
         if (!cast.photoUrl.isNullOrBlank()) {
+            initials.visibility = View.GONE
+            photo.visibility = View.VISIBLE
             Glide.with(v).load(cast.photoUrl)
                 .placeholder(R.drawable.cast_placeholder)
                 .error(R.drawable.cast_placeholder)
@@ -42,8 +47,21 @@ class CastCardPresenter : Presenter() {
                 .centerCrop()
                 .into(photo)
         } else {
-            photo.setImageResource(R.drawable.cast_placeholder)
+            // No portrait — render the cast member's initials inside the
+            // circular bg to keep the row visually consistent.
+            photo.visibility = View.GONE
+            initials.visibility = View.VISIBLE
+            initials.text = buildInitials(cast.name)
         }
+        v.setOnClickListener { onCastClick?.invoke(cast) }
+    }
+
+    private fun buildInitials(name: String): String {
+        val parts = name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (parts.isEmpty()) return "?"
+        val first = parts.first().first().uppercaseChar()
+        val last = if (parts.size > 1) parts.last().first().uppercaseChar() else null
+        return if (last != null) "$first$last" else "$first"
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {

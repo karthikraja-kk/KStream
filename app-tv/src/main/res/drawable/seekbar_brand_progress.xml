@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SeekBar progress: dark track + brand-gradient fill + magenta buffer. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:id="@android:id/background">
+        <shape>
+            <corners android:radius="1dp" />
+            <solid android:color="#22FFFFFF" />
+            <size android:height="2dp" />
+        </shape>
+    </item>
+
+    <item android:id="@android:id/secondaryProgress">
+        <clip>
+            <shape>
+                <corners android:radius="1dp" />
+                <solid android:color="#55E91E63" />
+                <size android:height="2dp" />
+            </shape>
+        </clip>
+    </item>
+
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape>
+                <corners android:radius="1dp" />
+                <gradient
+                    android:type="linear"
+                    android:angle="0"
+                    android:startColor="#FFFF6B1A"
+                    android:centerColor="#FFE91E63"
+                    android:endColor="#FF6A1A9A" />
+                <size android:height="2dp" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

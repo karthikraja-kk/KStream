@@ -40,4 +40,9 @@ class OfflineFirstLikedMovieRepository @Inject constructor(
     override suspend fun clearAll() {
         likedMovieDao.clearAll()
     }
+
+    override suspend fun unlikeAll(movieIds: Collection<String>) {
+        if (movieIds.isEmpty()) return
+        likedMovieDao.unlikeAll(movieIds.toList())
+    }
 }

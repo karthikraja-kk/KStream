@@ -29,7 +29,21 @@ import java.util.Locale
  * sticky preview pane mirrors it.
  */
 class MovieCardPresenter(
-    private val focusedRelay: FocusedMovieRelay? = null
+    private val focusedRelay: FocusedMovieRelay? = null,
+    /**
+     * When true, the title under the poster is kept visible (used by the
+     * search results grid where there's no sticky preview pane). When
+     * false (home rails default), the title is hidden because the focused
+     * tile's title is already displayed large in the sticky preview.
+     */
+    private val showTitle: Boolean = false,
+    /**
+     * When true, the card's horizontal focus padding is reduced so that
+     * adjacent tiles in a dense grid (search results) sit visually 2dp
+     * apart instead of 16-18dp. Vertical padding is preserved so the
+     * focus halo still has room to draw above/below.
+     */
+    private val compact: Boolean = false
 ) : Presenter() {
 
     @Volatile private var progressMap: Map<String, WatchProgress> = emptyMap()
@@ -63,6 +77,9 @@ class MovieCardPresenter(
     private fun applyAdaptiveSize(view: View) {
         val size = RailCardSizing.computePosterSize(view.resources.displayMetrics)
         val padPx = view.resources.getDimensionPixelSize(R.dimen.card_focus_padding)
+        // In compact mode squeeze horizontal padding way down so tiles
+        // visually sit 2dp apart; keep full vertical padding for halo room.
+        val horizPadPx = if (compact) (1 * view.resources.displayMetrics.density).toInt() else padPx
 
         view.findViewById<View>(R.id.card_poster_container)?.let { container ->
             container.layoutParams = container.layoutParams.apply {
@@ -73,12 +90,18 @@ class MovieCardPresenter(
         view.findViewById<View>(R.id.card_root)?.let { root ->
             // card_root reserves room for the focus-ring padding on every side
             // so the painted ring (drawn at the padded edge) is fully visible.
-            root.layoutParams = root.layoutParams.apply { width = size.widthPx + 2 * padPx }
+            root.layoutParams = root.layoutParams.apply { width = size.widthPx + 2 * horizPadPx }
+            if (compact) {
+                root.setPadding(horizPadPx, padPx, horizPadPx, padPx)
+            }
         }
-        // Hide title under the tile: focused movie's title is already shown
-        // large in the sticky preview pane, so duplicating it under every
-        // poster wastes vertical space without adding info.
-        view.findViewById<TextView>(R.id.card_title)?.visibility = View.GONE
+        // Title sits under the poster — match its width to the actual
+        // (adaptive) poster width so center-gravity centers under the art,
+        // and the single-line ellipsize boundary lines up with the edges.
+        view.findViewById<TextView>(R.id.card_title)?.let { title ->
+            title.layoutParams = title.layoutParams.apply { width = size.widthPx }
+            title.visibility = if (showTitle) View.VISIBLE else View.GONE
+        }
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {

@@ -4,6 +4,22 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!--
+      Android 11+ package visibility: declare the intents we'll resolve so
+      `Intent.resolveActivity` / `startActivity` can find a handler.
+      Without this, RECOGNIZE_SPEECH throws ActivityNotFoundException even
+      when a recognizer is installed (it's just hidden from us).
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <uses-feature
         android:name="android.software.leanback"
@@ -62,6 +78,18 @@
 
         <activity
             android:name=".ui.details.DetailsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KStreamTv" />
+
+        <activity
+            android:name=".ui.history.WatchHistoryActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KStreamTv" />
+
+        <activity
+            android:name=".ui.liked.LikedMoviesActivity"
             android:exported="false"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.KStreamTv" />

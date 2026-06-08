@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Left half of the Resume split-button. Same brand gradient as the
+     primary button but only the left side is rounded. Stroke appears on
+     focus. The right edge is flush against the caret half. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="#FFFF6B1A"
+                android:endColor="#FFE91E63" />
+            <stroke android:width="3dp" android:color="#FFFFFFFF" />
+            <corners
+                android:topLeftRadius="10dp"
+                android:bottomLeftRadius="10dp"
+                android:topRightRadius="0dp"
+                android:bottomRightRadius="0dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="#FFFF6B1A"
+                android:endColor="#FFE91E63" />
+            <corners
+                android:topLeftRadius="10dp"
+                android:bottomLeftRadius="10dp"
+                android:topRightRadius="0dp"
+                android:bottomRightRadius="0dp" />
+        </shape>
+    </item>
+</selector>

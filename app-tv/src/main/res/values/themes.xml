@@ -83,6 +83,21 @@
         <item name="android:lineSpacingMultiplier">1.3</item>
     </style>
 
+    <style name="PersonalToolbarAction" parent="@android:style/TextAppearance">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginStart">14dp</item>
+        <item name="android:background">@drawable/bg_personal_select_pill</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minWidth">96dp</item>
+        <item name="android:paddingStart">18dp</item>
+        <item name="android:paddingEnd">18dp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
     <!--
       Minimal cross-Activity transitions. Tier-gated upgrades happen at runtime;
       LOW tier keeps these to avoid extra GPU work on first paint.

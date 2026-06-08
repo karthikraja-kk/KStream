@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand-gradient indeterminate ring used by every spinner on the player
+  screen. ProgressBar rotates this drawable when set as
+  indeterminateDrawable + indeterminateDuration.
+-->
+<rotate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromDegrees="0"
+    android:toDegrees="360"
+    android:pivotX="50%"
+    android:pivotY="50%">
+    <shape
+        android:shape="ring"
+        android:innerRadiusRatio="3.6"
+        android:thicknessRatio="22"
+        android:useLevel="false">
+        <gradient
+            android:type="sweep"
+            android:startColor="#00FFFFFF"
+            android:centerColor="#FFFF6B1A"
+            android:endColor="#FF6A1A9A" />
+    </shape>
+</rotate>

@@ -70,6 +70,9 @@
         <!-- 10 -->
         <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s10_title" />
         <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s10_body" />
+        <!-- 11 -->
+        <TextView style="@style/TermsSectionTitle" android:text="@string/terms_s11_title" />
+        <TextView style="@style/TermsSectionBody"  android:text="@string/terms_s11_body" />
 
         <TextView
             android:layout_width="match_parent"

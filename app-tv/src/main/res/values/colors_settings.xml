@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Premium settings palette — cream text + champagne-gold accent on near-black gradient.
+    Kept separate from colors.xml so the global brand palette stays untouched.
+-->
+<resources>
+    <color name="settings_bg_top">#FF0B0810</color>
+    <color name="settings_bg_bottom">#FF070509</color>
+
+    <color name="settings_cream">#FFF2EBDC</color>
+    <color name="settings_cream_mute">#8CF2EBDC</color>     <!-- ~55% -->
+    <color name="settings_cream_dim">#52F2EBDC</color>      <!-- ~32% -->
+    <color name="settings_hairline">#22F2EBDC</color>       <!-- subtle borders -->
+
+    <color name="settings_gold">#FFE9CFA1</color>
+    <color name="settings_gold_mute">#80E9CFA1</color>
+
+    <color name="settings_pill_ready">#FF4ADE80</color>
+    <color name="settings_pill_cooldown">#FFE9CFA1</color>
+    <color name="settings_pill_running">#FFE91E63</color>
+
+    <color name="settings_tile_bg">#1AFFFFFF</color>
+    <color name="settings_tile_bg_focus">#33FFFFFF</color>
+    <color name="settings_danger">#FFFF6B6B</color>
+</resources>

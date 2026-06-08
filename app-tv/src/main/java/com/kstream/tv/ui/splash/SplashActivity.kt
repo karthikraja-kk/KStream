@@ -63,12 +63,26 @@ class SplashActivity : FragmentActivity() {
             }
         })
 
-        // Read the user-data prefs in parallel with the animation.
-        lifecycleScope.launch {
-            firstLaunchDone = runCatching {
-                userDataRepository.isFirstLaunchCompleted.first()
-            }.getOrDefault(false)
-            maybeNavigate()
+        // Read the user-data prefs in parallel with the animation. If the
+        // caller passed EXTRA_FORCE_WELCOME (Reset & Restart from Settings),
+        // skip the read entirely and force-route to Welcome — this is
+        // resilient to DataStore flush races across the process kill.
+        val forceWelcome = intent?.getBooleanExtra(EXTRA_FORCE_WELCOME, false) == true
+        if (forceWelcome) {
+            firstLaunchDone = false
+            // Defensively also persist the flag, in case the prior write
+            // was lost.
+            lifecycleScope.launch {
+                runCatching { userDataRepository.setFirstLaunchCompleted(false) }
+                maybeNavigate()
+            }
+        } else {
+            lifecycleScope.launch {
+                firstLaunchDone = runCatching {
+                    userDataRepository.isFirstLaunchCompleted.first()
+                }.getOrDefault(false)
+                maybeNavigate()
+            }
         }
 
         // Safety timeout in case the animation fails to load (e.g. asset
@@ -109,6 +123,8 @@ class SplashActivity : FragmentActivity() {
 
     companion object {
         const val ROUTE = "tv/splash"
+        /** When true, Splash skips the prefs read and routes to Welcome. */
+        const val EXTRA_FORCE_WELCOME = "force_welcome"
         // Animation is ~5.5s (132 frames @ 24fps). Give it a generous ceiling
         // so slow devices still get to play it fully if possible.
         private const val MAX_SPLASH_MS = 8_000L

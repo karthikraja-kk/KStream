@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Indicator shown on the side-nav item that represents the currently
+  active screen. Uses the KStream logo gradient (orange → magenta →
+  purple) for both the soft horizontal glow and the 3dp leading-edge
+  accent bar. Applied as a View foreground so the standard focus
+  selector still draws on top.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Soft horizontal glow — brand gradient fades from ~30% alpha at
+         the leading edge to 0 across the item. Tri-stop matches the
+         warm → primary → cool palette of the wordmark. -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:type="linear"
+                android:startColor="#4DFF6B1A"
+                android:centerColor="#33E91E63"
+                android:endColor="#006A1A9A"
+                android:centerX="0.35" />
+        </shape>
+    </item>
+
+    <!-- 3dp leading-edge accent bar with vertical brand gradient
+         (warm orange at top → magenta middle → cool purple at bottom). -->
+    <item
+        android:width="3dp"
+        android:gravity="start|center_vertical"
+        android:height="36dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:type="linear"
+                android:startColor="@color/accent_warm"
+                android:centerColor="@color/accent_primary"
+                android:endColor="@color/accent_cool" />
+            <corners
+                android:topRightRadius="2dp"
+                android:bottomRightRadius="2dp" />
+        </shape>
+    </item>
+</layer-list>
+

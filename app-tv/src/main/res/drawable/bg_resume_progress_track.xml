@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Track for the brand-gradient progress hair that sits under the
+     Resume split-button. The filled portion is a child View whose
+     background is bg_resume_progress_fill, sized at runtime. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#1AFFFFFF" />
+    <corners android:radius="2dp" />
+</shape>

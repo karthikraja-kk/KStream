@@ -32,6 +32,7 @@
     <!-- Details (P7) -->
     <string name="details_play">▶  Play</string>
     <string name="details_resume">▶  Resume</string>
+    <string name="details_already_watched">✓  Already watched</string>
     <string name="details_start_over">Start over</string>
     <string name="details_more_options">More options</string>
     <string name="details_download">Download</string>
@@ -67,16 +68,122 @@
     <string name="player_pause">Pause</string>
 
     <!-- Search / Browse / Settings (P10–P12) -->
+    <string name="search_title">Search</string>
     <string name="search_hint">Search movies and shows…</string>
+    <string name="search_hint_movie">Type a movie name</string>
+    <string name="search_hint_actor">Type an actor\'s name</string>
+    <string name="search_hint_director">Type a director\'s name</string>
+    <string name="search_hint_year">Type a year (e.g. 2024)</string>
+    <string name="search_hint_genre">Type a genre</string>
     <string name="search_no_results">No results.</string>
     <string name="search_loading">Searching…</string>
     <string name="search_empty">No results.</string>
+    <string name="search_scope_label">Search by</string>
+    <string name="search_scope_movie">Movie</string>
+    <string name="search_scope_actor">Actor</string>
+    <string name="search_scope_director">Director</string>
+    <string name="search_scope_year">Year</string>
+    <string name="search_scope_genre">Genre</string>
+    <string name="search_sort_label">Sort</string>
+    <string name="search_sort_newest_first">Newest first</string>
+    <string name="search_sort_oldest_first">Oldest first</string>
+    <string name="search_sort_title_az">Title A → Z</string>
+    <string name="search_sort_title_za">Title Z → A</string>
+    <string name="search_sort_rating_hi_lo">Rating: high → low</string>
+    <string name="search_sort_rating_lo_hi">Rating: low → high</string>
+    <string name="search_banner_movies_of">Movies of %1$s</string>
+    <string name="search_banner_movies_by">Movies by %1$s</string>
+    <string name="search_banner_movies_from">Movies from %1$s</string>
+    <string name="search_sort_relevance">Relevance</string>
+    <string name="search_sort_date_new">Date · Newest first ↓</string>
+    <string name="search_sort_date_old">Date · Oldest first ↑</string>
+    <string name="search_sort_rating_high">Rating · Highest first ↓</string>
+    <string name="search_sort_rating_low">Rating · Lowest first ↑</string>
+    <string name="search_sort_year_new">Year · Newest first ↓</string>
+    <string name="search_sort_year_old">Year · Oldest first ↑</string>
+    <string name="search_recent_label">Recently searched</string>
+    <string name="search_recent_clear">Clear all</string>
+    <string name="search_typeahead_label">Suggestions</string>
+    <string name="search_typeahead_show_all">Show all %1$d results for &quot;%2$s&quot;</string>
+    <string name="search_did_you_mean">Showing results for &quot;%1$s&quot;</string>
+    <string name="search_results_count">%1$d results</string>
+    <string name="search_voice_listening">Listening…</string>
+    <string name="search_voice_hint">Try &quot;Show me Christopher Nolan movies&quot;</string>
+    <string name="search_voice_unavailable">Voice search is not available on this device.</string>
+    <string name="search_voice_no_match">Didn\'t catch that. Try again.</string>
+    <string name="search_voice_content_desc">Voice search</string>
+    <string name="search_clear_content_desc">Clear search</string>
     <string name="browse_title">Browse</string>
     <string name="settings_title">Settings</string>
     <string name="settings_trigger_scan">Refresh Library</string>
     <string name="settings_clear_cache">Clear Image Cache</string>
     <string name="settings_clear_history">Clear Watch History</string>
     <string name="settings_toggle_lite">Toggle Lite Mode</string>
+
+    <!-- Premium settings: hero -->
+    <string name="settings_hero_greeting">Hello</string>
+    <string name="settings_stat_movies">Movies</string>
+    <string name="settings_stat_hours">Hours</string>
+    <string name="settings_stat_days">Days binged</string>
+
+    <!-- Premium settings: section headers -->
+    <string name="settings_section_activity">My activity</string>
+    <string name="settings_section_catalogue">Catalogue</string>
+    <string name="settings_section_device">Device &amp; app</string>
+
+    <!-- Premium settings: tiles -->
+    <string name="settings_tile_history_title">Watch history</string>
+    <string name="settings_tile_history_sub">Review and remove watched movies.</string>
+    <string name="settings_tile_liked_title">Liked movies</string>
+    <string name="settings_tile_liked_sub">Review and remove liked movies.</string>
+    <string name="settings_tile_scan_title">Scan latest movies</string>
+    <string name="settings_tile_scan_sub">Pull the newest titles from the server.</string>
+    <string name="settings_tile_hd_title">Show HD only</string>
+    <string name="settings_tile_hd_sub">Hides low resolution movies.</string>
+    <string name="settings_tile_cache_title">Clear cache</string>
+    <string name="settings_tile_cache_sub">Free up space used by posters and metadata.</string>
+    <string name="settings_tile_about_title">About</string>
+    <string name="settings_tile_about_sub">App version, build info and credits.</string>
+    <string name="settings_tile_terms_title">Terms &amp; credits</string>
+    <string name="settings_tile_terms_sub">Read the terms of use and acknowledgements.</string>
+    <string name="settings_tile_reset_title">Reset &amp; restart</string>
+    <string name="settings_tile_reset_sub">Wipes everything and starts fresh.</string>
+
+    <!-- Premium settings: scan status pill -->
+    <string name="settings_scan_status_unknown">Unknown</string>
+    <string name="settings_scan_status_ready">Ready</string>
+    <string name="settings_scan_status_cooldown">Cooldown</string>
+    <string name="settings_scan_status_running">Running</string>
+
+    <!-- About dialog -->
+    <string name="settings_about_title">About KStream</string>
+    <string name="settings_about_version">Version %1$s (build %2$d)</string>
+    <string name="settings_about_player">ExoPlayer %1$s</string>
+    <string name="settings_about_device">Device · %1$s · Android %2$s</string>
+    <string name="settings_about_credits_tmdb">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="settings_about_dismiss">Close</string>
+
+    <!-- Confirmations -->
+    <string name="settings_confirm_cache_title">Clear cache?</string>
+    <string name="settings_confirm_cache_msg">Removes cached posters and metadata. Your downloads, history and likes are kept.</string>
+    <string name="settings_confirm_cache_yes">Clear cache</string>
+    <string name="settings_confirm_reset_title">Reset and restart?</string>
+    <string name="settings_confirm_reset_msg">This wipes downloads, watch history, likes, prefs and cache, then restarts the app. Cannot be undone.</string>
+    <string name="settings_confirm_reset_yes">Reset everything</string>
+    <string name="settings_dialog_cancel">Cancel</string>
+    <string name="settings_confirm_scan_title">Scan latest movies?</string>
+    <string name="settings_confirm_scan_msg">This will fetch newly released titles from your sources. It may take a few minutes.</string>
+    <string name="settings_confirm_scan_yes">Start scan</string>
+
+    <!-- Tile cache sub: dynamic text uses this as fallback -->
+    <string name="settings_cache_size_fmt">Currently using %1$s.</string>
+
+    <!-- Premium settings extras -->
+    <string name="settings_on">ON</string>
+    <string name="settings_off">OFF</string>
+    <string name="settings_name_edit_hint">Edit</string>
+    <string name="settings_name_dialog_title">Your name</string>
+    <string name="settings_name_dialog_hint">Enter your name</string>
 </resources>
 
 

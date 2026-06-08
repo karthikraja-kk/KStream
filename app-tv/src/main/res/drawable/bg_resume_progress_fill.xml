@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Filled portion of the resume progress hair: brand gradient. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:startColor="#FFFF6B1A"
+        android:centerColor="#FFE91E63"
+        android:endColor="#FF6A1A9A" />
+    <corners android:radius="2dp" />
+</shape>

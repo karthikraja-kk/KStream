@@ -34,7 +34,8 @@ data class DetailsUiState(
     val watchProgressPercent: Float = 0f,
     val isRefreshingLinks: Boolean = false,
     val refreshError: String? = null,
-    val isLiked: Boolean = false
+    val isLiked: Boolean = false,
+    val isAlreadyWatched: Boolean = false
 )
 
 @HiltViewModel
@@ -76,14 +77,22 @@ class DetailsViewModel @Inject constructor(
     }
 
     private fun observeWatchProgress() {
+        refreshWatchProgress()
+    }
+
+    fun refreshWatchProgress() {
         viewModelScope.launch {
             try {
                 val progress = watchProgressRepository.getProgress(movieId)
-                val hasProg = progress != null && progress.lastPosition > 0 && progress.completionPercent < 95f
+                val hasAny = progress != null && progress.lastPosition > 0
+                val pct = progress?.completionPercent?.coerceIn(0f, 100f) ?: 0f
+                val alreadyWatched = hasAny && pct >= 97f
+                val hasProg = hasAny && pct < 97f
                 _uiState.update {
                     it.copy(
                         hasWatchProgress = hasProg,
-                        watchProgressPercent = if (hasProg) progress!!.completionPercent.coerceIn(0f, 100f) else 0f
+                        watchProgressPercent = if (hasProg) pct else 0f,
+                        isAlreadyWatched = alreadyWatched
                     )
                 }
             } catch (_: Exception) { }

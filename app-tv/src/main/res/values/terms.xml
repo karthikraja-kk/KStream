@@ -33,5 +33,8 @@
     <string name="terms_s10_title">10. Changes to Terms</string>
     <string name="terms_s10_body">We reserve the right to modify these Terms &amp; Conditions at any time. Continued use of the App after any changes constitutes your acceptance of the revised terms. We recommend reviewing these terms periodically.</string>
 
+    <string name="terms_s11_title">11. Acknowledgements &amp; Credits</string>
+    <string name="terms_s11_body">This product uses the TMDB API but is not endorsed or certified by TMDB. Movie metadata, posters, backdrops and cast information are provided by The Movie Database (https://www.themoviedb.org). We gratefully acknowledge TMDB and its contributors.\n\nKStream is also built on open-source software, including AndroidX Leanback, Jetpack Media3 ExoPlayer, Hilt, Kotlin Coroutines, Coil, Retrofit and OkHttp. Full license texts are available on request.</string>
+
     <string name="terms_footer">By using KStream, you acknowledge that you have read and understood these terms and agree to abide by them.</string>
 </resources>

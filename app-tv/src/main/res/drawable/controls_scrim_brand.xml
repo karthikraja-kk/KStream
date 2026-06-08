@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Top/bottom subtle vertical scrim so controls stay readable over video. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#CC000000"
+                android:centerColor="#33000000"
+                android:endColor="#CC000000"
+                android:centerY="0.5" />
+        </shape>
+    </item>
+</layer-list>
