@@ -530,8 +530,8 @@ class PlayerTvFragment : Fragment() {
 
     companion object {
         // Coarse: when the seekbar itself is focused — D-pad LEFT/RIGHT
-        // each accumulate 1 min so the user can scrub a long film fast.
-        private const val SEEK_STEP_COARSE_MS = 60_000L
+        // each accumulate 3 min so the user can scrub a long film fast.
+        private const val SEEK_STEP_COARSE_MS = 180_000L
         // Fine: when controls are hidden (or focus is on a non-seekbar
         // control) — D-pad LEFT/RIGHT each accumulate 10 s for precise
         // nudges. Both paths share the same debounced commit.

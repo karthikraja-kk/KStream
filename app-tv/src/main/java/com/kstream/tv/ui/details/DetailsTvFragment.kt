@@ -3,12 +3,14 @@ package com.kstream.tv.ui.details
 import android.animation.ValueAnimator
 import android.os.Bundle
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isGone
@@ -72,7 +74,7 @@ class DetailsTvFragment : Fragment() {
     private lateinit var resumeGroup: View
     private lateinit var resumePill: View
     private lateinit var resumeCaret: View
-    private lateinit var startOverTip: TextView
+    private var startOverTipPopup: PopupWindow? = null
     private lateinit var resumeLabel: TextView
     private lateinit var resumeProgressTrack: View
     private lateinit var resumeProgressFill: View
@@ -135,7 +137,6 @@ class DetailsTvFragment : Fragment() {
         resumeGroup = view.findViewById(R.id.resume_group)
         resumePill = view.findViewById(R.id.resume_pill)
         resumeCaret = view.findViewById(R.id.resume_caret)
-        startOverTip = view.findViewById(R.id.start_over_tip)
         resumeLabel = view.findViewById(R.id.resume_label)
         resumeProgressTrack = view.findViewById(R.id.resume_progress_track)
         resumeProgressFill = view.findViewById(R.id.resume_progress_fill)
@@ -162,8 +163,8 @@ class DetailsTvFragment : Fragment() {
         // ↺ Start Over: dedicated action, no dropdown. Click/OK on the
         // right segment restarts from the beginning immediately.
         resumeCaret.setOnClickListener { startPlayback(resume = false) }
-        resumeCaret.setOnFocusChangeListener { _, hasFocus ->
-            startOverTip.isVisible = hasFocus
+        resumeCaret.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) showStartOverTip(v) else dismissStartOverTip()
         }
         likeButton.setOnClickListener { viewModel.toggleLike() }
         retryButton.setOnClickListener { viewModel.refreshMovieDetails() }
@@ -197,7 +198,60 @@ class DetailsTvFragment : Fragment() {
     override fun onDestroyView() {
         kenBurnsAnimator?.cancel()
         kenBurnsAnimator = null
+        dismissStartOverTip()
         super.onDestroyView()
+    }
+
+    /**
+     * Floating "Start Over" chip anchored just above the resume caret.
+     * Shown only while the caret holds focus; uses a PopupWindow so it does
+     * not push or reflow the existing button row.
+     */
+    private fun showStartOverTip(anchor: View) {
+        dismissStartOverTip()
+        val ctx = context ?: return
+        val dm = resources.displayMetrics
+        val tip = TextView(ctx).apply {
+            text = getString(R.string.details_start_over)
+            setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            background = ContextCompat.getDrawable(ctx, R.drawable.bg_start_over_tip)
+            setPadding(
+                (10 * dm.density).toInt(),
+                (4 * dm.density).toInt(),
+                (10 * dm.density).toInt(),
+                (4 * dm.density).toInt()
+            )
+        }
+        val popup = PopupWindow(
+            tip,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            false
+        ).apply {
+            isClippingEnabled = false
+            isFocusable = false
+            isTouchable = false
+            isOutsideTouchable = false
+        }
+        // Measure so we can horizontally center over the caret.
+        tip.measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val tipW = tip.measuredWidth
+        val tipH = tip.measuredHeight
+        val gap = (6 * dm.density).toInt()
+        val xOffset = (anchor.width - tipW) / 2
+        val yOffset = -(anchor.height + tipH + gap)
+        popup.showAsDropDown(anchor, xOffset, yOffset, Gravity.START or Gravity.TOP)
+        startOverTipPopup = popup
+    }
+
+    private fun dismissStartOverTip() {
+        startOverTipPopup?.dismiss()
+        startOverTipPopup = null
     }
 
     override fun onResume() {

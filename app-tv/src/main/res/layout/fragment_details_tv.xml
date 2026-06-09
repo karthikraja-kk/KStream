@@ -307,21 +307,6 @@
                                 android:textStyle="bold"
                                 android:letterSpacing="0.06"
                                 tools:text="42:18 / 2:28:00 · 28 % watched" />
-
-                            <TextView
-                                android:id="@+id/start_over_tip"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/bg_start_over_tip"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="4dp"
-                                android:text="@string/details_start_over"
-                                android:textColor="#FFFFFF"
-                                android:textSize="11sp"
-                                android:textStyle="bold"
-                                android:letterSpacing="0.04"
-                                android:visibility="gone" />
                         </LinearLayout>
 
                         <Button

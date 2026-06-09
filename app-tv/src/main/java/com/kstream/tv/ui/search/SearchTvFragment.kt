@@ -703,15 +703,17 @@ class SearchTvFragment : Fragment() {
 
     private fun animateMicByRms(rmsdB: Float) {
         // RMS reported by SpeechRecognizer is in dB, roughly -2 (silence)
-        // to 10 (loud). Normalize and map to a 1.0..1.25 scale so the ring
-        // pulses with the user's voice without flickering too aggressively.
+        // to 10 (loud). Normalize and map to a subtle 1.00..1.12 scale so
+        // the ring pulses softly with the user's voice without clipping or
+        // looking gimmicky. Wrapped in a 240dp container with
+        // clipChildren=false so the bloom never gets cropped.
         val ring = voiceMicRing ?: return
         val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
-        val target = 1f + normalized * 0.25f
+        val target = 1f + normalized * 0.12f
         ring.animate()
             .scaleX(target)
             .scaleY(target)
-            .setDuration(120L)
+            .setDuration(140L)
             .start()
     }
 
