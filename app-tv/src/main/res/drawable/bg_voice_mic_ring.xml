@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand-gradient mic ring used as the background of the voice overlay's
+  central mic button. We scale this view based on RMS to mimic the
+  pulsing waveform you see in YouTube / Hotstar voice search.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:type="sweep"
+        android:startColor="#FFFF6B1A"
+        android:centerColor="#FFE91E63"
+        android:endColor="#FFFF6B1A" />
+</shape>

@@ -351,8 +351,20 @@ class SearchTvFragment : Fragment() {
                 viewModel.onQueryChange(s?.toString().orEmpty())
             }
         })
-        queryEdit.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+        queryEdit.setOnEditorActionListener { _, actionId, event ->
+            val isConfirm = actionId == EditorInfo.IME_ACTION_SEARCH ||
+                actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_GO ||
+                actionId == EditorInfo.IME_ACTION_NEXT ||
+                event?.keyCode == KeyEvent.KEYCODE_ENTER
+            if (isConfirm) {
+                // Tick / Done / Enter hides the keyboard explicitly and
+                // moves focus to the grid so re-focusing the EditText via
+                // D-pad won't auto-pop the IME again.
+                val imm = requireContext().getSystemService(
+                    android.content.Context.INPUT_METHOD_SERVICE
+                ) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(queryEdit.windowToken, 0)
                 grid.requestFocus()
                 true
             } else false
@@ -361,13 +373,40 @@ class SearchTvFragment : Fragment() {
             queryEdit.setText("")
             queryEdit.requestFocus()
         }
+        // TV IME contract: never open the keyboard on focus alone — only
+        // when the user explicitly taps the field or presses DPAD_CENTER /
+        // ENTER on it. The DPAD_LEFT/RIGHT/DOWN routing below is preserved.
+        queryEdit.showSoftInputOnFocus = false
+        queryEdit.setOnClickListener {
+            queryEdit.requestFocus()
+            val imm = requireContext().getSystemService(
+                android.content.Context.INPUT_METHOD_SERVICE
+            ) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(queryEdit, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
         // EditText eats DPAD_LEFT/RIGHT to move the cursor before Android's
         // focus search runs — which strands users inside the input pill
         // (especially when the clear button is gone). Intercept and route
         // horizontal d-pad presses manually to the next visible neighbor.
+        // Also: DPAD_CENTER / ENTER opens the IME (if not already showing).
         queryEdit.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    val imm = requireContext().getSystemService(
+                        android.content.Context.INPUT_METHOD_SERVICE
+                    ) as? android.view.inputmethod.InputMethodManager
+                    val imeShown = imm?.isAcceptingText == true
+                    if (!imeShown) {
+                        imm?.showSoftInput(
+                            queryEdit,
+                            android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
+                        )
+                        true
+                    } else false
+                }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     val next = if (clearBtn.visibility == View.VISIBLE) clearBtn else scopeIcon
                     next.requestFocus()
@@ -506,9 +545,6 @@ class SearchTvFragment : Fragment() {
 
     private fun wireVoice() {
         voiceBtn.setOnClickListener { launchVoiceSearch() }
-        // Always show the mic — the launchVoiceSearch() chain tries
-        // intent → in-app recognizer → toast if neither works, so the
-        // button stays consistent across devices.
     }
 
     private fun isAnyVoiceAvailable(): Boolean {
@@ -521,22 +557,9 @@ class SearchTvFragment : Fragment() {
 
     private fun launchVoiceSearch() {
         val ctx = requireContext()
-        // Path A: try the standard system speech dialog (Google / Samsung etc).
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.search_voice_listening))
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
-        if (intent.resolveActivity(ctx.packageManager) != null) {
-            try {
-                voiceLauncher.launch(intent)
-                return
-            } catch (_: Exception) {
-                // Fall through to in-app recognizer.
-            }
-        }
-        // Path B: in-app SpeechRecognizer (Fire TV / Android TV without a
-        // visible recognizer activity). Requires RECORD_AUDIO at runtime.
+        // PRIMARY path: in-app SpeechRecognizer + our own overlay UI.
+        // Skips the system's "choose recognizer" chooser entirely and
+        // gives us a YouTube/Netflix-style inline mic UI.
         if (SpeechRecognizer.isRecognitionAvailable(ctx)) {
             val granted = ContextCompat.checkSelfPermission(
                 ctx, Manifest.permission.RECORD_AUDIO
@@ -545,22 +568,40 @@ class SearchTvFragment : Fragment() {
             else recordPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             return
         }
+        // FALLBACK path: device has no in-process recognizer service —
+        // fall back to the system speech intent. May still show a chooser
+        // on devices with multiple recognizer apps, but only as last resort.
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.search_voice_listening))
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        if (intent.resolveActivity(ctx.packageManager) != null) {
+            try { voiceLauncher.launch(intent); return } catch (_: Exception) {}
+        }
         Toast.makeText(ctx, R.string.search_voice_unavailable, Toast.LENGTH_SHORT).show()
     }
 
     private fun startInAppRecognizer() {
         val ctx = requireContext()
         inAppRecognizer?.destroy()
+        showVoiceOverlay()
         val recognizer = SpeechRecognizer.createSpeechRecognizer(ctx)
         inAppRecognizer = recognizer
-        Toast.makeText(ctx, R.string.search_voice_listening, Toast.LENGTH_SHORT).show()
         recognizer.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onReadyForSpeech(params: Bundle?) {
+                setVoiceCaption(R.string.search_voice_listening)
+            }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onRmsChanged(rmsdB: Float) { animateMicByRms(rmsdB) }
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) {
+                val partial = partialResults
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()?.trim().orEmpty()
+                if (partial.isNotEmpty()) setVoiceTranscript(partial)
+            }
             override fun onEvent(eventType: Int, params: Bundle?) {}
             override fun onError(error: Int) {
                 if (!isAdded) return
@@ -568,6 +609,7 @@ class SearchTvFragment : Fragment() {
                     error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                 ) R.string.search_voice_no_match else R.string.search_voice_unavailable
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                hideVoiceOverlay()
                 recognizer.destroy()
                 inAppRecognizer = null
             }
@@ -575,6 +617,7 @@ class SearchTvFragment : Fragment() {
                 if (!isAdded) return
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val spoken = matches?.firstOrNull()?.trim().orEmpty()
+                hideVoiceOverlay()
                 if (spoken.isNotEmpty()) applySpokenText(spoken)
                 recognizer.destroy()
                 inAppRecognizer = null
@@ -583,15 +626,93 @@ class SearchTvFragment : Fragment() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, ctx.packageName)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
         try {
             recognizer.startListening(intent)
         } catch (_: Exception) {
+            hideVoiceOverlay()
             Toast.makeText(ctx, R.string.search_voice_unavailable, Toast.LENGTH_SHORT).show()
             recognizer.destroy()
             inAppRecognizer = null
         }
+    }
+
+    // ============================================================
+    // Voice overlay UI (in-fragment FrameLayout in fragment_search_tv.xml)
+    // ============================================================
+
+    private var voiceOverlay: View? = null
+    private var voiceMicRing: View? = null
+    private var voiceCaptionView: android.widget.TextView? = null
+    private var voiceTranscriptView: android.widget.TextView? = null
+
+    private fun ensureVoiceOverlayBound() {
+        if (voiceOverlay != null) return
+        val root = view ?: return
+        voiceOverlay = root.findViewById(R.id.voice_overlay)
+        voiceMicRing = root.findViewById(R.id.voice_mic_ring)
+        voiceCaptionView = root.findViewById(R.id.voice_caption)
+        voiceTranscriptView = root.findViewById(R.id.voice_transcript)
+        voiceOverlay?.setOnKeyListener { _, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN && (
+                    keyCode == KeyEvent.KEYCODE_BACK ||
+                        keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                        keyCode == KeyEvent.KEYCODE_ENTER
+                    )
+            ) {
+                cancelVoiceSearch(); true
+            } else false
+        }
+        voiceOverlay?.setOnClickListener { cancelVoiceSearch() }
+    }
+
+    private fun showVoiceOverlay() {
+        ensureVoiceOverlayBound()
+        voiceOverlay?.visibility = View.VISIBLE
+        voiceOverlay?.requestFocus()
+        voiceCaptionView?.setText(R.string.search_voice_listening)
+        voiceTranscriptView?.text = ""
+        voiceMicRing?.scaleX = 1f
+        voiceMicRing?.scaleY = 1f
+    }
+
+    private fun hideVoiceOverlay() {
+        voiceOverlay?.visibility = View.GONE
+        // Return focus to the mic button so D-pad lands somewhere sensible.
+        voiceBtn.requestFocus()
+    }
+
+    private fun cancelVoiceSearch() {
+        inAppRecognizer?.let {
+            try { it.cancel() } catch (_: Exception) {}
+            it.destroy()
+        }
+        inAppRecognizer = null
+        hideVoiceOverlay()
+    }
+
+    private fun setVoiceCaption(resId: Int) {
+        voiceCaptionView?.setText(resId)
+    }
+
+    private fun setVoiceTranscript(text: String) {
+        voiceTranscriptView?.text = text
+    }
+
+    private fun animateMicByRms(rmsdB: Float) {
+        // RMS reported by SpeechRecognizer is in dB, roughly -2 (silence)
+        // to 10 (loud). Normalize and map to a 1.0..1.25 scale so the ring
+        // pulses with the user's voice without flickering too aggressively.
+        val ring = voiceMicRing ?: return
+        val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+        val target = 1f + normalized * 0.25f
+        ring.animate()
+            .scaleX(target)
+            .scaleY(target)
+            .setDuration(120L)
+            .start()
     }
 
     private fun applySpokenText(spoken: String) {

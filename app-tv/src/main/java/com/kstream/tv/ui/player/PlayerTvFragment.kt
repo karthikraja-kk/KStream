@@ -1,6 +1,7 @@
 package com.kstream.tv.ui.player
 
 import android.os.Bundle
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -8,10 +9,12 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageButton
-import android.widget.PopupMenu
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -61,6 +64,7 @@ class PlayerTvFragment : Fragment() {
     private lateinit var controlsOverlay: FrameLayout
     private lateinit var titleText: TextView
     private lateinit var qualityButton: Button
+    private lateinit var qualityPanel: LinearLayout
     private lateinit var playPauseButton: ImageButton
     private lateinit var positionText: TextView
     private lateinit var durationText: TextView
@@ -114,6 +118,7 @@ class PlayerTvFragment : Fragment() {
         controlsOverlay = view.findViewById(R.id.controls_overlay)
         titleText = view.findViewById(R.id.player_title)
         qualityButton = view.findViewById(R.id.btn_quality)
+        qualityPanel = view.findViewById(R.id.quality_panel)
         playPauseButton = view.findViewById(R.id.btn_play_pause)
         positionText = view.findViewById(R.id.player_position)
         durationText = view.findViewById(R.id.player_duration)
@@ -253,6 +258,10 @@ class PlayerTvFragment : Fragment() {
 
     /** Called from PlayerActivity when BACK pressed while controls visible. */
     fun hideControlsForBack(): Boolean {
+        if (::qualityPanel.isInitialized && qualityPanel.isVisible) {
+            hideQualityPanel()
+            return true
+        }
         if (!controlsVisible) return false
         hideControls()
         return true
@@ -329,6 +338,10 @@ class PlayerTvFragment : Fragment() {
 
     private fun hideControls() {
         autoHideJob?.cancel()
+        if (::qualityPanel.isInitialized && qualityPanel.isVisible) {
+            qualityPanel.visibility = View.GONE
+            qualityPanel.removeAllViews()
+        }
         controlsOverlay.visibility = View.GONE
         controlsVisible = false
     }
@@ -371,20 +384,83 @@ class PlayerTvFragment : Fragment() {
 
     private fun showQualityMenu() {
         if (availableQualities.size <= 1) return
-        val menu = PopupMenu(requireContext(), qualityButton)
+        if (qualityPanel.isVisible) {
+            hideQualityPanel()
+            return
+        }
+        qualityPanel.removeAllViews()
         availableQualities.forEachIndexed { idx, q ->
-            val label = if (q == currentQuality) "• $q" else q
-            menu.menu.add(0, idx, idx, label)
-        }
-        menu.setOnMenuItemClickListener { item ->
-            val selected = availableQualities.getOrNull(item.itemId) ?: return@setOnMenuItemClickListener false
-            if (selected != currentQuality) {
-                viewModel.switchQuality(selected)
+            val isLast = idx == availableQualities.lastIndex
+            val row = makeQualityRow(q, q == currentQuality, isLast) {
+                if (q != currentQuality) viewModel.switchQuality(q)
+                hideQualityPanel()
+                resetAutoHide()
             }
-            resetAutoHide()
-            true
+            qualityPanel.addView(row)
         }
-        menu.show()
+        qualityPanel.visibility = View.VISIBLE
+        qualityPanel.getChildAt(0)?.requestFocus()
+        resetAutoHide()
+    }
+
+    private fun hideQualityPanel() {
+        if (!qualityPanel.isVisible) return
+        qualityPanel.visibility = View.GONE
+        qualityPanel.removeAllViews()
+        qualityButton.requestFocus()
+    }
+
+    /** Branded dropdown row matching the search-by / sort-by panels. */
+    private fun makeQualityRow(
+        label: String,
+        selected: Boolean,
+        isLast: Boolean,
+        onSelect: () -> Unit
+    ): View {
+        val ctx = requireContext()
+        val dm = resources.displayMetrics
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isFocusable = true
+            background = ContextCompat.getDrawable(ctx, R.drawable.bg_search_dropdown_row)
+            setPadding(
+                (12 * dm.density).toInt(),
+                (10 * dm.density).toInt(),
+                (12 * dm.density).toInt(),
+                (10 * dm.density).toInt()
+            )
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            if (!isLast) lp.bottomMargin = (2 * dm.density).toInt()
+            layoutParams = lp
+        }
+        val check = ImageView(ctx).apply {
+            setImageResource(R.drawable.ic_check)
+            val s = (18 * dm.density).toInt()
+            layoutParams = LinearLayout.LayoutParams(s, s).apply {
+                marginEnd = (10 * dm.density).toInt()
+            }
+            imageTintList = ContextCompat.getColorStateList(ctx, R.color.accent_primary)
+            visibility = if (selected) View.VISIBLE else View.INVISIBLE
+        }
+        val tv = TextView(ctx).apply {
+            text = label
+            setTextColor(ContextCompat.getColor(ctx, R.color.text_primary))
+            textSize = 14f
+        }
+        row.addView(check)
+        row.addView(tv)
+        row.setOnClickListener { onSelect() }
+        row.setOnKeyListener { _, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_BACK) {
+                hideQualityPanel()
+                true
+            } else false
+        }
+        return row
     }
 
     // ------------------------------------------------------------------
@@ -454,8 +530,8 @@ class PlayerTvFragment : Fragment() {
 
     companion object {
         // Coarse: when the seekbar itself is focused — D-pad LEFT/RIGHT
-        // each accumulate 5 min so the user can scrub a long film fast.
-        private const val SEEK_STEP_COARSE_MS = 5 * 60_000L
+        // each accumulate 1 min so the user can scrub a long film fast.
+        private const val SEEK_STEP_COARSE_MS = 60_000L
         // Fine: when controls are hidden (or focus is on a non-seekbar
         // control) — D-pad LEFT/RIGHT each accumulate 10 s for precise
         // nudges. Both paths share the same debounced commit.

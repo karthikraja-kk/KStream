@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand-styled scrim for the voice search overlay. Slightly translucent
+  so the search screen is faintly visible behind, focusing attention on
+  the mic ring.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#E60E0F12" />
+</shape>

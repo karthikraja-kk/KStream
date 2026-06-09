@@ -15,11 +15,8 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.util.TypedValue
-import android.view.KeyEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
-import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -32,6 +29,7 @@ import androidx.lifecycle.lifecycleScope
 import com.kstream.core.common.AppState
 import com.kstream.core.domain.repository.UserDataRepository
 import com.kstream.tv.R
+import com.kstream.tv.ui.common.TvEditTextIme
 import com.kstream.tv.ui.main.MainActivity
 import com.kstream.tv.ui.terms.TermsActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -76,35 +74,6 @@ class WelcomeActivity : FragmentActivity() {
         applyAdaptiveLogoSize()
         playEntryAnimations()
 
-        nameField.setOnEditorActionListener { _, actionId, event ->
-            val isDone = actionId == EditorInfo.IME_ACTION_DONE ||
-                actionId == EditorInfo.IME_ACTION_NEXT ||
-                actionId == EditorInfo.IME_ACTION_GO ||
-                event?.keyCode == KeyEvent.KEYCODE_ENTER
-            if (isDone) {
-                // ALWAYS dismiss the keyboard when the user taps the IME
-                // confirm key (tick). Then either advance (if Continue is
-                // enabled) or move focus back to the field to surface the
-                // empty-name guard.
-                hideKeyboard()
-                if (continueBtn.isEnabled) {
-                    continueBtn.requestFocus()
-                    continueBtn.performClick()
-                } else {
-                    updateContinueEnabled()
-                    // Park focus on the Continue row (or terms row) so the
-                    // EditText doesn't re-pop the keyboard via focus. The
-                    // user can press DPAD_UP to return to the field.
-                    if (!termsCheck.isChecked) {
-                        termsCheck.requestFocus()
-                    } else {
-                        continueBtn.requestFocus()
-                    }
-                }
-                true
-            } else false
-        }
-
         nameField.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -116,45 +85,21 @@ class WelcomeActivity : FragmentActivity() {
 
         continueBtn.setOnClickListener { onContinue() }
 
-        // On TV, EditText receiving focus via D-pad navigation would normally
-        // pop the IME open immediately. Suppress that — the IME should only
-        // appear when the user EXPLICITLY taps the field (DPAD_CENTER / click).
-        nameField.showSoftInputOnFocus = false
-        nameField.setOnClickListener { showKeyboardFor(nameField) }
-        nameField.setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN &&
-                (keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-                    keyCode == KeyEvent.KEYCODE_ENTER ||
-                    keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)
-            ) {
-                // Only open the IME if it's not already showing; otherwise
-                // let the IME's own confirm-key path (onEditorAction) handle
-                // the press so the tick dismisses the keyboard.
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-                val imeShown = imm?.isAcceptingText == true
-                if (!imeShown) {
-                    showKeyboardFor(nameField)
-                    return@setOnKeyListener true
-                }
+        // TV IME contract: open on click/center, close on tick, never on focus.
+        TvEditTextIme.apply(nameField) {
+            if (continueBtn.isEnabled) {
+                continueBtn.requestFocus()
+                continueBtn.performClick()
+            } else {
+                updateContinueEnabled()
+                if (!termsCheck.isChecked) termsCheck.requestFocus()
+                else continueBtn.requestFocus()
             }
-            false
         }
 
         nameField.setSelection(nameField.text?.length ?: 0)
         nameField.requestFocus()
         updateContinueEnabled()
-    }
-
-    private fun showKeyboardFor(view: EditText) {
-        view.requestFocus()
-        view.setSelection(view.text?.length ?: 0)
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
-    }
-
-    private fun hideKeyboard() {
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(nameField.windowToken, 0)
     }
 
     /**

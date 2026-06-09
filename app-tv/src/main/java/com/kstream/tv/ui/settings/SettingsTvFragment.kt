@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -115,14 +116,24 @@ class SettingsTvFragment : Fragment() {
         scanRelative = v.findViewById(R.id.scan_relative_text)
         scanDate = v.findViewById(R.id.scan_date_text)
         cacheSubtitle = v.findViewById(R.id.tile_cache_sub)
+        // Don't auto-pop the IME on focus. The pencil-button click drives
+        // enterNameEdit() which explicitly calls showSoftInput; once the
+        // user dismisses the keyboard (tick / back), re-focusing the
+        // EditText (e.g. via D-pad) must NOT silently re-open it.
+        nameEdit.showSoftInputOnFocus = false
     }
 
     private fun wireTiles() {
         nameAction.setOnClickListener {
             if (isEditingName) commitNameEdit() else enterNameEdit()
         }
-        nameEdit.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
+        nameEdit.setOnEditorActionListener { _, actionId, event ->
+            val isConfirm = actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_GO ||
+                actionId == EditorInfo.IME_ACTION_NEXT ||
+                actionId == EditorInfo.IME_ACTION_SEND ||
+                event?.keyCode == KeyEvent.KEYCODE_ENTER
+            if (isConfirm) {
                 commitNameEdit(); true
             } else false
         }

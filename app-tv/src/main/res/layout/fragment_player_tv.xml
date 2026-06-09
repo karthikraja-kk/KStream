@@ -99,6 +99,24 @@
                 xmlns:tools="http://schemas.android.com/tools" />
         </LinearLayout>
 
+        <!--
+          Quality dropdown panel: in-app, branded surface that matches
+          the search-by / sort-by dropdowns. Anchored top-left, just
+          under the quality chip. Populated and toggled by PlayerTvFragment.
+        -->
+        <LinearLayout
+            android:id="@+id/quality_panel"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_marginStart="48dp"
+            android:layout_marginTop="120dp"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:background="@drawable/bg_search_dropdown_panel"
+            android:elevation="12dp"
+            android:visibility="gone" />
+
         <!-- Center play/pause button. -->
         <ImageButton
             android:id="@+id/btn_play_pause"

@@ -72,6 +72,7 @@ class DetailsTvFragment : Fragment() {
     private lateinit var resumeGroup: View
     private lateinit var resumePill: View
     private lateinit var resumeCaret: View
+    private lateinit var startOverTip: TextView
     private lateinit var resumeLabel: TextView
     private lateinit var resumeProgressTrack: View
     private lateinit var resumeProgressFill: View
@@ -134,6 +135,7 @@ class DetailsTvFragment : Fragment() {
         resumeGroup = view.findViewById(R.id.resume_group)
         resumePill = view.findViewById(R.id.resume_pill)
         resumeCaret = view.findViewById(R.id.resume_caret)
+        startOverTip = view.findViewById(R.id.start_over_tip)
         resumeLabel = view.findViewById(R.id.resume_label)
         resumeProgressTrack = view.findViewById(R.id.resume_progress_track)
         resumeProgressFill = view.findViewById(R.id.resume_progress_fill)
@@ -160,6 +162,9 @@ class DetailsTvFragment : Fragment() {
         // ↺ Start Over: dedicated action, no dropdown. Click/OK on the
         // right segment restarts from the beginning immediately.
         resumeCaret.setOnClickListener { startPlayback(resume = false) }
+        resumeCaret.setOnFocusChangeListener { _, hasFocus ->
+            startOverTip.isVisible = hasFocus
+        }
         likeButton.setOnClickListener { viewModel.toggleLike() }
         retryButton.setOnClickListener { viewModel.refreshMovieDetails() }
         synopsisToggle.setOnClickListener { toggleSynopsis() }

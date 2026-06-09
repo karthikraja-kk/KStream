@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Inner solid disc behind the mic icon — sits inside the rotating gradient
+  ring so the icon stays legible while the ring pulses around it.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#FF0E0F12" />
+</shape>
