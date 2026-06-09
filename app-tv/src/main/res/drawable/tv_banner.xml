@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   TV launcher banner. Required size: 320dp x 180dp.
-  P0 uses a brand-color shape with the wordmark overlay — replaced by a final
-  PNG/vector banner asset in a polish pass.
+  Brand-tinted background + centered horizontal wordmark logo so the tile
+  is recognizable in the Fire TV / Leanback launcher.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
@@ -13,4 +13,14 @@
                 android:color="@color/accent_gold" />
         </shape>
     </item>
+    <item
+        android:left="24dp"
+        android:right="24dp"
+        android:top="24dp"
+        android:bottom="24dp">
+        <bitmap
+            android:gravity="center|fill"
+            android:src="@drawable/kstream_logo_horizontal" />
+    </item>
 </layer-list>
+

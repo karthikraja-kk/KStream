@@ -47,6 +47,9 @@
         <!-- LEANBACK_LAUNCHER entry: SplashActivity decides where to go next. -->
         <activity
             android:name=".ui.splash.SplashActivity"
+            android:banner="@drawable/tv_banner"
+            android:icon="@mipmap/ic_launcher"
+            android:logo="@drawable/tv_banner"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
