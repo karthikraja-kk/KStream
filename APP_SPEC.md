@@ -72,7 +72,7 @@ The app is "Read-Only." All data is managed by the Scrapper. The app should alwa
 *   **Filtering**: Allow users to filter by `year` or `genres`. (Postgres handles array-contains queries for genres).
 
 ### **Handling "Slug" for Deep-Linking**
-The `slug` column (e.g., `/happy-raj-2026-tamil-movie/`) should be used if you want to share links to specific movies or implement a web-version of the app later.
+The `slug` column (e.g., `/abc-1234-movie/`) should be used if you want to share links to specific movies or implement a web-version of the app later.
 
 ---
 **Context Note**: This document is the source of truth for the frontend agent. Use the table fields exactly as defined here to avoid database errors.
