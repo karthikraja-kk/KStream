@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.common.toUserMessage
 import com.kstream.core.domain.GetMovieDetailsUseCase
-import com.kstream.core.domain.MediaLinkUtils
 import com.kstream.core.domain.ResolveAndCachePlayableUrlUseCase
 import com.kstream.core.domain.repository.WatchProgressRepository
 import com.kstream.core.domain.repository.DownloadRepository
@@ -186,9 +185,14 @@ class DetailsViewModel @Inject constructor(
     }
 
     /**
-     * "Refresh link" button: re-mints a fresh playback link for the currently
-     * selected quality and caches the ~48h direct R2 URL so playing it is
-     * instant. Blocks the screen (via [isRefreshingLinks]) while running.
+     * "Refresh link" button: ALWAYS re-mints a fresh playback link through the
+     * backend (edge function `refresh-media` -> GitHub Actions), regardless of
+     * the current watch tokens or cached R2 URL, then caches the ~48h direct
+     * R2 link so playing it is instant. Blocks the screen (via
+     * [isRefreshingLinks]) while running.
+     *
+     * NOTE: this is intentionally different from the player's playback path,
+     * which keeps the fast cached/resolve short-circuits.
      */
     fun refreshWatchLink() {
         if (_uiState.value.isRefreshingLinks) return
@@ -196,13 +200,12 @@ class DetailsViewModel @Inject constructor(
         val quality = _uiState.value.selectedQuality
             ?: mwm.media.firstOrNull()?.quality
             ?: return
-        val media = mwm.media.find { it.quality == quality } ?: return
         val slug = mwm.movie.slug
 
         viewModelScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
             // Keep the blocking overlay up for at least MIN_REFRESH_OVERLAY_MS so
-            // the loader is visible even when the refresh completes instantly.
+            // the loader is visible even when the backend answers immediately.
             suspend fun finish(error: String?, toast: String?) {
                 val remaining = MIN_REFRESH_OVERLAY_MS - (SystemClock.elapsedRealtime() - startedAt)
                 if (remaining > 0) delay(remaining)
@@ -212,21 +215,9 @@ class DetailsViewModel @Inject constructor(
 
             _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null) }
             try {
-                // 1) Current watch URLs still valid — re-mint the direct link and
-                //    refresh the 48h cache without touching the backend.
-                val currentWatch = listOfNotNull(media.watchUrl1, media.watchUrl2).filter { it.isNotBlank() }
-                if (currentWatch.isNotEmpty() && !MediaLinkUtils.isAnyExpired(currentWatch)) {
-                    resolveAndCachePlayableUrlUseCase.resolveAndCacheUrl(movieId, quality, currentWatch)
-                    finish(null, "Link refreshed")
-                    return@launch
-                }
-                // 2) Watch URLs expired but a valid cached link exists — nothing left to re-mint.
-                if (resolveAndCachePlayableUrlUseCase.cachedPlayableUrl(movieId, quality) != null) {
-                    finish(null, "Link refreshed")
-                    return@launch
-                }
-                // 3) Backend refresh + poll until done (max ~2 min).
-                val maxAttempts = 24
+                // Always hit the backend; poll up to 5 min for the GHA
+                // cold-start to finish, then cache the fresh link.
+                val maxAttempts = 60
                 for (attempt in 0..maxAttempts) {
                     if (attempt > 0) delay(5000)
                     when (val result = refreshMovieMediaUseCase(slug)) {
