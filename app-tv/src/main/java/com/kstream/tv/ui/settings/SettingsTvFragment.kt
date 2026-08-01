@@ -62,6 +62,8 @@ class SettingsTvFragment : Fragment() {
     private lateinit var tileReset: View
 
     private lateinit var hdPill: TextView
+    private lateinit var enginePill: TextView
+    private lateinit var tileVideoEngine: View
     private lateinit var scanPill: LinearLayout
     private lateinit var scanPillDot: View
     private lateinit var scanPillLabel: TextView
@@ -71,6 +73,7 @@ class SettingsTvFragment : Fragment() {
 
     @Volatile private var isDispatchingScan = false
     private var currentHdOnly: Boolean = false
+    private var currentEngineKey: String = "AUTO"
     private var isEditingName: Boolean = false
     private var lastRenderedName: String = ""
 
@@ -105,11 +108,13 @@ class SettingsTvFragment : Fragment() {
         tileLiked = v.findViewById(R.id.tile_liked)
         tileScan = v.findViewById(R.id.tile_scan)
         tileHdOnly = v.findViewById(R.id.tile_hd_only)
+        tileVideoEngine = v.findViewById(R.id.tile_video_engine)
         tileCache = v.findViewById(R.id.tile_cache)
         tileAbout = v.findViewById(R.id.tile_about)
         tileTerms = v.findViewById(R.id.tile_terms)
         tileReset = v.findViewById(R.id.tile_reset)
         hdPill = v.findViewById(R.id.tile_hd_pill)
+        enginePill = v.findViewById(R.id.tile_engine_pill)
         scanPill = v.findViewById(R.id.scan_status_pill)
         scanPillDot = v.findViewById(R.id.scan_status_dot)
         scanPillLabel = v.findViewById(R.id.scan_status_label)
@@ -150,6 +155,7 @@ class SettingsTvFragment : Fragment() {
             renderHdPill(next)
             viewModel.setHdOnly(next)
         }
+        tileVideoEngine.setOnClickListener { showVideoEngineChooser() }
         tileCache.setOnClickListener { showClearCacheDialog() }
         tileAbout.setOnClickListener { showAboutDialog() }
         tileTerms.setOnClickListener {
@@ -241,6 +247,11 @@ class SettingsTvFragment : Fragment() {
             renderHdPill(s.isHdOnly)
         }
 
+        if (currentEngineKey != s.videoEngine) {
+            currentEngineKey = s.videoEngine
+            renderEnginePill(s.videoEngine)
+        }
+
         if (s.cacheSizeText.isNotBlank()) {
             cacheSubtitle.text = getString(R.string.settings_cache_size_fmt, s.cacheSizeText)
         }
@@ -264,6 +275,130 @@ class SettingsTvFragment : Fragment() {
     private fun renderHdPill(on: Boolean) {
         hdPill.isActivated = on
         hdPill.setText(if (on) R.string.settings_on else R.string.settings_off)
+    }
+
+    private fun renderEnginePill(engineKey: String) {
+        val labelRes = when (engineKey) {
+            "EXO" -> R.string.settings_engine_exo
+            else -> R.string.settings_engine_auto
+        }
+        enginePill.setText(labelRes)
+        // The "Auto" pill stays inactive; pinned engines get the active treatment
+        // so the user sees at a glance that they're overriding the default.
+        enginePill.isActivated = (engineKey == "EXO")
+    }
+
+    /**
+     * Branded chooser dialog (matches the player's quality dropdown look).
+     * Each row shows the engine name + a short helper sentence beneath it
+     * so the user understands the trade-off before picking.
+     */
+    private fun showVideoEngineChooser() {
+        val ctx = requireContext()
+        val dm = ctx.resources.displayMetrics
+        val current = currentEngineKey
+
+        val title = TextView(ctx).apply {
+            setText(R.string.settings_engine_chooser_title)
+            setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.text_primary))
+            textSize = 16f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, 0, 0, (10 * dm.density).toInt())
+        }
+
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            background = androidx.core.content.ContextCompat.getDrawable(
+                ctx, R.drawable.bg_search_dropdown_panel
+            )
+            setPadding(
+                (18 * dm.density).toInt(),
+                (16 * dm.density).toInt(),
+                (18 * dm.density).toInt(),
+                (16 * dm.density).toInt()
+            )
+            addView(title)
+        }
+
+        val dialog = AlertDialog.Builder(ctx)
+            .setView(container)
+            .create()
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0x00000000))
+
+        data class Choice(val key: String, val labelRes: Int, val descRes: Int)
+        val choices = listOf(
+            Choice("AUTO", R.string.settings_engine_auto, R.string.settings_engine_auto_desc),
+            Choice("EXO", R.string.settings_engine_exo, R.string.settings_engine_exo_desc)
+        )
+
+        choices.forEachIndexed { idx, c ->
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                isFocusable = true
+                isClickable = true
+                background = androidx.core.content.ContextCompat.getDrawable(
+                    ctx, R.drawable.bg_search_dropdown_row
+                )
+                setPadding(
+                    (14 * dm.density).toInt(),
+                    (12 * dm.density).toInt(),
+                    (14 * dm.density).toInt(),
+                    (12 * dm.density).toInt()
+                )
+                val lp = LinearLayout.LayoutParams(
+                    (360 * dm.density).toInt(),
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                if (idx != choices.lastIndex) lp.bottomMargin = (6 * dm.density).toInt()
+                layoutParams = lp
+            }
+            val titleRow = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val check = ImageView(ctx).apply {
+                setImageResource(R.drawable.ic_check)
+                val s = (18 * dm.density).toInt()
+                layoutParams = LinearLayout.LayoutParams(s, s).apply {
+                    marginEnd = (10 * dm.density).toInt()
+                }
+                imageTintList = androidx.core.content.ContextCompat.getColorStateList(
+                    ctx, R.color.accent_primary
+                )
+                visibility = if (c.key == current) View.VISIBLE else View.INVISIBLE
+            }
+            val name = TextView(ctx).apply {
+                setText(c.labelRes)
+                setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.text_primary))
+                textSize = 14f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            titleRow.addView(check)
+            titleRow.addView(name)
+
+            val desc = TextView(ctx).apply {
+                setText(c.descRes)
+                setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.text_tertiary))
+                textSize = 11f
+                setPadding((28 * dm.density).toInt(), (4 * dm.density).toInt(), 0, 0)
+            }
+
+            row.addView(titleRow)
+            row.addView(desc)
+            row.setOnClickListener {
+                if (c.key != currentEngineKey) {
+                    viewModel.setVideoEngine(c.key)
+                    Toast.makeText(ctx, getString(c.labelRes), Toast.LENGTH_SHORT).show()
+                }
+                dialog.dismiss()
+            }
+            container.addView(row)
+        }
+
+        dialog.show()
+        // Focus the currently-selected row so D-pad confirm just re-confirms.
+        container.getChildAt(1 + choices.indexOfFirst { it.key == current }.coerceAtLeast(0))
+            ?.requestFocus()
     }
 
     private fun renderScanPill(state: ScanState) {

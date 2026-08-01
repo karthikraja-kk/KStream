@@ -5,11 +5,13 @@ import androidx.room.RoomDatabase
 import com.kstream.core.data.local.dao.DownloadDao
 import com.kstream.core.data.local.dao.LikedMovieDao
 import com.kstream.core.data.local.dao.MovieDao
+import com.kstream.core.data.local.dao.MovieEnginePrefDao
 import com.kstream.core.data.local.dao.RecommendationDao
 import com.kstream.core.data.local.dao.WatchProgressDao
 import com.kstream.core.data.local.entities.DownloadEntity
 import com.kstream.core.data.local.entities.LikedMovieEntity
 import com.kstream.core.data.local.entities.MovieEntity
+import com.kstream.core.data.local.entities.MovieEnginePrefEntity
 import com.kstream.core.data.local.entities.RecommendationEntity
 import com.kstream.core.data.local.entities.WatchProgressEntity
 
@@ -19,9 +21,10 @@ import com.kstream.core.data.local.entities.WatchProgressEntity
         WatchProgressEntity::class,
         DownloadEntity::class,
         LikedMovieEntity::class,
-        RecommendationEntity::class
+        RecommendationEntity::class,
+        MovieEnginePrefEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class KStreamDatabase : RoomDatabase() {
@@ -30,4 +33,5 @@ abstract class KStreamDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
     abstract fun likedMovieDao(): LikedMovieDao
     abstract fun recommendationDao(): RecommendationDao
+    abstract fun movieEnginePrefDao(): MovieEnginePrefDao
 }

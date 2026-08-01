@@ -73,7 +73,9 @@ data class SettingsUiState(
     val isLoadingHistory: Boolean = false,
     val successMessage: String? = null,
     val isCarouselEnabled: Boolean = true,
-    val isLiteMode: Boolean = false
+    val isLiteMode: Boolean = false,
+    /** Engine setting key from `VideoEngine.key`: "AUTO", "EXO" or "VLC". Defaults to "AUTO". */
+    val videoEngine: String = "AUTO"
 )
 
 @HiltViewModel
@@ -139,6 +141,11 @@ class SettingsViewModel @Inject constructor(
             .onEach { enabled -> _uiState.update { it.copy(isHdOnly = enabled) } }
             .launchIn(viewModelScope)
 
+        userDataRepository.videoEngine
+            .catch { emit("AUTO") }
+            .onEach { engine -> _uiState.update { it.copy(videoEngine = engine) } }
+            .launchIn(viewModelScope)
+
         startLiveScanMonitor()
         startWatchHistoryMonitor()
         refreshCacheSize()
@@ -157,6 +164,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 userDataRepository.setHdOnlyFilter(enabled)
+            } catch (_: Exception) { }
+        }
+    }
+
+    /** Persists the engine choice (key is "AUTO" / "EXO" / "VLC"). */
+    fun setVideoEngine(engineKey: String) {
+        viewModelScope.launch {
+            try {
+                userDataRepository.setVideoEngine(engineKey)
             } catch (_: Exception) { }
         }
     }

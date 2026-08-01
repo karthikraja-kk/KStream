@@ -77,12 +77,26 @@ object TvEditTextIme {
 
     fun showKeyboard(view: EditText) {
         view.requestFocus()
-        if (view is EditText) {
-            view.setSelection(view.text?.length ?: 0)
-        }
+        view.setSelection(view.text?.length ?: 0)
         val imm = view.context.getSystemService(Activity.INPUT_METHOD_SERVICE)
-            as? InputMethodManager
-        imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+            as? InputMethodManager ?: return
+        // Fire TV's IME routinely ignores a *synchronous* SHOW_IMPLICIT call
+        // issued from inside a key/click handler (the window hasn't settled yet),
+        // which is why tapping the search box did nothing. Post it so focus is
+        // committed first, then verify and fall back to the forced toggle that
+        // Fire TV honors reliably.
+        view.post {
+            imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+            view.postDelayed({
+                if (!imm.isActive(view)) {
+                    @Suppress("DEPRECATION")
+                    imm.toggleSoftInput(
+                        InputMethodManager.SHOW_FORCED,
+                        InputMethodManager.HIDE_IMPLICIT_ONLY
+                    )
+                }
+            }, 150)
+        }
     }
 
     fun hideKeyboard(view: View) {

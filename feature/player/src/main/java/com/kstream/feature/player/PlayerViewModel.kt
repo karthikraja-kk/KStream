@@ -29,7 +29,11 @@ data class PlayerUiState(
     val funnyMessage: String? = null,
     val refreshError: String? = null,
     val loadError: String? = null,
-    val localFileMissing: Boolean = false
+    val localFileMissing: Boolean = false,
+    /** Always "EXO" — which engine is currently driving the surface. */
+    val activeEngine: String = "EXO",
+    /** Set by the coordinator when both engines failed or hard-cap fired. */
+    val sourceUnavailable: Boolean = false
 ) {
     companion object {
         val FUNNY_MESSAGES = listOf(
@@ -55,8 +59,13 @@ class PlayerViewModel @Inject constructor(
     private val customDownloadManager: CustomDownloadManager,
     private val networkMonitor: NetworkMonitor,
     private val watchProgressRepository: com.kstream.core.domain.repository.WatchProgressRepository,
-    val playerManager: PlayerManager
+    private val userDataRepository: com.kstream.core.domain.repository.UserDataRepository,
+    val coordinator: PlayerEngineCoordinator
 ) : ViewModel() {
+
+    // Exposed for backwards-compatible call sites (e.g. ExoPlayer-only code paths
+    // like `getPlayer()` on the PlayerView). New code should use `coordinator`.
+    val playerManager: PlayerManager get() = coordinator.exoManager
 
     private val movieId: String = android.net.Uri.decode(savedStateHandle.get<String>("movieId") ?: "")
     private val initialQuality: String = android.net.Uri.decode(savedStateHandle.get<String>("quality") ?: "")
@@ -68,14 +77,76 @@ class PlayerViewModel @Inject constructor(
     private var movieWithMedia: com.kstream.core.model.MovieWithMedia? = null
     private var progressSyncJob: Job? = null
 
+    // Most recent user setting; observed continuously from datastore.
+    @Volatile private var userEngine: VideoEngine = VideoEngine.DEFAULT
+
     init {
         if (movieId.isNotEmpty() && initialQuality.isNotEmpty()) {
+            observeVideoEngineSetting()
+            observeCoordinatorEvents()
             loadMediaAndPlay()
             observeNetworkState()
-            observeUrlFailures()
         } else {
             _uiState.update { it.copy(isLoading = false, loadError = "Unable to play — missing movie information.") }
         }
+    }
+
+    private fun observeVideoEngineSetting() {
+        userDataRepository.videoEngine
+            .catch { emit("AUTO") }
+            .onEach { key -> userEngine = VideoEngine.fromKey(key) }
+            .launchIn(viewModelScope)
+    }
+
+    private fun observeCoordinatorEvents() {
+        coordinator.activeEngine
+            .onEach { engine -> _uiState.update { it.copy(activeEngine = engine.key) } }
+            .launchIn(viewModelScope)
+        coordinator.events
+            .onEach { event ->
+                when (event) {
+                    is PlayerEngineCoordinator.Event.SourceUnavailable -> {
+                        android.util.Log.w("PlayerViewModel", "Source unavailable: ${event.reason}")
+                        when (event.reason) {
+                            // Just-now both-engines-failed OR hard-cap: the URLs we have are
+                            // probably stale. Try the refresh chain (will rotate fresh links
+                            // and replay). If THAT still ends up here it lands as RECENT_FAILURE.
+                            PlayerEngineCoordinator.LockoutReason.BOTH_FAILED,
+                            PlayerEngineCoordinator.LockoutReason.HARD_CAP -> {
+                                android.util.Log.i("PlayerViewModel",
+                                    "Triggering refreshAndRetry (movieSlug=$movieSlug, " +
+                                    "movieWithMediaSlug=${movieWithMedia?.movie?.slug}, " +
+                                    "isRefreshingLinks=${_uiState.value.isRefreshingLinks})")
+                                refreshAndRetry()
+                            }
+                            // A previous attempt failed within the 5-minute lockout window.
+                            // Don't auto-refresh — show "Source unavailable" + Try Again.
+                            PlayerEngineCoordinator.LockoutReason.RECENT_FAILURE -> {
+                                stopFunnyMessages()
+                                _uiState.update {
+                                    it.copy(
+                                        isLoading = false,
+                                        isRefreshingLinks = false,
+                                        showRefreshOverlay = false,
+                                        funnyMessage = null,
+                                        sourceUnavailable = true,
+                                        loadError = "Source unavailable. Try again in a few minutes."
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    is PlayerEngineCoordinator.Event.LinkProbablyStale -> {
+                        android.util.Log.i("PlayerViewModel",
+                            "LinkProbablyStale (engine=${event.currentEngine}) — refreshing before swap")
+                        // Pause coordinator's hard-cap timer so it doesn't fire while the refresh
+                        // chain is polling Supabase (which has its own 2-min timeout).
+                        coordinator.pauseTimers()
+                        refreshAndRetry()
+                    }
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     private var wasOffline = false
@@ -87,9 +158,8 @@ class PlayerViewModel @Inject constructor(
                     _uiState.update { it.copy(isOffline = false) }
                     wasOffline = false
                     try {
-                        val player = playerManager.getPlayer()
-                        player.prepare()
-                        player.play()
+                        // Resume on whichever engine is currently active.
+                        coordinator.controller().play()
                     } catch (_: Exception) { }
                 } else if (isOnline) {
                     _uiState.update { it.copy(isOffline = false) }
@@ -102,12 +172,9 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun observeUrlFailures() {
-        playerManager.allUrlsFailed
-            .onEach { error ->
-                android.util.Log.w("PlayerViewModel", "All URLs failed (${error.errorCode}), attempting media refresh...")
-                refreshAndRetry()
-            }
-            .launchIn(viewModelScope)
+        // Legacy: ExoPlayer's allUrlsFailed flow is now routed via PlayerEngineCoordinator
+        // which decides whether to swap engines, then emits SourceUnavailable for the VM
+        // to refresh. Kept as a no-op stub so external test code that calls it still compiles.
     }
 
     private var movieSlug: String? = null
@@ -115,19 +182,28 @@ class PlayerViewModel @Inject constructor(
     private var funnyMessageJob: Job? = null
 
     fun retryRefresh() {
-        _uiState.update { it.copy(refreshError = null) }
+        _uiState.update { it.copy(refreshError = null, sourceUnavailable = false, loadError = null) }
+        // If the lockout was the reason for sourceUnavailable, ask the coordinator to clear it
+        // and re-attempt with the URLs it already has.
+        val pos = coordinator.controller().currentPositionMs
+        coordinator.retryAfterLockout(pos, userEngine)
         refreshAndRetry()
     }
 
     private fun refreshAndRetry() {
-        if (_uiState.value.isRefreshingLinks) return
+        if (_uiState.value.isRefreshingLinks) {
+            android.util.Log.w("PlayerViewModel", "refreshAndRetry: already refreshing — skip")
+            return
+        }
 
         val slug = movieSlug ?: movieWithMedia?.movie?.slug
         if (slug == null) {
+            android.util.Log.w("PlayerViewModel", "refreshAndRetry: slug missing — abort")
             _uiState.update { it.copy(refreshError = "Could not refresh links — movie info missing.") }
             return
         }
 
+        android.util.Log.i("PlayerViewModel", "refreshAndRetry: starting refresh for slug=$slug")
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null, showRefreshOverlay = false, funnyMessage = null) }
 
@@ -221,10 +297,16 @@ class PlayerViewModel @Inject constructor(
                     val urlsToPlay = newUrls.ifEmpty { freshUrls }
 
                     if (urlsToPlay.isNotEmpty()) {
-                        val startPosition = playerManager.getPlayer().currentPosition.coerceAtLeast(0)
-                        playerManager.play(urlsToPlay, startPosition)
-                        _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null) }
-                        android.util.Log.d("PlayerViewModel", "Playback resumed with refreshed URLs")
+                        // Fall back to saved watch progress if the coordinator has no
+                        // current position yet (e.g. proactive expiry-detect path —
+                        // we never even started a play attempt, so currentPositionMs is 0).
+                        val livePos = coordinator.controller().currentPositionMs.coerceAtLeast(0)
+                        val startPosition = if (livePos > 0L) livePos
+                            else getWatchProgressUseCase(movieId).coerceAtLeast(0L)
+                        coordinator.markUrlsFresh()
+                        coordinator.play(movieId, urlsToPlay, startPosition, forceStartOver = false, userSetting = userEngine)
+                        _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, sourceUnavailable = false, loadError = null) }
+                        android.util.Log.d("PlayerViewModel", "Playback resumed with refreshed URLs (pos=$startPosition)")
                     } else {
                         _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = "No working links found. Please try again later.") }
                     }
@@ -265,7 +347,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun onBufferingStateChanged(isBuffering: Boolean) {
-        _uiState.update { 
+        _uiState.update {
             it.copy(
                 isBuffering = isBuffering,
                 isOffline = wasOffline && isBuffering && !it.isPlayingLocal
@@ -280,9 +362,7 @@ class PlayerViewModel @Inject constructor(
                 if (isOnline) {
                     _uiState.update { it.copy(isOffline = false) }
                     wasOffline = false
-                    val player = playerManager.getPlayer()
-                    player.prepare()
-                    player.play()
+                    coordinator.controller().play()
                 }
             } catch (_: Exception) { }
         }
@@ -297,7 +377,7 @@ class PlayerViewModel @Inject constructor(
                 val localPath = customDownloadManager.getLocalPath(movieId, initialQuality)
                 if (localPath != null && customDownloadManager.checkFileExists(localPath)) {
                     val startPosition = getWatchProgressUseCase(movieId)
-                    playerManager.playLocal(localPath, startPosition)
+                    coordinator.playLocal(localPath, startPosition, forceStartOver = false)
                     _uiState.update { it.copy(isLoading = false, isPlayingLocal = true, isOffline = false) }
                     startProgressSync()
                     return@launch
@@ -317,7 +397,7 @@ class PlayerViewModel @Inject constructor(
                     availableQualities = mediaList.map { m -> m.quality },
                     currentQuality = initialQuality
                 ) }
-                
+               
                 val media = mediaList.find { it.quality == initialQuality }
                 val fallbackUrls = listOfNotNull(
                     media?.watchUrl1,
@@ -325,8 +405,18 @@ class PlayerViewModel @Inject constructor(
                 )
 
                 if (fallbackUrls.isNotEmpty()) {
+                    // Proactive expiry check: if the saved URL has an `exp` param that
+                    // has already passed, refresh BEFORE trying to play. Saves the user
+                    // from watching an inevitable Exo-then-VLC failure on a stale link.
+                    if (MediaLinkUtils.isAnyExpired(fallbackUrls)) {
+                        android.util.Log.i("PlayerViewModel",
+                            "Saved URLs are expired — refreshing before play (movie=$movieId)")
+                        _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
+                        refreshAndRetry()
+                        return@launch
+                    }
                     val startPosition = getWatchProgressUseCase(movieId)
-                    playerManager.play(fallbackUrls, startPosition)
+                    coordinator.play(movieId, fallbackUrls, startPosition, forceStartOver = false, userSetting = userEngine)
                     _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
                     startProgressSync()
                 } else {
@@ -362,8 +452,14 @@ class PlayerViewModel @Inject constructor(
                     media?.watchUrl1, media?.watchUrl2
                 )
                 if (fallbackUrls.isNotEmpty()) {
+                    if (MediaLinkUtils.isAnyExpired(fallbackUrls)) {
+                        android.util.Log.i("PlayerViewModel",
+                            "watchOnline: saved URLs expired — refreshing first")
+                        refreshAndRetry()
+                        return@launch
+                    }
                     val startPosition = getWatchProgressUseCase(movieId)
-                    playerManager.play(fallbackUrls, startPosition)
+                    coordinator.play(movieId, fallbackUrls, startPosition, forceStartOver = false, userSetting = userEngine)
                     startProgressSync()
                 } else {
                     _uiState.update { it.copy(loadError = "No streaming links available for this movie.") }
@@ -392,14 +488,14 @@ class PlayerViewModel @Inject constructor(
 
     fun switchQuality(newQuality: String) {
         if (newQuality == _uiState.value.currentQuality) return
-        
+       
         viewModelScope.launch {
             try {
                 val localPath = customDownloadManager.getLocalPath(movieId, newQuality)
-                val currentPos = playerManager.getPlayer().currentPosition
-                
+                val currentPos = coordinator.controller().currentPositionMs
+
                 if (localPath != null && customDownloadManager.checkFileExists(localPath)) {
-                    playerManager.playLocal(localPath, currentPos)
+                    coordinator.playLocal(localPath, currentPos, forceStartOver = false)
                     _uiState.update { it.copy(currentQuality = newQuality, isPlayingLocal = true, isOffline = false) }
                 } else {
                     val media = movieWithMedia?.media?.find { it.quality == newQuality } ?: return@launch
@@ -407,9 +503,9 @@ class PlayerViewModel @Inject constructor(
                         media.watchUrl1,
                         media.watchUrl2
                     )
-                    
+
                     if (fallbackUrls.isNotEmpty()) {
-                        playerManager.switchQuality(fallbackUrls.first())
+                        coordinator.switchQuality(fallbackUrls.first(), currentPos)
                         _uiState.update { it.copy(currentQuality = newQuality, isPlayingLocal = false) }
                     }
                 }
@@ -429,9 +525,11 @@ class PlayerViewModel @Inject constructor(
             while (true) {
                 delay(5000)
                 try {
-                    val player = playerManager.getPlayer()
-                    if (player.isPlaying) {
-                        saveWatchProgressUseCase(movieId, player.currentPosition, player.duration, _uiState.value.currentQuality)
+                    val c = coordinator.controller()
+                    val pos = c.currentPositionMs
+                    val dur = c.durationMs
+                    if (pos > 0 && dur > 0) {
+                        saveWatchProgressUseCase(movieId, pos, dur, _uiState.value.currentQuality)
                     }
                 } catch (e: Exception) {
                     // Ignore transient player errors during sync
@@ -440,10 +538,57 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Capture and persist the current playback position synchronously. Called
+     * from `PlayerTvFragment.onStop()` so that the user's progress is written
+     * BEFORE the previous destination's `onResume()` re-queries the watch
+     * progress table — otherwise the Resume button on the detail page only
+     * appears on the second visit because `onCleared()` (which also saves)
+     * runs after the destination is already visible.
+     */
+    fun saveCurrentProgress() {
+        if (movieId.isEmpty()) return
+        try {
+            val c = coordinator.controller()
+            val pos = c.currentPositionMs
+            val dur = c.durationMs
+            if (pos > 0 && dur > 0) {
+                kotlinx.coroutines.runBlocking {
+                    kotlinx.coroutines.withTimeoutOrNull(1000L) {
+                        saveWatchProgressUseCase(movieId, pos, dur, _uiState.value.currentQuality)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerViewModel", "saveCurrentProgress failed", e)
+        }
+    }
+
     override fun onCleared() {
+        // Persist the final playback position BEFORE releasing the engines so
+        // the detail page's "Resume" button is accurate when the user comes
+        // back. viewModelScope is already cancelled at this point so we can't
+        // launch a normal coroutine; runBlocking with a short timeout keeps
+        // the main thread blocked just long enough for the single Room
+        // upsert to complete.
+        try {
+            val c = coordinator.controller()
+            val pos = c.currentPositionMs
+            val dur = c.durationMs
+            if (movieId.isNotEmpty() && pos > 0 && dur > 0) {
+                kotlinx.coroutines.runBlocking {
+                    kotlinx.coroutines.withTimeoutOrNull(1000L) {
+                        saveWatchProgressUseCase(movieId, pos, dur, _uiState.value.currentQuality)
+                    }
+                }
+                android.util.Log.i("PlayerViewModel", "onCleared: saved progress pos=$pos dur=$dur")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerViewModel", "onCleared: progress save failed", e)
+        }
         super.onCleared()
         try {
-            playerManager.release()
+            coordinator.release()
         } catch (e: Exception) {
             android.util.Log.e("PlayerViewModel", "Error in onCleared", e)
         }

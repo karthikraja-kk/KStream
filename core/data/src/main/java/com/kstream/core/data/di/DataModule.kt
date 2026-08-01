@@ -6,11 +6,13 @@ import com.kstream.core.data.local.KStreamDatabase
 import com.kstream.core.data.local.dao.DownloadDao
 import com.kstream.core.data.local.dao.LikedMovieDao
 import com.kstream.core.data.local.dao.MovieDao
+import com.kstream.core.data.local.dao.MovieEnginePrefDao
 import com.kstream.core.data.local.dao.RecommendationDao
 import com.kstream.core.data.local.dao.WatchProgressDao
 import com.kstream.core.data.repository.*
 import com.kstream.core.domain.repository.DownloadRepository
 import com.kstream.core.domain.repository.LikedMovieRepository
+import com.kstream.core.domain.repository.MovieEnginePrefRepository
 import com.kstream.core.domain.repository.MovieRepository
 import com.kstream.core.domain.repository.RecommendationRepository
 import com.kstream.core.domain.repository.UserDataRepository
@@ -57,6 +59,11 @@ abstract class DataModule {
         recommendationRepository: OfflineFirstRecommendationRepository
     ): RecommendationRepository
 
+    @Binds
+    abstract fun bindMovieEnginePrefRepository(
+        movieEnginePrefRepository: OfflineFirstMovieEnginePrefRepository
+    ): MovieEnginePrefRepository
+
     companion object {
         @Provides
         @Singleton
@@ -67,7 +74,7 @@ abstract class DataModule {
                 context,
                 KStreamDatabase::class.java,
                 "kstream.db"
-            ).fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6, 7)
+            ).fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6, 7, 8)
                 .build()
         }
 
@@ -85,5 +92,8 @@ abstract class DataModule {
 
         @Provides
         fun provideRecommendationDao(database: KStreamDatabase): RecommendationDao = database.recommendationDao()
+
+        @Provides
+        fun provideMovieEnginePrefDao(database: KStreamDatabase): MovieEnginePrefDao = database.movieEnginePrefDao()
     }
 }

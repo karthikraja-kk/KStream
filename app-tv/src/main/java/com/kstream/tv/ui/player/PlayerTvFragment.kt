@@ -23,6 +23,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
+import com.kstream.feature.player.ControllerListener
+import com.kstream.feature.player.PlaybackController
 import com.kstream.feature.player.PlayerUiState
 import com.kstream.feature.player.PlayerViewModel
 import com.kstream.tv.R
@@ -91,7 +93,26 @@ class PlayerTvFragment : Fragment() {
     private var currentQuality: String = ""
     private var userIsDraggingSeek = false
     private var wasPlayingBeforeStop = false
+    private var currentEngineKey: String = "EXO"
 
+    // Listener registered on the coordinator's active controller. Re-attached
+    // whenever the engine swaps so the fragment always reflects the live engine.
+    private val controllerListener = object : ControllerListener {
+        override fun onIsLoadingChanged(isLoading: Boolean) {
+            viewModel.onBufferingStateChanged(isLoading)
+        }
+        override fun onPlaybackStateChanged(state: Int) {
+            viewModel.onBufferingStateChanged(state == PlaybackController.STATE_BUFFERING)
+            updateBufferingSpinner()
+        }
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updatePlayPauseIcon()
+        }
+    }
+
+    // Kept for the ExoPlayer-only path: PlayerView still needs a Media3 Player.Listener
+    // for the rare events the controller doesn't surface (e.g. ad-state). For dual-engine
+    // event routing we use [controllerListener] above.
     private val playerListener = object : Player.Listener {
         override fun onIsLoadingChanged(isLoading: Boolean) {
             viewModel.onBufferingStateChanged(isLoading)
@@ -136,11 +157,18 @@ class PlayerTvFragment : Fragment() {
         errorText = view.findViewById(R.id.error_text)
         retryButton = view.findViewById(R.id.btn_retry_player)
 
-        val player = viewModel.playerManager.getPlayer()
-        playerView.player = player
+        // PlayerView still gets the ExoPlayer instance so the ExoPlayer path
+        // renders without any extra wiring. We also register the Media3
+        // [playerListener] for buffering/state on the Exo side. The
+        // engine-agnostic [controllerListener] is registered against the
+        // coordinator's active controller (re-registered each engine swap
+        // in [render]).
+        val exoPlayer = viewModel.playerManager.getPlayer()
+        playerView.player = exoPlayer
         playerView.useController = false
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-        player.addListener(playerListener)
+        exoPlayer.addListener(playerListener)
+        viewModel.coordinator.controller().addListener(controllerListener)
 
         playPauseButton.setOnClickListener { togglePlayPause() }
         qualityButton.setOnClickListener { showQualityMenu() }
@@ -149,7 +177,7 @@ class PlayerTvFragment : Fragment() {
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val duration = player.duration.coerceAtLeast(0L)
+                    val duration = viewModel.coordinator.controller().durationMs.coerceAtLeast(0L)
                     val target = (duration * progress / 1000L)
                     positionText.text = formatTime(target)
                     resetAutoHide()
@@ -158,9 +186,10 @@ class PlayerTvFragment : Fragment() {
             override fun onStartTrackingTouch(sb: SeekBar?) { userIsDraggingSeek = true }
             override fun onStopTrackingTouch(sb: SeekBar?) {
                 userIsDraggingSeek = false
-                val duration = player.duration.coerceAtLeast(0L)
+                val controller = viewModel.coordinator.controller()
+                val duration = controller.durationMs.coerceAtLeast(0L)
                 val target = (duration * (sb?.progress ?: 0) / 1000L)
-                player.seekTo(target)
+                controller.seekTo(target)
             }
         })
 
@@ -201,6 +230,17 @@ class PlayerTvFragment : Fragment() {
         currentQuality = state.currentQuality
         qualityButton.text = if (currentQuality.isNotEmpty()) "$currentQuality  ▾" else "Quality  ▾"
         qualityButton.isEnabled = availableQualities.size > 1
+
+        // Re-register the controller listener if the active engine key changes.
+        if (state.activeEngine != currentEngineKey) {
+            val prevController = viewModel.coordinator.controller()
+            currentEngineKey = state.activeEngine
+            try { prevController.removeListener(controllerListener) } catch (_: Exception) {}
+            val newController = viewModel.coordinator.controller()
+            newController.addListener(controllerListener)
+            playerView.isVisible = true
+            updatePlayPauseIcon()
+        }
 
         updateBufferingSpinner()
     }
@@ -281,15 +321,13 @@ class PlayerTvFragment : Fragment() {
     }
 
     private fun commitPendingSeek() {
-        val player = viewModel.playerManager.playerOrNull() ?: run {
-            pendingSeekMs = 0L; hideSeekIndicators(); return
-        }
+        val controller = viewModel.coordinator.controller()
         val delta = pendingSeekMs
         pendingSeekMs = 0L
         if (delta == 0L) { hideSeekIndicators(); return }
-        val duration = player.duration.coerceAtLeast(0L)
-        val target = (player.currentPosition + delta).coerceIn(0L, if (duration > 0) duration else Long.MAX_VALUE)
-        player.seekTo(target)
+        val duration = controller.durationMs.coerceAtLeast(0L)
+        val target = (controller.currentPositionMs + delta).coerceIn(0L, if (duration > 0) duration else Long.MAX_VALUE)
+        controller.seekTo(target)
         // Keep indicator visible briefly after commit, then fade.
         viewLifecycleOwner.lifecycleScope.launch {
             delay(400)
@@ -358,15 +396,14 @@ class PlayerTvFragment : Fragment() {
     // Play / pause / quality menu.
     // ------------------------------------------------------------------
     private fun togglePlayPause() {
-        val player = viewModel.playerManager.playerOrNull() ?: return
-        if (player.isPlaying) player.pause() else player.play()
+        val controller = viewModel.coordinator.controller()
+        if (controller.isPlaying) controller.pause() else controller.play()
         updatePlayPauseIcon()
     }
 
     private fun updatePlayPauseIcon() {
         if (!::playPauseButton.isInitialized) return
-        val player = viewModel.playerManager.playerOrNull()
-        val isPlaying = player?.isPlaying == true
+        val isPlaying = viewModel.coordinator.controller().isPlaying
         playPauseButton.setImageResource(
             if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow
         )
@@ -376,8 +413,7 @@ class PlayerTvFragment : Fragment() {
 
     private fun updateBufferingSpinner() {
         if (!::bufferingSpinner.isInitialized) return
-        val player = viewModel.playerManager.playerOrNull()
-        val buffering = player?.playbackState == Player.STATE_BUFFERING
+        val buffering = viewModel.coordinator.controller().playbackState == PlaybackController.STATE_BUFFERING
         bufferingSpinner.isVisible = buffering && !loadingOverlay.isVisible &&
             !refreshOverlay.isVisible && !errorOverlay.isVisible
     }
@@ -471,19 +507,17 @@ class PlayerTvFragment : Fragment() {
         progressJob = viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
-                    val player = viewModel.playerManager.playerOrNull()
-                    if (player != null) {
-                        val pos = player.currentPosition.coerceAtLeast(0L)
-                        val dur = player.duration.coerceAtLeast(0L)
-                        positionText.text = formatTime(pos)
-                        durationText.text = formatTime(dur)
-                        if (!userIsDraggingSeek && dur > 0) {
-                            seekBar.progress = (pos * 1000L / dur).toInt()
-                        }
-                        val buffered = player.bufferedPosition.coerceAtLeast(0L)
-                        if (dur > 0) {
-                            seekBar.secondaryProgress = (buffered * 1000L / dur).toInt()
-                        }
+                    val controller = viewModel.coordinator.controller()
+                    val pos = controller.currentPositionMs.coerceAtLeast(0L)
+                    val dur = controller.durationMs.coerceAtLeast(0L)
+                    positionText.text = formatTime(pos)
+                    durationText.text = formatTime(dur)
+                    if (!userIsDraggingSeek && dur > 0) {
+                        seekBar.progress = (pos * 1000L / dur).toInt()
+                    }
+                    val buffered = controller.bufferedPositionMs.coerceAtLeast(0L)
+                    if (dur > 0) {
+                        seekBar.secondaryProgress = (buffered * 1000L / dur).toInt()
                     }
                     delay(500)
                 }
@@ -505,15 +539,20 @@ class PlayerTvFragment : Fragment() {
     // ------------------------------------------------------------------
     override fun onStop() {
         super.onStop()
-        val player = viewModel.playerManager.playerOrNull() ?: return
-        wasPlayingBeforeStop = player.isPlaying
-        if (player.isPlaying) player.pause()
+        // Save progress BEFORE pausing so the detail page's onResume sees the
+        // up-to-date position (PlayerViewModel.onCleared also saves, but it
+        // runs after the back navigation has already restored the previous
+        // fragment).
+        try { viewModel.saveCurrentProgress() } catch (_: Exception) {}
+        val controller = viewModel.coordinator.controller()
+        wasPlayingBeforeStop = controller.isPlaying
+        if (controller.isPlaying) controller.pause()
     }
 
     override fun onStart() {
         super.onStart()
         if (wasPlayingBeforeStop) {
-            viewModel.playerManager.playerOrNull()?.play()
+            viewModel.coordinator.controller().play()
             wasPlayingBeforeStop = false
         }
         updatePlayPauseIcon()
@@ -523,6 +562,9 @@ class PlayerTvFragment : Fragment() {
         autoHideJob?.cancel()
         seekCommitJob?.cancel()
         progressJob?.cancel()
+        try {
+            viewModel.coordinator.controller().removeListener(controllerListener)
+        } catch (_: Exception) {}
         viewModel.playerManager.playerOrNull()?.removeListener(playerListener)
         playerView.player = null
         super.onDestroyView()

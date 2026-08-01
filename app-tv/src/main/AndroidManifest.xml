@@ -108,6 +108,7 @@
             android:name=".ui.search.SearchActivity"
             android:exported="false"
             android:screenOrientation="landscape"
+            android:windowSoftInputMode="stateAlwaysHidden"
             android:theme="@style/Theme.KStreamTv" />
 
         <activity

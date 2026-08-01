@@ -31,6 +31,7 @@ class KStreamDataStore @Inject constructor(
     private val HD_ONLY_FILTER = booleanPreferencesKey("hd_only_filter")
     private val CAROUSEL_ENABLED = booleanPreferencesKey("carousel_enabled")
     private val LITE_MODE = booleanPreferencesKey("lite_mode")
+    private val VIDEO_ENGINE = stringPreferencesKey("video_engine")
 
     val username: Flow<String> = context.dataStore.data.map { it[USERNAME] ?: "Guest" }
     val isFirstLaunchCompleted: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH_COMPLETED] ?: false }
@@ -43,6 +44,7 @@ class KStreamDataStore @Inject constructor(
         val isTv = context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
         prefs[LITE_MODE] ?: isTv // Default to true on TV devices
     }
+    val videoEngine: Flow<String> = context.dataStore.data.map { it[VIDEO_ENGINE] ?: "AUTO" }
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         decodeRecentSearches(it[RECENT_SEARCHES])
     }
@@ -81,6 +83,10 @@ class KStreamDataStore @Inject constructor(
 
     suspend fun setLiteMode(enabled: Boolean) {
         context.dataStore.edit { it[LITE_MODE] = enabled }
+    }
+
+    suspend fun setVideoEngine(engine: String) {
+        context.dataStore.edit { it[VIDEO_ENGINE] = engine }
     }
 
     suspend fun clearAll() {

@@ -183,7 +183,8 @@
             <LinearLayout
                 android:id="@+id/tile_scan"
                 style="@style/SettingsTile"
-                android:layout_marginEnd="8dp">
+                android:layout_marginEnd="8dp"
+                android:layout_marginBottom="12dp">
                 <ImageView style="@style/SettingsTileIcon" android:src="@drawable/ic_settings_refresh" />
                 <LinearLayout style="@style/SettingsTileText">
                     <TextView style="@style/SettingsTileTitle" android:text="@string/settings_tile_scan_title" />
@@ -252,7 +253,8 @@
             <LinearLayout
                 android:id="@+id/tile_hd_only"
                 style="@style/SettingsTile"
-                android:layout_marginStart="8dp">
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="12dp">
                 <ImageView style="@style/SettingsTileIcon" android:src="@drawable/ic_settings_hd" />
                 <LinearLayout style="@style/SettingsTileText">
                     <TextView style="@style/SettingsTileTitle" android:text="@string/settings_tile_hd_title" />
@@ -275,6 +277,36 @@
                     android:textSize="10sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.18" />
+            </LinearLayout>
+
+            <!-- Video engine (Auto / Exo / VLC) — spans both columns since the helper text is long. -->
+            <LinearLayout
+                android:id="@+id/tile_video_engine"
+                style="@style/SettingsTile"
+                android:layout_columnSpan="2"
+                android:layout_gravity="fill_horizontal">
+                <ImageView style="@style/SettingsTileIcon" android:src="@drawable/ic_settings_engine" />
+                <LinearLayout style="@style/SettingsTileText">
+                    <TextView style="@style/SettingsTileTitle" android:text="@string/settings_tile_engine_title" />
+                    <TextView style="@style/SettingsTileSubtitle" android:text="@string/settings_tile_engine_sub" />
+                </LinearLayout>
+                <TextView
+                    android:id="@+id/tile_engine_pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:minWidth="64dp"
+                    android:gravity="center"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:background="@drawable/bg_settings_onoff_pill"
+                    android:text="@string/settings_engine_auto"
+                    android:textColor="@color/text_primary"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12" />
             </LinearLayout>
         </GridLayout>
 

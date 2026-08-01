@@ -72,3 +72,19 @@ data class RecommendationEntity(
     val score: Double,
     val computedAt: Long = System.currentTimeMillis()
 )
+
+/**
+ * Per-movie video-engine memory.
+ *
+ *  - [engine]      : "EXO" / "VLC" — the engine that last produced a successful play for this movie.
+ *                    `null` means "no winner recorded yet".
+ *  - [lastFailMs]  : epoch-ms of the most recent both-engines-failed event. `null` means no failure.
+ *                    Used to short-circuit subsequent attempts within a 5-minute lockout window
+ *                    and surface "Source unavailable" + Try Again immediately.
+ */
+@Entity(tableName = "movie_engine_pref")
+data class MovieEnginePrefEntity(
+    @PrimaryKey val movieId: String,
+    val engine: String? = null,
+    val lastFailMs: Long? = null
+)

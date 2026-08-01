@@ -16,6 +16,7 @@ class DefaultUserDataRepository @Inject constructor(
     override val isHdOnlyFilter: Flow<Boolean> = dataStore.isHdOnlyFilter
     override val isCarouselEnabled: Flow<Boolean> = dataStore.isCarouselEnabled
     override val isLiteMode: Flow<Boolean> = dataStore.isLiteMode
+    override val videoEngine: Flow<String> = dataStore.videoEngine
 
     override suspend fun setUsername(name: String) = dataStore.setUsername(name)
     override suspend fun setDownloadLocation(location: String) = dataStore.setDownloadLocation(location)
@@ -24,6 +25,7 @@ class DefaultUserDataRepository @Inject constructor(
     override suspend fun setHdOnlyFilter(hdOnly: Boolean) = dataStore.setHdOnlyFilter(hdOnly)
     override suspend fun setCarouselEnabled(enabled: Boolean) = dataStore.setCarouselEnabled(enabled)
     override suspend fun setLiteMode(enabled: Boolean) = dataStore.setLiteMode(enabled)
+    override suspend fun setVideoEngine(engine: String) = dataStore.setVideoEngine(engine)
     override suspend fun addRecentSearch(query: String) = dataStore.addRecentSearch(query)
     override suspend fun clearRecentSearches() = dataStore.clearRecentSearches()
     override suspend fun clearAllData() = dataStore.clearAll()

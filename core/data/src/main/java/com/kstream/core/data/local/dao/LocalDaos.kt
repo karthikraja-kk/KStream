@@ -5,6 +5,7 @@ import com.kstream.core.data.local.entities.DownloadEntity
 import com.kstream.core.data.local.entities.DownloadStatus as EntityDownloadStatus
 import com.kstream.core.data.local.entities.LikedMovieEntity
 import com.kstream.core.data.local.entities.MovieEntity
+import com.kstream.core.data.local.entities.MovieEnginePrefEntity
 import com.kstream.core.data.local.entities.RecommendationEntity
 import com.kstream.core.data.local.entities.WatchProgressEntity
 import kotlinx.coroutines.flow.Flow
@@ -131,4 +132,22 @@ interface RecommendationDao {
 
     @Query("SELECT computedAt FROM recommendations LIMIT 1")
     suspend fun getLastComputedAt(): Long?
+}
+
+@Dao
+interface MovieEnginePrefDao {
+    @Query("SELECT * FROM movie_engine_pref WHERE movieId = :movieId")
+    suspend fun get(movieId: String): MovieEnginePrefEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(pref: MovieEnginePrefEntity)
+
+    @Query("UPDATE movie_engine_pref SET engine = :engine WHERE movieId = :movieId")
+    suspend fun updateEngine(movieId: String, engine: String?)
+
+    @Query("UPDATE movie_engine_pref SET lastFailMs = :ts WHERE movieId = :movieId")
+    suspend fun updateLastFail(movieId: String, ts: Long?)
+
+    @Query("DELETE FROM movie_engine_pref")
+    suspend fun clearAll()
 }

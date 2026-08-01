@@ -11,6 +11,7 @@ interface UserDataRepository {
     val isHdOnlyFilter: Flow<Boolean>
     val isCarouselEnabled: Flow<Boolean>
     val isLiteMode: Flow<Boolean>
+    val videoEngine: Flow<String>
 
     suspend fun setUsername(name: String)
     suspend fun setDownloadLocation(location: String)
@@ -20,6 +21,7 @@ interface UserDataRepository {
     suspend fun setHdOnlyFilter(hdOnly: Boolean)
     suspend fun setCarouselEnabled(enabled: Boolean)
     suspend fun setLiteMode(enabled: Boolean)
+    suspend fun setVideoEngine(engine: String)
     suspend fun addRecentSearch(query: String)
     suspend fun clearRecentSearches()
     suspend fun clearAllData()

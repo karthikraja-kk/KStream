@@ -378,11 +378,7 @@ class SearchTvFragment : Fragment() {
         // ENTER on it. The DPAD_LEFT/RIGHT/DOWN routing below is preserved.
         queryEdit.showSoftInputOnFocus = false
         queryEdit.setOnClickListener {
-            queryEdit.requestFocus()
-            val imm = requireContext().getSystemService(
-                android.content.Context.INPUT_METHOD_SERVICE
-            ) as? android.view.inputmethod.InputMethodManager
-            imm?.showSoftInput(queryEdit, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            com.kstream.tv.ui.common.TvEditTextIme.showKeyboard(queryEdit)
         }
         // EditText eats DPAD_LEFT/RIGHT to move the cursor before Android's
         // focus search runs — which strands users inside the input pill
@@ -400,10 +396,7 @@ class SearchTvFragment : Fragment() {
                     ) as? android.view.inputmethod.InputMethodManager
                     val imeShown = imm?.isAcceptingText == true
                     if (!imeShown) {
-                        imm?.showSoftInput(
-                            queryEdit,
-                            android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
-                        )
+                        com.kstream.tv.ui.common.TvEditTextIme.showKeyboard(queryEdit)
                         true
                     } else false
                 }

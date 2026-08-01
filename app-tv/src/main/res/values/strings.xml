@@ -186,6 +186,15 @@
     <string name="settings_name_edit_hint">Edit</string>
     <string name="settings_name_dialog_title">Your name</string>
     <string name="settings_name_dialog_hint">Enter your name</string>
+
+    <!-- Video engine selector -->
+    <string name="settings_tile_engine_title">Video engine</string>
+    <string name="settings_tile_engine_sub">Pick which player decodes streams. Auto handles most cases.</string>
+    <string name="settings_engine_chooser_title">Video engine</string>
+    <string name="settings_engine_auto">Auto (recommended)</string>
+    <string name="settings_engine_auto_desc">Uses ExoPlayer and automatically refreshes the source link if a stream can\'t open. Best for most movies.</string>
+    <string name="settings_engine_exo">ExoPlayer</string>
+    <string name="settings_engine_exo_desc">Google\'s native player. Fast and battery-friendly. Same engine as Auto, without the automatic link refresh on failure.</string>
 </resources>
 
 
