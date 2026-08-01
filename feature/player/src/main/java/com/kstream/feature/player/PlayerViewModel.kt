@@ -7,15 +7,14 @@ import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.common.toUserMessage
 import com.kstream.core.domain.GetMovieDetailsUseCase
 import com.kstream.core.domain.GetWatchProgressUseCase
+import com.kstream.core.domain.MediaLinkUtils
 import com.kstream.core.domain.SaveWatchProgressUseCase
 import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class PlayerUiState(
@@ -58,6 +57,7 @@ class PlayerViewModel @Inject constructor(
     private val getWatchProgressUseCase: GetWatchProgressUseCase,
     private val saveWatchProgressUseCase: SaveWatchProgressUseCase,
     private val refreshMovieMediaUseCase: com.kstream.core.domain.RefreshMovieMediaUseCase,
+    private val resolveAndCachePlayableUrlUseCase: com.kstream.core.domain.ResolveAndCachePlayableUrlUseCase,
     private val customDownloadManager: CustomDownloadManager,
     private val networkMonitor: NetworkMonitor,
     private val watchProgressRepository: com.kstream.core.domain.repository.WatchProgressRepository,
@@ -379,53 +379,19 @@ class PlayerViewModel @Inject constructor(
 
     // ------------------------------------------------------------------
     // Direct R2 URL cache ("single refresh = ~48h alive").
-    //
-    // The CDN's download.php gateway tokens die in ~3 minutes, but the Cloudflare
-    // R2 presigned URL they 302 to is valid for ~48h. We resolve once and cache it
-    // so seeks/pause/resume reuse the long-lived URL instead of re-hitting the
-    // short-lived gateway.
+    // Delegated to the shared ResolveAndCachePlayableUrlUseCase (also used by
+    // the details-page "Refresh link" button) so both surfaces share one code
+    // path.
     // ------------------------------------------------------------------
 
-    private suspend fun cachedPlayableUrl(movieId: String, quality: String): String? {
-        return try {
-            val cached = userDataRepository.getResolvedMediaUrl(movieId, quality)
-            if (cached != null && MediaLinkUtils.isR2UrlValid(cached.url, cached.expiresAt)) {
-                cached.url
-            } else null
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private suspend fun cachedPlayableUrl(movieId: String, quality: String): String? =
+        resolveAndCachePlayableUrlUseCase.cachedPlayableUrl(movieId, quality)
 
-    /**
-     * Turn a short-lived `download.php` URL into a direct, ~48h-valid R2 URL by
-     * resolving the redirect once and persisting it. Falls back to the original
-     * URL if resolution fails so the existing error/refresh path still applies.
-     */
     private suspend fun resolveAndCacheUrl(
         movieId: String,
         quality: String,
         candidates: List<String>
-    ): List<String> {
-        val first = candidates.firstOrNull { it.isNotBlank() } ?: return emptyList()
-        return withContext(Dispatchers.IO) {
-            try {
-                val resolved = RedirectResolver().resolveOnce(first)
-                if (resolved != first && resolved.isNotBlank()) {
-                    val expiresAt = MediaLinkUtils.r2ExpiryMs(resolved)
-                        ?: (System.currentTimeMillis() + R2_FALLBACK_TTL_MS)
-                    userDataRepository.setResolvedMediaUrl(movieId, quality, resolved, expiresAt)
-                    android.util.Log.i("PlayerViewModel", "Resolved + cached direct URL for $movieId/$quality")
-                    listOf(resolved)
-                } else {
-                    candidates
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("PlayerViewModel", "resolveAndCacheUrl failed: ${e.message}")
-                candidates
-            }
-        }
-    }
+    ): List<String> = resolveAndCachePlayableUrlUseCase.resolveAndCacheUrl(movieId, quality, candidates)
 
     private fun loadMediaAndPlay() {        viewModelScope.launch {
             try {
@@ -686,10 +652,5 @@ class PlayerViewModel @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("PlayerViewModel", "Error in onCleared", e)
         }
-    }
-
-    private companion object {
-        /** Fallback lifetime for a resolved URL when the CDN omits X-Amz-Expires. */
-        const val R2_FALLBACK_TTL_MS = 48 * 60 * 60 * 1000L
     }
 }

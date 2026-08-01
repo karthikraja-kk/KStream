@@ -322,6 +322,20 @@
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:textAllCaps="false" />
+
+                        <Button
+                            android:id="@+id/btn_refresh_link"
+                            android:layout_width="wrap_content"
+                            android:layout_height="46dp"
+                            android:minWidth="46dp"
+                            android:layout_marginStart="12dp"
+                            android:background="@drawable/bg_ghost_btn"
+                            android:paddingHorizontal="18dp"
+                            android:text="@string/details_refresh_link"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textAllCaps="false" />
                     </LinearLayout>
 
                     </LinearLayout>
@@ -416,5 +430,44 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:visibility="gone" />
+
+    <!-- Blocking "Refresh link" overlay: shown while refreshWatchLink() runs.
+         Covers the whole screen, grabs focus, and swallows back + all input so
+         the user can't navigate away until the refresh finishes. -->
+    <FrameLayout
+        android:id="@+id/refresh_blocker_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#E6000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <ProgressBar
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:indeterminate="true"
+                android:indeterminateDrawable="@drawable/brand_loader_ring"
+                android:indeterminateDuration="900" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:text="@string/details_refresh_waiting"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+        </LinearLayout>
+    </FrameLayout>
 
 </FrameLayout>

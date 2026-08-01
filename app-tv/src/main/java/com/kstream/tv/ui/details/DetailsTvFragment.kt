@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +13,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -80,6 +83,10 @@ class DetailsTvFragment : Fragment() {
     private lateinit var resumeProgressFill: View
     private lateinit var resumeProgressLabel: TextView
     private lateinit var likeButton: Button
+    private lateinit var refreshLinkButton: Button
+    private lateinit var refreshBlockerOverlay: View
+    private var backCallback: OnBackPressedCallback? = null
+    private var lastWaitToastAt = 0L
     private lateinit var qualityRow: ViewGroup
     private lateinit var castHeader: TextView
     private lateinit var castGrid: HorizontalGridView
@@ -142,6 +149,8 @@ class DetailsTvFragment : Fragment() {
         resumeProgressFill = view.findViewById(R.id.resume_progress_fill)
         resumeProgressLabel = view.findViewById(R.id.resume_progress_label)
         likeButton = view.findViewById(R.id.btn_like)
+        refreshLinkButton = view.findViewById(R.id.btn_refresh_link)
+        refreshBlockerOverlay = view.findViewById(R.id.refresh_blocker_overlay)
         qualityRow = view.findViewById(R.id.quality_row)
         castHeader = view.findViewById(R.id.cast_header)
         castGrid = view.findViewById(R.id.cast_grid)
@@ -167,8 +176,21 @@ class DetailsTvFragment : Fragment() {
             if (hasFocus) showStartOverTip(v) else dismissStartOverTip()
         }
         likeButton.setOnClickListener { viewModel.toggleLike() }
+        refreshLinkButton.setOnClickListener { viewModel.refreshWatchLink() }
         retryButton.setOnClickListener { viewModel.refreshMovieDetails() }
         synopsisToggle.setOnClickListener { toggleSynopsis() }
+
+        // Blocking refresh overlay: swallow BACK + all input while visible.
+        backCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                // Consume back — navigation is blocked while refreshing.
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback!!)
+        refreshBlockerOverlay.setOnKeyListener { _, _, event ->
+            if (event.action == KeyEvent.ACTION_DOWN) showWaitToast()
+            true
+        }
         startKenBurns()
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -254,6 +276,14 @@ class DetailsTvFragment : Fragment() {
         startOverTipPopup = null
     }
 
+    /** Throttled "Please wait" toast while the blocking refresh overlay is up. */
+    private fun showWaitToast() {
+        val now = System.currentTimeMillis()
+        if (now - lastWaitToastAt < 2000) return
+        lastWaitToastAt = now
+        Toast.makeText(requireContext(), R.string.details_refresh_please_wait, Toast.LENGTH_SHORT).show()
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refreshWatchProgress()
@@ -261,6 +291,17 @@ class DetailsTvFragment : Fragment() {
 
     private fun render(state: DetailsUiState) {
         loadingOverlay.isVisible = state.isLoading
+
+        // Blocking refresh overlay — freezes navigation while refreshing.
+        val refreshing = state.isRefreshingLinks
+        refreshBlockerOverlay.isVisible = refreshing
+        backCallback?.isEnabled = refreshing
+        if (refreshing) {
+            refreshBlockerOverlay.requestFocus()
+        } else if (refreshBlockerOverlay.hasFocus()) {
+            playButton.requestFocus()
+        }
+
         val mwm = state.movieWithMedia
         if (state.error != null && mwm == null) {
             errorOverlay.isVisible = true

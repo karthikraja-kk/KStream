@@ -38,6 +38,9 @@
     <string name="details_download">Download</string>
     <string name="details_like">♡ Like</string>
     <string name="details_liked">♥ Liked</string>
+    <string name="details_refresh_link">↻ Refresh link</string>
+    <string name="details_refresh_waiting">Refreshing new link, please wait</string>
+    <string name="details_refresh_please_wait">Please wait</string>
     <string name="details_retry">Retry</string>
     <string name="details_quality">Available Quality</string>
     <string name="details_cast">Cast</string>

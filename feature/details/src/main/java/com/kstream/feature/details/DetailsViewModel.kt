@@ -1,6 +1,7 @@
 package com.kstream.feature.details
 
 import android.content.Context
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -8,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.kstream.core.common.NetworkMonitor
 import com.kstream.core.common.toUserMessage
 import com.kstream.core.domain.GetMovieDetailsUseCase
+import com.kstream.core.domain.MediaLinkUtils
+import com.kstream.core.domain.ResolveAndCachePlayableUrlUseCase
 import com.kstream.core.domain.repository.WatchProgressRepository
 import com.kstream.core.domain.repository.DownloadRepository
 import com.kstream.core.domain.repository.LikedMovieRepository
@@ -16,6 +19,7 @@ import com.kstream.core.model.MovieWithMedia
 import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -43,6 +47,7 @@ class DetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getMovieDetailsUseCase: GetMovieDetailsUseCase,
     private val refreshMovieMediaUseCase: com.kstream.core.domain.RefreshMovieMediaUseCase,
+    private val resolveAndCachePlayableUrlUseCase: ResolveAndCachePlayableUrlUseCase,
     private val watchProgressRepository: WatchProgressRepository,
     private val likedMovieRepository: LikedMovieRepository,
     private val customDownloadManager: CustomDownloadManager,
@@ -52,6 +57,8 @@ class DetailsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val movieId: String = android.net.Uri.decode(savedStateHandle.get<String>("movieId") ?: "")
+
+    private val MIN_REFRESH_OVERLAY_MS = 700L
 
     private val _uiState = MutableStateFlow(DetailsUiState(isLoading = true))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
@@ -176,6 +183,86 @@ class DetailsViewModel @Inject constructor(
 
     fun refreshMovieDetails() {
         fetchMovieDetails()
+    }
+
+    /**
+     * "Refresh link" button: re-mints a fresh playback link for the currently
+     * selected quality and caches the ~48h direct R2 URL so playing it is
+     * instant. Blocks the screen (via [isRefreshingLinks]) while running.
+     */
+    fun refreshWatchLink() {
+        if (_uiState.value.isRefreshingLinks) return
+        val mwm = _uiState.value.movieWithMedia ?: return
+        val quality = _uiState.value.selectedQuality
+            ?: mwm.media.firstOrNull()?.quality
+            ?: return
+        val media = mwm.media.find { it.quality == quality } ?: return
+        val slug = mwm.movie.slug
+
+        viewModelScope.launch {
+            val startedAt = SystemClock.elapsedRealtime()
+            // Keep the blocking overlay up for at least MIN_REFRESH_OVERLAY_MS so
+            // the loader is visible even when the refresh completes instantly.
+            suspend fun finish(error: String?, toast: String?) {
+                val remaining = MIN_REFRESH_OVERLAY_MS - (SystemClock.elapsedRealtime() - startedAt)
+                if (remaining > 0) delay(remaining)
+                _uiState.update { it.copy(isRefreshingLinks = false, refreshError = error) }
+                if (toast != null) Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
+            }
+
+            _uiState.update { it.copy(isRefreshingLinks = true, refreshError = null) }
+            try {
+                // 1) Current watch URLs still valid — re-mint the direct link and
+                //    refresh the 48h cache without touching the backend.
+                val currentWatch = listOfNotNull(media.watchUrl1, media.watchUrl2).filter { it.isNotBlank() }
+                if (currentWatch.isNotEmpty() && !MediaLinkUtils.isAnyExpired(currentWatch)) {
+                    resolveAndCachePlayableUrlUseCase.resolveAndCacheUrl(movieId, quality, currentWatch)
+                    finish(null, "Link refreshed")
+                    return@launch
+                }
+                // 2) Watch URLs expired but a valid cached link exists — nothing left to re-mint.
+                if (resolveAndCachePlayableUrlUseCase.cachedPlayableUrl(movieId, quality) != null) {
+                    finish(null, "Link refreshed")
+                    return@launch
+                }
+                // 3) Backend refresh + poll until done (max ~2 min).
+                val maxAttempts = 24
+                for (attempt in 0..maxAttempts) {
+                    if (attempt > 0) delay(5000)
+                    when (val result = refreshMovieMediaUseCase(slug)) {
+                        is com.kstream.core.model.RefreshMediaResult.Done -> {
+                            val refreshed = getMovieDetailsUseCase(movieId)
+                            if (refreshed != null) {
+                                _uiState.update { it.copy(movieWithMedia = refreshed) }
+                                val freshMedia = refreshed.media.find { it.quality == quality }
+                                val freshWatch = listOfNotNull(freshMedia?.watchUrl1, freshMedia?.watchUrl2)
+                                    .filter { it.isNotBlank() }
+                                if (freshWatch.isNotEmpty()) {
+                                    resolveAndCachePlayableUrlUseCase.resolveAndCacheUrl(movieId, quality, freshWatch)
+                                    finish(null, "Link refreshed")
+                                } else {
+                                    finish("No fresh streaming link available", "No fresh streaming link found")
+                                }
+                            } else {
+                                finish("Failed to reload movie", "Could not refresh links")
+                            }
+                            return@launch
+                        }
+                        is com.kstream.core.model.RefreshMediaResult.Failed -> {
+                            finish(result.error, "Could not refresh links. Please try again.")
+                            return@launch
+                        }
+                        is com.kstream.core.model.RefreshMediaResult.Queued,
+                        is com.kstream.core.model.RefreshMediaResult.Processing -> {
+                            // still in progress, keep polling
+                        }
+                    }
+                }
+                finish("Refresh timed out", "Refresh timed out. Please try again.")
+            } catch (e: Exception) {
+                finish(e.toUserMessage(), "Could not refresh links. Please try again.")
+            }
+        }
     }
 
     fun onQualitySelected(quality: String) {

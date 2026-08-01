@@ -3,7 +3,7 @@ package com.kstream.feature.player
 import android.net.Uri
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.ResolvingDataSource
-import java.net.HttpURLConnection
+import com.kstream.core.domain.RedirectUrlResolver
 import java.net.URL
 
 /**
@@ -52,32 +52,8 @@ class RedirectResolver(
     }
 
     /** Follow up to [maxHops] redirects manually, returning the final URL. */
-    fun resolveOnce(start: String, maxHops: Int = 5): String {
-        var current = start
-        var hops = 0
-        while (hops < maxHops) {
-            val conn = (URL(current).openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = false
-                requestMethod = "GET"
-                connectTimeout = 15000
-                readTimeout = 15000
-                setRequestProperty("User-Agent", UA)
-            }
-            try {
-                val code = conn.responseCode
-                if (code in 300..399) {
-                    val loc = conn.getHeaderField("Location") ?: return current
-                    current = absolutize(current, loc)
-                    hops++
-                    continue
-                }
-                return current
-            } finally {
-                conn.disconnect()
-            }
-        }
-        return current
-    }
+    fun resolveOnce(start: String, maxHops: Int = 5): String =
+        RedirectUrlResolver.resolveOnce(start, maxHops)
 
     private fun absolutize(base: String, loc: String): String =
         try { URL(URL(base), loc).toString() } catch (_: Exception) { loc }

@@ -1,12 +1,14 @@
-package com.kstream.feature.player
+package com.kstream.core.domain
 
 import android.util.Base64
 
 /**
  * Helpers for inspecting the streaming URLs the backend hands out. The
- * watch URLs from uptomkv (and similar CDNs) embed a base64 `dl` parameter
- * whose decoded payload contains an `exp=<unix_seconds>` field — once that
- * timestamp passes, the CDN responds with HTML/garbage instead of MP4.
+ * watch URLs from fastbytes/uptomkv (and similar CDNs) embed a base64 `dl`
+ * parameter whose decoded payload contains an `exp=<unix_seconds>` field —
+ * once that timestamp passes, the CDN responds with HTML/garbage instead of
+ * MP4. Direct Cloudflare R2 presigned URLs instead carry `X-Amz-Date` +
+ * `X-Amz-Expires` (~48h lifetime).
  *
  * We use this to decide whether to refresh links BEFORE attempting playback,
  * avoiding pointless engine swaps when the real problem is a stale URL.
