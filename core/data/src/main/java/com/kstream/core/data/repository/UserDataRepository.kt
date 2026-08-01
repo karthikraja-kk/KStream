@@ -28,5 +28,9 @@ class DefaultUserDataRepository @Inject constructor(
     override suspend fun setVideoEngine(engine: String) = dataStore.setVideoEngine(engine)
     override suspend fun addRecentSearch(query: String) = dataStore.addRecentSearch(query)
     override suspend fun clearRecentSearches() = dataStore.clearRecentSearches()
+    override suspend fun getResolvedMediaUrl(movieId: String, quality: String) =
+        dataStore.getResolvedMediaUrl(movieId, quality)
+    override suspend fun setResolvedMediaUrl(movieId: String, quality: String, url: String, expiresAt: Long) =
+        dataStore.setResolvedMediaUrl(movieId, quality, url, expiresAt)
     override suspend fun clearAllData() = dataStore.clearAll()
 }

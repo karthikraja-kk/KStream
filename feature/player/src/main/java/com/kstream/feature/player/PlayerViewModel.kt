@@ -10,10 +10,12 @@ import com.kstream.core.domain.GetWatchProgressUseCase
 import com.kstream.core.domain.SaveWatchProgressUseCase
 import com.kstream.feature.downloads.CustomDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class PlayerUiState(
@@ -303,10 +305,17 @@ class PlayerViewModel @Inject constructor(
                         val livePos = coordinator.controller().currentPositionMs.coerceAtLeast(0)
                         val startPosition = if (livePos > 0L) livePos
                             else getWatchProgressUseCase(movieId).coerceAtLeast(0L)
-                        coordinator.markUrlsFresh()
-                        coordinator.play(movieId, urlsToPlay, startPosition, forceStartOver = false, userSetting = userEngine)
-                        _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, sourceUnavailable = false, loadError = null) }
-                        android.util.Log.d("PlayerViewModel", "Playback resumed with refreshed URLs (pos=$startPosition)")
+                        // Resolve the freshly-refreshed download.php URL once into a
+                        // ~48h-valid direct R2 URL and cache it, then play that.
+                        val urls = resolveAndCacheUrl(movieId, _uiState.value.currentQuality, urlsToPlay)
+                        if (urls.isNotEmpty()) {
+                            coordinator.markUrlsFresh()
+                            coordinator.play(movieId, urls, startPosition, forceStartOver = false, userSetting = userEngine)
+                            _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, sourceUnavailable = false, loadError = null) }
+                            android.util.Log.d("PlayerViewModel", "Playback resumed with refreshed URLs (pos=$startPosition)")
+                        } else {
+                            _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = "No working links found. Please try again later.") }
+                        }
                     } else {
                         _uiState.update { it.copy(isRefreshingLinks = false, showRefreshOverlay = false, funnyMessage = null, refreshError = "No working links found. Please try again later.") }
                     }
@@ -368,8 +377,57 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun loadMediaAndPlay() {
-        viewModelScope.launch {
+    // ------------------------------------------------------------------
+    // Direct R2 URL cache ("single refresh = ~48h alive").
+    //
+    // The CDN's download.php gateway tokens die in ~3 minutes, but the Cloudflare
+    // R2 presigned URL they 302 to is valid for ~48h. We resolve once and cache it
+    // so seeks/pause/resume reuse the long-lived URL instead of re-hitting the
+    // short-lived gateway.
+    // ------------------------------------------------------------------
+
+    private suspend fun cachedPlayableUrl(movieId: String, quality: String): String? {
+        return try {
+            val cached = userDataRepository.getResolvedMediaUrl(movieId, quality)
+            if (cached != null && MediaLinkUtils.isR2UrlValid(cached.url, cached.expiresAt)) {
+                cached.url
+            } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Turn a short-lived `download.php` URL into a direct, ~48h-valid R2 URL by
+     * resolving the redirect once and persisting it. Falls back to the original
+     * URL if resolution fails so the existing error/refresh path still applies.
+     */
+    private suspend fun resolveAndCacheUrl(
+        movieId: String,
+        quality: String,
+        candidates: List<String>
+    ): List<String> {
+        val first = candidates.firstOrNull { it.isNotBlank() } ?: return emptyList()
+        return withContext(Dispatchers.IO) {
+            try {
+                val resolved = RedirectResolver().resolveOnce(first)
+                if (resolved != first && resolved.isNotBlank()) {
+                    val expiresAt = MediaLinkUtils.r2ExpiryMs(resolved)
+                        ?: (System.currentTimeMillis() + R2_FALLBACK_TTL_MS)
+                    userDataRepository.setResolvedMediaUrl(movieId, quality, resolved, expiresAt)
+                    android.util.Log.i("PlayerViewModel", "Resolved + cached direct URL for $movieId/$quality")
+                    listOf(resolved)
+                } else {
+                    candidates
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("PlayerViewModel", "resolveAndCacheUrl failed: ${e.message}")
+                candidates
+            }
+        }
+    }
+
+    private fun loadMediaAndPlay() {        viewModelScope.launch {
             try {
                 val isOnline = networkMonitor.isOnline.first()
                 _uiState.update { it.copy(isOffline = !isOnline) }
@@ -405,20 +463,38 @@ class PlayerViewModel @Inject constructor(
                 )
 
                 if (fallbackUrls.isNotEmpty()) {
-                    // Proactive expiry check: if the saved URL has an `exp` param that
-                    // has already passed, refresh BEFORE trying to play. Saves the user
-                    // from watching an inevitable Exo-then-VLC failure on a stale link.
-                    if (MediaLinkUtils.isAnyExpired(fallbackUrls)) {
-                        android.util.Log.i("PlayerViewModel",
-                            "Saved URLs are expired — refreshing before play (movie=$movieId)")
-                        _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
-                        refreshAndRetry()
-                        return@launch
-                    }
                     val startPosition = getWatchProgressUseCase(movieId)
-                    coordinator.play(movieId, fallbackUrls, startPosition, forceStartOver = false, userSetting = userEngine)
-                    _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
-                    startProgressSync()
+                    // Prefer a still-valid cached direct R2 URL (48h lifetime) —
+                    // no refresh, no re-resolve, instant play.
+                    val cachedUrl = cachedPlayableUrl(movieId, initialQuality)
+                    when {
+                        cachedUrl != null -> {
+                            coordinator.play(movieId, listOf(cachedUrl), startPosition, forceStartOver = false, userSetting = userEngine)
+                            _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
+                            startProgressSync()
+                        }
+                        // Proactive expiry check: if the saved URL has an `exp` param that
+                        // has already passed, refresh BEFORE trying to play. Saves the user
+                        // from watching an inevitable Exo-then-VLC failure on a stale link.
+                        MediaLinkUtils.isAnyExpired(fallbackUrls) -> {
+                            android.util.Log.i("PlayerViewModel",
+                                "Saved URLs are expired — refreshing before play (movie=$movieId)")
+                            _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
+                            refreshAndRetry()
+                            return@launch
+                        }
+                        else -> {
+                            val urls = resolveAndCacheUrl(movieId, initialQuality, fallbackUrls)
+                            if (urls.isNotEmpty()) {
+                                coordinator.play(movieId, urls, startPosition, forceStartOver = false, userSetting = userEngine)
+                                _uiState.update { it.copy(isLoading = false, isOffline = !isOnline) }
+                                startProgressSync()
+                            } else {
+                                _uiState.update { it.copy(isLoading = false) }
+                                refreshAndRetry()
+                            }
+                        }
+                    }
                 } else {
                     // URLs are null/empty — trigger refresh to fetch fresh links
                     android.util.Log.w("PlayerViewModel", "No watch URLs available, triggering media refresh...")
@@ -452,15 +528,29 @@ class PlayerViewModel @Inject constructor(
                     media?.watchUrl1, media?.watchUrl2
                 )
                 if (fallbackUrls.isNotEmpty()) {
-                    if (MediaLinkUtils.isAnyExpired(fallbackUrls)) {
-                        android.util.Log.i("PlayerViewModel",
-                            "watchOnline: saved URLs expired — refreshing first")
-                        refreshAndRetry()
-                        return@launch
-                    }
                     val startPosition = getWatchProgressUseCase(movieId)
-                    coordinator.play(movieId, fallbackUrls, startPosition, forceStartOver = false, userSetting = userEngine)
-                    startProgressSync()
+                    val cachedUrl = cachedPlayableUrl(movieId, initialQuality)
+                    when {
+                        cachedUrl != null -> {
+                            coordinator.play(movieId, listOf(cachedUrl), startPosition, forceStartOver = false, userSetting = userEngine)
+                            startProgressSync()
+                        }
+                        MediaLinkUtils.isAnyExpired(fallbackUrls) -> {
+                            android.util.Log.i("PlayerViewModel",
+                                "watchOnline: saved URLs expired — refreshing first")
+                            refreshAndRetry()
+                            return@launch
+                        }
+                        else -> {
+                            val urls = resolveAndCacheUrl(movieId, initialQuality, fallbackUrls)
+                            if (urls.isNotEmpty()) {
+                                coordinator.play(movieId, urls, startPosition, forceStartOver = false, userSetting = userEngine)
+                                startProgressSync()
+                            } else {
+                                _uiState.update { it.copy(loadError = "No streaming links available for this movie.") }
+                            }
+                        }
+                    }
                 } else {
                     _uiState.update { it.copy(loadError = "No streaming links available for this movie.") }
                 }
@@ -505,8 +595,12 @@ class PlayerViewModel @Inject constructor(
                     )
 
                     if (fallbackUrls.isNotEmpty()) {
-                        coordinator.switchQuality(fallbackUrls.first(), currentPos)
-                        _uiState.update { it.copy(currentQuality = newQuality, isPlayingLocal = false) }
+                        val cachedUrl = cachedPlayableUrl(movieId, newQuality)
+                        val url = cachedUrl ?: resolveAndCacheUrl(movieId, newQuality, fallbackUrls).firstOrNull()
+                        if (url != null) {
+                            coordinator.switchQuality(url, currentPos)
+                            _uiState.update { it.copy(currentQuality = newQuality, isPlayingLocal = false) }
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -592,5 +686,10 @@ class PlayerViewModel @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("PlayerViewModel", "Error in onCleared", e)
         }
+    }
+
+    private companion object {
+        /** Fallback lifetime for a resolved URL when the CDN omits X-Amz-Expires. */
+        const val R2_FALLBACK_TTL_MS = 48 * 60 * 60 * 1000L
     }
 }

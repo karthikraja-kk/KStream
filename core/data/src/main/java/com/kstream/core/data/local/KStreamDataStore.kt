@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.kstream.core.domain.repository.ResolvedMediaUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +22,8 @@ class KStreamDataStore @Inject constructor(
     companion object {
         private const val RECENT_SEARCH_DELIMITER = "||"
         private const val MAX_RECENT_SEARCHES = 10
+        private const val MEDIA_URL_KEY_SEPARATOR = "::"
+        private const val MAX_RESOLVED_MEDIA_URLS = 200
     }
 
     private val USERNAME = stringPreferencesKey("username")
@@ -32,6 +36,7 @@ class KStreamDataStore @Inject constructor(
     private val CAROUSEL_ENABLED = booleanPreferencesKey("carousel_enabled")
     private val LITE_MODE = booleanPreferencesKey("lite_mode")
     private val VIDEO_ENGINE = stringPreferencesKey("video_engine")
+    private val RESOLVED_MEDIA_URLS = stringPreferencesKey("resolved_media_urls")
 
     val username: Flow<String> = context.dataStore.data.map { it[USERNAME] ?: "Guest" }
     val isFirstLaunchCompleted: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH_COMPLETED] ?: false }
@@ -87,6 +92,64 @@ class KStreamDataStore @Inject constructor(
 
     suspend fun setVideoEngine(engine: String) {
         context.dataStore.edit { it[VIDEO_ENGINE] = engine }
+    }
+
+    /**
+     * Read a previously cached direct R2 playable URL for [movieId]+[quality].
+     * Caller is responsible for checking `expiresAt` (the URL is only valid for
+     * the window the CDN baked into it, ~48h).
+     */
+    suspend fun getResolvedMediaUrl(movieId: String, quality: String): ResolvedMediaUrl? {
+        val entry = resolvedMediaUrls()[mediaKey(movieId, quality)] ?: return null
+        val url = entry.optString("url").takeIf { it.isNotBlank() } ?: return null
+        return ResolvedMediaUrl(url = url, expiresAt = entry.optLong("expiresAt", 0L))
+    }
+
+    /** Cache a direct R2 playable URL for [movieId]+[quality]. */
+    suspend fun setResolvedMediaUrl(movieId: String, quality: String, url: String, expiresAt: Long) {
+        if (url.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val map = decodeResolvedMediaUrls(prefs[RESOLVED_MEDIA_URLS])
+            map[mediaKey(movieId, quality)] = JSONObject()
+                .put("url", url)
+                .put("expiresAt", expiresAt)
+            trimResolvedMediaUrls(map)
+            prefs[RESOLVED_MEDIA_URLS] = encodeResolvedMediaUrls(map)
+        }
+    }
+
+    private fun mediaKey(movieId: String, quality: String) = "$movieId$MEDIA_URL_KEY_SEPARATOR$quality"
+
+    private suspend fun resolvedMediaUrls(): Map<String, JSONObject> =
+        decodeResolvedMediaUrls(context.dataStore.data.first()[RESOLVED_MEDIA_URLS])
+
+    private fun decodeResolvedMediaUrls(value: String?): MutableMap<String, JSONObject> {
+        if (value.isNullOrBlank()) return mutableMapOf()
+        return try {
+            val obj = JSONObject(value)
+            val result = mutableMapOf<String, JSONObject>()
+            obj.keys().forEach { key -> result[key] = obj.optJSONObject(key) }
+            result
+        } catch (_: Exception) {
+            mutableMapOf()
+        }
+    }
+
+    private fun encodeResolvedMediaUrls(map: Map<String, JSONObject>): String {
+        val obj = JSONObject()
+        map.forEach { (k, v) -> obj.put(k, v) }
+        return obj.toString()
+    }
+
+    /** Cap the cache by dropping the soonest-to-expire entries past the limit. */
+    private fun trimResolvedMediaUrls(map: MutableMap<String, JSONObject>) {
+        if (map.size <= MAX_RESOLVED_MEDIA_URLS) return
+        val overflow = map.size - MAX_RESOLVED_MEDIA_URLS
+        val toDrop = map.entries
+            .sortedBy { it.value.optLong("expiresAt", Long.MAX_VALUE) }
+            .take(overflow)
+            .map { it.key }
+        toDrop.forEach { map.remove(it) }
     }
 
     suspend fun clearAll() {

@@ -52,7 +52,7 @@ class RedirectResolver(
     }
 
     /** Follow up to [maxHops] redirects manually, returning the final URL. */
-    private fun resolveOnce(start: String, maxHops: Int = 5): String {
+    fun resolveOnce(start: String, maxHops: Int = 5): String {
         var current = start
         var hops = 0
         while (hops < maxHops) {
